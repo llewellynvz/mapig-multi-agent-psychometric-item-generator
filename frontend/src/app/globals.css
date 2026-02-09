@@ -63,6 +63,48 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans), "Segoe UI", "Helvetica Neue", sans-serif;
+    background-image:
+      radial-gradient(circle at 15% 15%, rgba(0, 141, 161, 0.08), transparent 45%),
+      radial-gradient(circle at 85% 8%, rgba(167, 209, 43, 0.08), transparent 35%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 1));
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at 15% 15%, rgba(0, 168, 192, 0.14), transparent 45%),
+      radial-gradient(circle at 85% 8%, rgba(167, 209, 43, 0.12), transparent 35%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 1));
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display), var(--font-sans), "Segoe UI", sans-serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+@layer utilities {
+  .animate-fade-up {
+    animation: fade-up 0.45s ease-out both;
+  }
+
+  .glass-panel {
+    @apply border border-border bg-card backdrop-blur;
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

@@ -9,10 +9,13 @@ export interface UserRequest {
   response_scale: string;
   item_count?: number;
   constraints?: string[];
+  construct_exclusions?: string;
   native_construct?: string;
   example_item?: string;
   approved_domains?: string[];
   exclude_sources?: string[];
+  human_feedback?: string;
+  previous_items?: string[];
 }
 
 export interface FinalItem {

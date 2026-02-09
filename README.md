@@ -33,9 +33,10 @@ You provide a `UserRequest` that must include:
 - `response_scale`
 
 Optional inputs include:
-- `item_count` (default 10)
+- `item_count` (default 10, minimum 10, maximum 50)
 - `example_item`
 - `native_construct`
+- `construct_exclusions` (what this construct is not / overlap boundaries to avoid)
 - `constraints`
 - `approved_domains` (per-request allowlist for web retrieval)
 
@@ -103,12 +104,17 @@ uvicorn app.main:app --reload
 ### 4) Run frontend + backend together (dev)
 From the repo root:
 ```bash
-./run_dev.sh
+npm run dev
 ```
 
 You can override ports with environment variables:
 ```bash
-BACKEND_PORT=8001 FRONTEND_PORT=3001 ./run_dev.sh
+BACKEND_PORT=8001 FRONTEND_PORT=3001 npm run dev
+```
+
+Alternative shell script:
+```bash
+./run_dev.sh
 ```
 
 Swagger UI:
@@ -122,6 +128,7 @@ Swagger UI:
 {
   "construct_name": "Workplace belonging",
   "construct_definition": "A sustained sense of being accepted, included, and valued as a legitimate member of one’s work community.",
+  "construct_exclusions": "Exclude job satisfaction and work engagement; keep focus on social inclusion and acceptance.",
   "target_population": "Full-time employees in a hybrid work setting",
   "response_scale": "5-point Likert: Strongly disagree to Strongly agree",
   "item_count": 10,
@@ -140,6 +147,15 @@ The API returns:
 - `audit`: thread_id, run_id, timestamp, iteration_count, stop_reason, model_info, approved_sources
 
 This structure is designed for audit trails and enterprise integration.
+
+---
+
+## 🔁 Human refinement loop
+
+The frontend supports a human-in-the-loop rerun:
+- Generate an initial item set.
+- Add reviewer feedback in the results step.
+- Run refinement again with `human_feedback` and `previous_items` included in the request payload.
 
 ---
 

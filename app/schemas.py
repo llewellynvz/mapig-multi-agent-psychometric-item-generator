@@ -37,14 +37,27 @@ class UserRequest(BaseModel):
 
     response_scale: str = Field(..., min_length=2, description="Response scale, e.g., 5-point Likert.")
 
-    item_count: conint(ge=10, le=50) = Field(
+    item_count: conint(ge=2, le=50) = Field(
         default=10,
-        description="Number of items to generate. Minimum 10.",
+        description="Number of items to generate. Minimum 2, maximum 50.",
     )
 
     constraints: List[str] = Field(
         default_factory=list,
         description="Hard constraints for item writing (reading level, no idioms, etc.).",
+    )
+    construct_exclusions: Optional[str] = Field(
+        default=None,
+        description="Optional note describing what nearby constructs this is NOT and where overlap should be avoided.",
+    )
+
+    human_feedback: Optional[str] = Field(
+        default=None,
+        description="Optional human feedback to guide a refinement rerun.",
+    )
+    previous_items: List[str] = Field(
+        default_factory=list,
+        description="Optional prior generated item texts used as refinement context.",
     )
 
     # Optional retrieval constraints (web surf)

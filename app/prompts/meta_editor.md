@@ -10,6 +10,10 @@ A JSON object with:
 - content_comments (optional if implemented)
 - iteration
 
+Note on optional request fields
+- request may include human_feedback and previous_items from a prior human review cycle.
+- If present, integrate human_feedback while preserving construct validity and reviewer safety constraints.
+
 Output format
 Return JSON only with this exact shape:
 

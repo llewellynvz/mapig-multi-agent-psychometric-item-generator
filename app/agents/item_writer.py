@@ -17,12 +17,25 @@ def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> ItemWrit
         # Deterministic stub: generate simple items with citations to the first evidence chunk(s).
         citations = [e.source_id for e in evidence[:2]] or ["local:unknown#1"]
         items: List[DraftItem] = []
+        previous = request.previous_items or []
+        has_feedback = bool((request.human_feedback or "").strip())
         for i in range(item_count):
+            baseline = previous[i] if i < len(previous) else None
+            item_text = (
+                f"{baseline} (Refined {i + 1})"
+                if baseline and has_feedback
+                else f"I feel a sense of belonging at my workplace. (Item {i + 1})"
+            )
+            rationale = (
+                "Refined from prior human feedback while preserving construct alignment."
+                if baseline and has_feedback
+                else "Stubbed item for orchestration testing. Replace with Azure mode for real generation."
+            )
             items.append(
                 DraftItem(
-                    item_text=f"I feel a sense of belonging at my workplace. (Item {i + 1})",
+                    item_text=item_text,
                     construct_name=request.construct_name,
-                    rationale="Stubbed item for orchestration testing. Replace with Azure mode for real generation.",
+                    rationale=rationale,
                     evidence_citations=citations,
                 )
             )

@@ -1,6 +1,12 @@
 "use client";
 
-import { GENERATE_ITEMS_URL, GENERATE_ITEMS_STREAM_URL, type ProgressEvent } from "@/lib/api";
+import {
+  GENERATE_ITEMS_URL,
+  GENERATE_ITEMS_STREAM_URL,
+  RUN_STATUS_URL,
+  type ProgressEvent,
+  type RunStatusResponse,
+} from "@/lib/api";
 import type { FinalOutput, UserRequest } from "@/lib/types";
 
 export interface GenerateItemsParams {
@@ -57,6 +63,23 @@ export interface GenerateItemsStreamParams {
   onProgress?: (event: ProgressEvent) => void;
 }
 
+export async function fetchRunStatus(threadId: string): Promise<RunStatusResponse> {
+  const res = await fetch(RUN_STATUS_URL(threadId), {
+    method: "GET",
+  });
+  if (!res.ok) {
+    const rawText = await res.text();
+    let detail: unknown;
+    try {
+      detail = JSON.parse(rawText);
+    } catch {
+      detail = rawText;
+    }
+    throw new GenerateError(res.status, detail, rawText);
+  }
+  return res.json() as Promise<RunStatusResponse>;
+}
+
 export async function generateItemsStream({
   body,
   threadId,
@@ -69,17 +92,11 @@ export async function generateItemsStream({
     headers["X-Thread-ID"] = threadId;
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:72',message:'Starting fetch to stream endpoint',data:{url:GENERATE_ITEMS_STREAM_URL,hasThreadId:!!threadId},timestamp:Date.now(),hypothesisId:'H1_H2_H3_H4_H5'})}).catch(()=>{});
-  // #endregion
   const res = await fetch(GENERATE_ITEMS_STREAM_URL, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:78',message:'Fetch response received',data:{ok:res.ok,status:res.status,statusText:res.statusText,hasBody:!!res.body},timestamp:Date.now(),hypothesisId:'H1_H2_H3_H4_H5'})}).catch(()=>{});
-  // #endregion
 
   if (!res.ok) {
     const rawText = await res.text();
@@ -95,16 +112,10 @@ export async function generateItemsStream({
 
   // Read SSE stream
   const reader = res.body?.getReader();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:91',message:'Checking reader availability',data:{hasReader:!!reader},timestamp:Date.now(),hypothesisId:'H1_H2_H3'})}).catch(()=>{});
-  // #endregion
   const decoder = new TextDecoder();
   let buffer = "";
 
   if (!reader) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:96',message:'No reader available - throwing error',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     throw new GenerateError(500, "No response body", "");
   }
 
@@ -112,14 +123,8 @@ export async function generateItemsStream({
   let errorMessage: string | null = null;
 
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:103',message:'Starting SSE read loop',data:{},timestamp:Date.now(),hypothesisId:'H1_H2_H3_H4'})}).catch(()=>{});
-    // #endregion
     while (true) {
       const { done, value } = await reader.read();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:105',message:'Read chunk from stream',data:{done:done,hasValue:!!value,valueLength:value?.length},timestamp:Date.now(),hypothesisId:'H1_H2_H3_H4'})}).catch(()=>{});
-      // #endregion
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -131,9 +136,6 @@ export async function generateItemsStream({
           const data = line.slice(6); // Remove "data: " prefix
           try {
             const event: ProgressEvent = JSON.parse(data);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:115',message:'Parsed SSE event',data:{eventType:event.type},timestamp:Date.now(),hypothesisId:'H1_H2'})}).catch(()=>{});
-            // #endregion
             
             if (onProgress) {
               onProgress(event);
@@ -145,18 +147,12 @@ export async function generateItemsStream({
               errorMessage = event.message || "Unknown error";
             }
           } catch (e) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:127',message:'Failed to parse SSE event',data:{error:String(e),data:data},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-            // #endregion
             console.error("Failed to parse SSE event:", e, data);
           }
         }
       }
     }
   } catch (e) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate.ts:132',message:'Exception in SSE read loop',data:{error:String(e),errorType:typeof e},timestamp:Date.now(),hypothesisId:'H1_H2_H3_H4_H5'})}).catch(()=>{});
-    // #endregion
     throw e;
   } finally {
     reader.releaseLock();
@@ -183,9 +179,12 @@ export function formToRequest(values: {
   response_scale: string;
   item_count: number;
   constraints: string[];
+  construct_exclusions?: string;
   native_construct?: string;
   example_item?: string;
   approved_domains: string[];
+  human_feedback?: string;
+  previous_items?: string[];
 }): UserRequest {
   const req: UserRequest = {
     construct_name: values.construct_name,
@@ -195,8 +194,11 @@ export function formToRequest(values: {
     item_count: values.item_count,
     constraints: values.constraints.length ? values.constraints : undefined,
     approved_domains: values.approved_domains.length ? values.approved_domains : undefined,
+    previous_items: values.previous_items?.length ? values.previous_items : undefined,
   };
+  if (values.construct_exclusions?.trim()) req.construct_exclusions = values.construct_exclusions.trim();
   if (values.native_construct?.trim()) req.native_construct = values.native_construct.trim();
   if (values.example_item?.trim()) req.example_item = values.example_item.trim();
+  if (values.human_feedback?.trim()) req.human_feedback = values.human_feedback.trim();
   return req;
 }

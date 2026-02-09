@@ -49,10 +49,14 @@ def surf(request: UserRequest) -> RetrievalResponse:
     exclude = ""
     if request.exclude_sources:
         exclude = " Avoid or exclude: " + ", ".join(request.exclude_sources) + "."
+    boundary = ""
+    if request.construct_exclusions:
+        boundary = f"Boundary exclusions: {request.construct_exclusions}.\n"
 
     user_query = (
         f"Target construct: {request.construct_name}.\n"
         f"Definition: {request.construct_definition}.\n"
+        f"{boundary}"
         f"Population: {request.target_population}.\n"
         f"Optional native label: {request.native_construct or ''}.\n"
         f"Optional example item: {request.example_item or ''}.\n"

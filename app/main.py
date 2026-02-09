@@ -6,7 +6,7 @@ import json
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +42,34 @@ from app.logging_setup import configure_logging
 from app.logging_utils import get_performance_summary
 from app.schemas import FinalOutput, UserRequest
 from app.settings import settings
+
+RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+
+def _utc_now_iso() -> str:
+    return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
+
+
+def _set_run_status(thread_id: str, run_id: str, **updates: Any) -> None:
+    existing = RUN_STATUS_REGISTRY.get(thread_id, {})
+    if not existing:
+        existing = {
+            "thread_id": thread_id,
+            "run_id": run_id,
+            "status": "running",
+            "current_node": None,
+            "display_name": None,
+            "iteration": 0,
+            "error": None,
+            "final_output": None,
+            "started_at": _utc_now_iso(),
+            "updated_at": _utc_now_iso(),
+        }
+    existing["thread_id"] = thread_id
+    existing["run_id"] = run_id
+    existing.update(updates)
+    existing["updated_at"] = _utc_now_iso()
+    RUN_STATUS_REGISTRY[thread_id] = existing
 
 
 @asynccontextmanager
@@ -117,6 +145,14 @@ def performance_summary():
     return get_performance_summary()
 
 
+@app.get("/v1/runs/{thread_id}/status")
+def run_status(thread_id: str):
+    state = RUN_STATUS_REGISTRY.get(thread_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Run status not found")
+    return state
+
+
 @app.post("/v1/generate-items", response_model=FinalOutput)
 async def generate_items(
     request: UserRequest,
@@ -145,13 +181,50 @@ async def generate_items(
         "run_id": run_id,
         "timestamp_utc": timestamp_utc,
     }
+    _set_run_status(
+        thread_id,
+        run_id,
+        status="running",
+        current_node="init_run",
+        display_name="Initializing",
+        iteration=0,
+        error=None,
+        final_output=None,
+        started_at=timestamp_utc,
+    )
 
-    result_state = app.state.graph.invoke(initial_state, config=config)
+    try:
+        result_state = app.state.graph.invoke(initial_state, config=config)
+    except Exception as exc:
+        _set_run_status(
+            thread_id,
+            run_id,
+            status="error",
+            error=str(exc),
+        )
+        raise
 
     if "final_output" not in result_state:
+        _set_run_status(
+            thread_id,
+            run_id,
+            status="error",
+            error="Graph completed without final_output",
+        )
         raise HTTPException(status_code=500, detail="Graph completed without final_output")
 
-    return result_state["final_output"]
+    final_output = result_state["final_output"]
+    _set_run_status(
+        thread_id,
+        run_id,
+        status="complete",
+        current_node="finalize_node",
+        display_name="Finalizing",
+        final_output=final_output.model_dump(),
+        error=None,
+    )
+
+    return final_output
 
 
 @app.post("/v1/generate-items-stream")
@@ -183,6 +256,17 @@ async def generate_items_stream(
         "run_id": run_id,
         "timestamp_utc": timestamp_utc,
     }
+    _set_run_status(
+        thread_id,
+        run_id,
+        status="running",
+        current_node="init_run",
+        display_name="Initializing",
+        iteration=0,
+        error=None,
+        final_output=None,
+        started_at=timestamp_utc,
+    )
 
     async def event_generator():
         """Generate SSE events as the graph executes."""
@@ -241,17 +325,42 @@ async def generate_items_stream(
                     # Emit node start event (once per node per iteration)
                     if node_name not in seen_in_iteration[current_iteration]:
                         node_display_name = node_name.replace("_node", "").replace("_", " ").title()
+                        _set_run_status(
+                            thread_id,
+                            run_id,
+                            status="running",
+                            current_node=node_name,
+                            display_name=node_display_name,
+                            iteration=current_iteration,
+                            error=None,
+                        )
                         yield f"data: {json.dumps({'type': 'node_start', 'node': node_name, 'display_name': node_display_name, 'iteration': current_iteration})}\n\n"
                         seen_in_iteration[current_iteration].add(node_name)
 
                     # Emit iteration change event
                     if current_iteration != last_iteration and current_iteration > 0:
+                        _set_run_status(
+                            thread_id,
+                            run_id,
+                            status="running",
+                            iteration=current_iteration,
+                            error=None,
+                        )
                         yield f"data: {json.dumps({'type': 'iteration', 'iteration': current_iteration})}\n\n"
                         last_iteration = current_iteration
 
                     # Check for final output
                     if "final_output" in node_state and not final_output_sent:
                         final_output = node_state["final_output"]
+                        _set_run_status(
+                            thread_id,
+                            run_id,
+                            status="complete",
+                            current_node="finalize_node",
+                            display_name="Finalizing",
+                            final_output=final_output.model_dump(),
+                            error=None,
+                        )
                         yield f"data: {json.dumps({'type': 'complete', 'data': final_output.model_dump()})}\n\n"
                         final_output_sent = True
                         return
@@ -260,14 +369,43 @@ async def generate_items_stream(
             if not final_output_sent:
                 result_state = await asyncio.to_thread(app.state.graph.invoke, initial_state, config)
                 if "final_output" in result_state:
+                    _set_run_status(
+                        thread_id,
+                        run_id,
+                        status="complete",
+                        current_node="finalize_node",
+                        display_name="Finalizing",
+                        final_output=result_state["final_output"].model_dump(),
+                        error=None,
+                    )
                     yield f"data: {json.dumps({'type': 'complete', 'data': result_state['final_output'].model_dump()})}\n\n"
                 else:
+                    _set_run_status(
+                        thread_id,
+                        run_id,
+                        status="error",
+                        error="Graph completed without final_output",
+                    )
                     yield f"data: {json.dumps({'type': 'error', 'message': 'Graph completed without final_output'})}\n\n"
 
+        except asyncio.CancelledError:
+            _set_run_status(
+                thread_id,
+                run_id,
+                status="error",
+                error="Client disconnected before completion",
+            )
+            raise
         except Exception as e:
             import traceback
             error_msg = str(e)
             error_trace = traceback.format_exc()
+            _set_run_status(
+                thread_id,
+                run_id,
+                status="error",
+                error=error_msg,
+            )
             # #region agent log
             try:
                 with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:

@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { useState } from "react";
+import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -22,6 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider delayDuration={300}>
+          <ChunkLoadRecovery />
           {children}
           <Toaster />
         </TooltipProvider>

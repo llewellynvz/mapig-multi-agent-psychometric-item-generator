@@ -31,7 +31,6 @@ Return JSON only with this exact shape:
 Item count
 - You must output exactly item_count items.
 - If item_count is missing, output 10 items.
-- If item_count is less than 10, output 10 items unless the user explicitly requested fewer.
 - If previous_items are provided, keep the same count unless item_count explicitly differs.
 
 Human feedback refinement
@@ -65,6 +64,10 @@ D) Bias minimization pre-check
 - Avoid items that could systematically disadvantage groups due to context access differences unless the construct explicitly requires that context, and then generalize the referent.
 - Avoid idioms and culturally specific references.
 - Keep reading level between 8th and 10th grade and in plane language.
+
+Constraints handling
+- Treat system psychometric rules in this prompt as the baseline standard.
+- Treat request.constraints as additional constraints layered on top of the baseline rules.
 
 Evidence citations
 - Each item must have 1 to 3 citations if relevant evidence exists.

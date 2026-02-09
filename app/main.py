@@ -41,13 +41,23 @@ from app.graph import build_graph
 from app.logging_setup import configure_logging
 from app.logging_utils import get_performance_summary
 from app.schemas import FinalOutput, UserRequest
-from app.settings import settings
+from app.settings import STANDARD_ITEM_CONSTRAINTS, settings
 
 RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 
 def _utc_now_iso() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
+
+
+def _normalize_request(request: UserRequest) -> UserRequest:
+    # Baseline constraints are always active; user constraints are additive.
+    merged_constraints: list[str] = []
+    for item in [*STANDARD_ITEM_CONSTRAINTS, *(request.constraints or [])]:
+        value = (item or "").strip()
+        if value and value not in merged_constraints:
+            merged_constraints.append(value)
+    return request.model_copy(update={"constraints": merged_constraints})
 
 
 def _set_run_status(thread_id: str, run_id: str, **updates: Any) -> None:
@@ -175,8 +185,9 @@ async def generate_items(
         "recursion_limit": 50,  # hard stop in case of prompt failures
     }
 
+    normalized_request = _normalize_request(request)
     initial_state = {
-        "user_request": request,
+        "user_request": normalized_request,
         "thread_id": thread_id,
         "run_id": run_id,
         "timestamp_utc": timestamp_utc,
@@ -250,8 +261,9 @@ async def generate_items_stream(
         "recursion_limit": 50,  # hard stop in case of prompt failures
     }
 
+    normalized_request = _normalize_request(request)
     initial_state = {
-        "user_request": request,
+        "user_request": normalized_request,
         "thread_id": thread_id,
         "run_id": run_id,
         "timestamp_utc": timestamp_utc,

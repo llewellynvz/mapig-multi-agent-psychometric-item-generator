@@ -9,7 +9,7 @@ export const instrumentSetupSchema = z.object({
     .min(2, "Construct name must be at least 2 characters"),
   construct_definition: z
     .string()
-    .min(30, "Construct definition must be at least 30 characters"),
+    .min(10, "Construct definition must be at least 10 characters"),
   target_population: z
     .string()
     .min(2, "Target population must be at least 2 characters"),
@@ -18,7 +18,7 @@ export const instrumentSetupSchema = z.object({
     .min(2, "Response scale is required"),
   item_count: z
     .number()
-    .min(10, "Minimum 10 items")
+    .min(2, "Minimum 2 items")
     .max(50, "Maximum 50 items"),
   constraints: z.array(z.string()).default([]),
   construct_exclusions: z.string().optional(),

@@ -35,7 +35,7 @@ export function FlowStepper({ current }: FlowStepperProps) {
   const currentIndex = getStepIndex(current);
 
   return (
-    <section className="animate-fade-up rounded-3xl border border-border/80 bg-card/95 p-4 shadow-sm backdrop-blur md:p-6">
+    <section className="animate-fade-up rounded-3xl border border-border/60 bg-gradient-to-br from-[#0B2A34] via-[#0F3743] to-[#1A4A53] p-4 text-white shadow-sm backdrop-blur md:p-6">
       <div className="grid gap-3 md:grid-cols-3">
         {STEPS.map((step, index) => {
           const Icon = ICONS[step.id];
@@ -47,10 +47,10 @@ export function FlowStepper({ current }: FlowStepperProps) {
               key={step.id}
               className={cn(
                 "rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm",
-                status === "done" && "border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5",
+                status === "done" && "border-white/25 bg-white/10",
                 status === "active" &&
-                  "border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-background shadow-md",
-                status === "pending" && "border-border/80 bg-background/70"
+                  "border-accent bg-white/20 shadow-md",
+                status === "pending" && "border-white/20 bg-white/5"
               )}
               style={{ animationDelay: `${index * 70}ms` }}
             >
@@ -58,17 +58,17 @@ export function FlowStepper({ current }: FlowStepperProps) {
                 <span
                   className={cn(
                     "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
-                    status === "pending" && "bg-muted text-muted-foreground",
-                    status === "active" && "bg-primary text-primary-foreground",
+                    status === "pending" && "bg-white/15 text-slate-100",
+                    status === "active" && "bg-accent text-white",
                     status === "done" && "bg-primary text-primary-foreground"
                   )}
                 >
                   {index + 1}
                 </span>
-                <Icon className={cn("h-4 w-4", status === "active" ? "animate-spin" : "")} />
-                <p className="text-sm font-semibold md:text-base">{step.label}</p>
+                <Icon className={cn("h-4 w-4 text-white", status === "active" ? "animate-spin" : "")} />
+                <p className="text-sm font-semibold text-white md:text-base">{step.label}</p>
               </div>
-              <p className="text-xs text-muted-foreground md:text-sm">{step.description}</p>
+              <p className="text-xs text-slate-100/80 md:text-sm">{step.description}</p>
             </article>
           );
         })}

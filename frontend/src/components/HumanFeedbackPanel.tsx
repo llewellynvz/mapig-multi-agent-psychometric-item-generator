@@ -21,10 +21,10 @@ export function HumanFeedbackPanel({
   onRefine,
 }: HumanFeedbackPanelProps) {
   return (
-    <Card className="border-primary/30 bg-gradient-to-br from-primary/10 via-background to-primary/5 shadow-sm">
-      <CardHeader>
+    <Card className="glass-panel shadow-sm">
+      <CardHeader className="border-b border-border/60">
         <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-          <MessageSquareText className="h-5 w-5 text-primary" />
+          <MessageSquareText className="h-5 w-5 text-white" />
           Human Feedback Loop
         </CardTitle>
       </CardHeader>
@@ -55,4 +55,3 @@ export function HumanFeedbackPanel({
     </Card>
   );
 }
-

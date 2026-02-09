@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export interface TagInputProps {
@@ -45,7 +43,7 @@ export function TagInput({
   return (
     <div
       className={cn(
-        "flex min-h-10 w-full flex-wrap items-center gap-2 rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
+        "flex min-h-10 w-full flex-wrap items-center gap-2 rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:border-accent focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2",
         className
       )}
     >

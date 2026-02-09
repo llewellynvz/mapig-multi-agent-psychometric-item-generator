@@ -15,10 +15,10 @@ export function DeveloperDrawer({ requestJson, responseJson }: DeveloperDrawerPr
   const hasContent = requestJson !== null || responseJson !== null;
 
   return (
-    <div className="border-t bg-muted/30">
+    <div className="rounded-2xl border border-white/15 bg-[#0B2A34]/70">
       <Button
         variant="ghost"
-        className="w-full justify-between rounded-none"
+        className="w-full justify-between rounded-none text-white hover:bg-accent hover:text-white"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls="developer-drawer-content"
@@ -29,26 +29,26 @@ export function DeveloperDrawer({ requestJson, responseJson }: DeveloperDrawerPr
       {open && (
         <div
           id="developer-drawer-content"
-          className="border-t px-4 py-4 space-y-4 max-h-[400px] overflow-auto"
+          className="max-h-[400px] space-y-4 overflow-auto border-t border-white/15 px-4 py-4"
         >
           {requestJson !== null && (
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">Last request</p>
-              <pre className="rounded-2xl bg-muted p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">
+              <p className="mb-2 text-sm font-medium text-slate-200">Last request</p>
+              <pre className="overflow-x-auto break-words whitespace-pre-wrap rounded-2xl bg-white/10 p-4 text-xs text-slate-100">
                 {requestJson}
               </pre>
             </div>
           )}
           {responseJson !== null && (
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">Last response</p>
-              <pre className="rounded-2xl bg-muted p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">
+              <p className="mb-2 text-sm font-medium text-slate-200">Last response</p>
+              <pre className="overflow-x-auto break-words whitespace-pre-wrap rounded-2xl bg-white/10 p-4 text-xs text-slate-100">
                 {responseJson}
               </pre>
             </div>
           )}
           {!hasContent && (
-            <p className="text-sm text-muted-foreground">No request/response yet.</p>
+            <p className="text-sm text-slate-200">No request/response yet.</p>
           )}
         </div>
       )}

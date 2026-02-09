@@ -1,92 +1,104 @@
-# 🧪 MAPIG – Multi-Agent Psychometric Item Generator
+# MAPIG: Multi-Agent Psychometric Item Generator
 
-### Evidence-bounded, multi-agent item drafting for psychometric scale development
+Evidence-bounded, human-in-the-loop item generation for psychometric scale development.
 
-MAPIG is an implementation inspired by the LM-AIG conceptual framework for LLM-based multi-agent automatic item generation described by Lee, Son, and Jia (2025).  
-It provides an auditable, schema-driven pipeline that drafts Likert-type items and iteratively improves them via specialised review agents.
+![MAPIG architecture](./mapig_arc.png)
 
-![MAPIG orchestration diagram](./mapig_arc.png)
+## Overview
+MAPIG is a multi-agent workflow for drafting and refining psychometric items with explicit auditability.
 
+It is designed for teams that need:
+- Transparent evidence usage
+- Repeatable generation runs
+- Structured review and revision loops
+- Human feedback integration before finalization
 
----
+MAPIG generates candidate items and review artifacts. It supports expert judgment; it does not replace validation, piloting, or psychometric evaluation.
 
-## 📌 What this project is
+## Product Highlights
+- Guided UI flow: `Setup -> Run -> Results`
+- Run recovery: active sessions can be restored after browser close/reopen
+- Human feedback loop: rerun using prior items + reviewer feedback
+- Evidence trail: grouped, clickable web sources and local curated references
+- Audit metadata on every run: `thread_id`, `run_id`, `iteration_count`, `stop_reason`, model info
 
-Psychometric item writing is sensitive to wording, context assumptions, and construct drift. MAPIG operationalises a conservative workflow:
+## Architecture
+Core agents:
+- Retrieval (local curated files + optional allowlisted web retrieval)
+- Item Writer
+- Content Reviewer
+- Linguistic Reviewer
+- Bias Reviewer
+- Meta Editor
+- Critic
 
-- Strict JSON schemas between agents to reduce format drift and improve traceability
-- Evidence-bounded retrieval with an approved-source policy
-- Iterative review loops with explicit roles
-- Audit metadata in every response for reproducibility
+Execution model:
+- Typed schemas between agents
+- Iterative review/revision until acceptance or stop condition
+- Streaming progress events for frontend status updates
 
-MAPIG produces **item drafts** and review artefacts. It does not replace human judgment, piloting, or validation.
-
----
-
-## 🧠 How it works
-
-### Inputs
-You provide a `UserRequest` that must include:
+## API Contract
+Required request fields:
 - `construct_name`
-- `construct_definition` (required)
+- `construct_definition`
 - `target_population`
 - `response_scale`
 
-Optional inputs include:
-- `item_count` (default 10, minimum 10, maximum 50)
-- `example_item`
-- `native_construct`
-- `construct_exclusions` (what this construct is not / overlap boundaries to avoid)
+Optional request fields:
+- `item_count` (default `10`, range `2-50`)
 - `constraints`
-- `approved_domains` (per-request allowlist for web retrieval)
+- `construct_exclusions` (what this construct is not / overlap boundaries)
+- `native_construct`
+- `example_item`
+- `approved_domains`
+- `exclude_sources`
+- `human_feedback`
+- `previous_items`
 
-### Agents
-- **WebSurfer Agent**: retrieves construct-relevant academic evidence using Perplexity, constrained by an allowlist of approved domains.
-- **Local retrieval**: pulls curated evidence from `data/approved_sources/*.md`.
-- **Item Writer Agent**: drafts `DraftItem[]` with rationales and evidence citations.
-- **Content Reviewer**: checks construct fidelity and contamination with neighbor constructs.
-- **Linguistic Reviewer**: checks clarity, ambiguity, readability, and wording hazards.
-- **Bias Reviewer**: flags bias risk and likely DIF drivers.
-- **Meta Editor**: revises items using reviewer comments while preserving construct coverage.
-- **Critic Agent (LLM)**: decides whether to iterate again or finalise, with explicit stop conditions.
+Response:
+- `final_items[]`
+- `audit`
 
----
+## Constraints Model (Important)
+MAPIG applies constraints in two layers:
 
-## 🔒 Approved sources policy
+1. Standard baseline constraints (always active)
+- No double-barrelled items
+- Avoid idioms
+- Minimize reading level
+- Positively keyed only
 
+2. Additional user constraints
+- Anything provided in `constraints` is added on top of the baseline.
+- User constraints are treated as additive, not replacements.
+
+## Approved Sources Policy
 MAPIG supports two evidence channels:
+- Local curated sources in `data/approved_sources/`
+- Web retrieval constrained to an approved domain allowlist
 
-1) **Local approved sources**  
-Markdown files in `data/approved_sources/` are treated as curated sources and cited as `local:<file>#<chunk>`.
+Web retrieval is blocked without allowlisted domains:
+- Configure `PERPLEXITY_DOMAIN_FILTER` in `.env`, or
+- Send `approved_domains` per request
 
-2) **Web retrieval restricted to allowlisted domains**  
-Perplexity retrieval is blocked unless an allowlist is provided.
-- Set `PERPLEXITY_DOMAIN_FILTER` in `.env`, or
-- Provide `approved_domains` in the API request
+Recommended mode:
+- `SEARCH_PROVIDER=hybrid`
 
-Recommendation:
-- Use `SEARCH_PROVIDER=hybrid` so local item-writing standards remain available even when web retrieval is enabled.
-
----
-
-## 🛠 Quickstart
-
+## Quickstart
 ### 1) Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2) Create `.env` in the project root
+### 2) Configure environment
+Create `.env` in the repository root.
 
-OpenAI:
+Example:
 ```env
 APP_MODE=openai
 OPENAI_API_KEY=YOUR_KEY
 OPENAI_MODEL=gpt-4o-mini
-```
 
-Perplexity retrieval (approved domains only):
-```env
 SEARCH_PROVIDER=hybrid
 PERPLEXITY_API_KEY=YOUR_KEY
 PERPLEXITY_BASE_URL=https://api.perplexity.ai/v2
@@ -96,34 +108,30 @@ PERPLEXITY_MAX_RESULTS=8
 PERPLEXITY_DOMAIN_FILTER=doi.org,psycnet.apa.org,link.springer.com,sciencedirect.com,onlinelibrary.wiley.com,tandfonline.com,journals.sagepub.com,academic.oup.com,cambridge.org
 ```
 
-### 3) Run the API
+### 3) Run API only
 ```bash
 uvicorn app.main:app --reload
 ```
 
-### 4) Run frontend + backend together (dev)
-From the repo root:
+### 4) Run frontend + backend together
 ```bash
 npm run dev
 ```
 
-You can override ports with environment variables:
+Override ports:
 ```bash
 BACKEND_PORT=8001 FRONTEND_PORT=3001 npm run dev
 ```
 
-Alternative shell script:
+Alternative shell runner:
 ```bash
 ./run_dev.sh
 ```
 
-Swagger UI:
-- http://127.0.0.1:8000/docs
+API docs:
+- `http://127.0.0.1:8000/docs`
 
----
-
-## 🧾 Example request
-
+## Example Request
 ```json
 {
   "construct_name": "Workplace belonging",
@@ -132,81 +140,52 @@ Swagger UI:
   "target_population": "Full-time employees in a hybrid work setting",
   "response_scale": "5-point Likert: Strongly disagree to Strongly agree",
   "item_count": 10,
-  "example_item": "I feel like I belong in my team.",
-  "constraints": ["No double-barrelled items", "Avoid idioms", "Minimise reading level"],
-  "approved_domains": ["doi.org", "psycnet.apa.org", "link.springer.com"]
+  "constraints": [
+    "Avoid references to organization-specific jargon",
+    "Keep items under 20 words"
+  ],
+  "approved_domains": [
+    "doi.org",
+    "psycnet.apa.org",
+    "link.springer.com"
+  ]
 }
 ```
 
----
+## Human Feedback Reruns
+The UI supports iterative refinement:
+1. Generate the initial item set
+2. Add reviewer feedback
+3. Rerun with:
+- `human_feedback`
+- `previous_items`
 
-## ✅ What you get back
+Feedback history is tracked per round in the Results view.
 
-The API returns:
-- `final_items`: item text, construct name, rationale, evidence citations
-- `audit`: thread_id, run_id, timestamp, iteration_count, stop_reason, model_info, approved_sources
+## Testing
+Frontend production build:
+```bash
+npm --prefix frontend run build
+```
 
-This structure is designed for audit trails and enterprise integration.
-
----
-
-## 🔁 Human refinement loop
-
-The frontend supports a human-in-the-loop rerun:
-- Generate an initial item set.
-- Add reviewer feedback in the results step.
-- Run refinement again with `human_feedback` and `previous_items` included in the request payload.
-
----
-
-## 🧪 Testing
-
-Run tests:
+Backend tests (if installed):
 ```bash
 pytest -q
 ```
 
-A healthy run:
-- API starts cleanly
-- `/v1/generate-items` returns 200 OK
-- Response validates against schemas
-- Audit block includes iteration counts and sources
+## Contributing
+Issues and pull requests are welcome for:
+- Stability fixes
+- Prompt and reviewer quality improvements
+- UX and accessibility improvements
+- Performance and observability upgrades
 
----
+## Maintainer
+Created by Prof. Llewellyn E. van Zyl  
+Website: https://www.psynalytics.com  
+GitHub: https://github.com/llewellynvz
 
-## 📚 Adding curated local sources
-
-Add markdown files to:
-- `data/approved_sources/`
-
-Guidance:
-- Keep each file focused on one topic, such as a construct definition, item-writing standards, or a measurement standard.
-- Prefer short excerpts and paraphrases with bibliographic notes.
-- Do not copy proprietary item banks.
-
----
-
-## 👨‍💻 **Who Maintains This?**  
-This project was created by **Prof. Llewellyn E. van Zyl** .  
-
-- 🌍 **Website:** [www.psynalytics.com](https://www.psynalytics.com)  
-- 🔗 **GitHub:** [@llewellynvz](https://github.com/llewellynvz) 
-
-🔥 If you’d like to **contribute**, feel free to fork this repo, submit a pull request, or report bugs!  
-
----
-
-## 📜 License
-
-This software is proprietary. Use and local modification are permitted for personal, academic, and internal research purposes only. Redistribution or commercial use is not permitted. See LICENSE for details.
-
-
----
-
-## ⭐ If you found this useful
-
-Star the repository ⭐
-
-Share it with colleagues using Mplus
-
-Contribute improvements or edge-case fixes
+## License
+Proprietary software.  
+Personal, academic, and internal research use is permitted.  
+Redistribution and commercial use are not permitted.

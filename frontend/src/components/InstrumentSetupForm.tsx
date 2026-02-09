@@ -87,7 +87,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
       construct_definition: saved.construct_definition ?? "",
       target_population: saved.target_population ?? "",
       response_scale: saved.response_scale ?? defaultInstrumentSetup.response_scale,
-      item_count: Number.isFinite(savedItemCount) ? Math.max(10, savedItemCount) : 10,
+      item_count: Number.isFinite(savedItemCount) ? Math.max(2, savedItemCount) : 10,
       constraints: Array.isArray(saved.constraints) ? saved.constraints : [...DEFAULT_CONSTRAINTS],
       construct_exclusions: saved.construct_exclusions ?? "",
       native_construct: saved.native_construct ?? "",
@@ -129,11 +129,11 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Instrument Setup</CardTitle>
+    <Card className="glass-panel shadow-sm">
+      <CardHeader className="border-b border-border/60">
+        <CardTitle className="text-base md:text-lg">Instrument Setup</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pt-5">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="construct_name">Construct name (required)</Label>
@@ -143,7 +143,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               {...form.register("construct_name")}
             />
             {form.formState.errors.construct_name && (
-              <p className="text-sm text-destructive">
+              <p className="text-sm font-medium text-accent">
                 {form.formState.errors.construct_name.message}
               </p>
             )}
@@ -151,7 +151,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
 
           <div className="space-y-2">
             <Label htmlFor="construct_definition">
-              Construct definition (required, min 30 chars)
+              Construct definition (required, min 10 chars)
             </Label>
             <Textarea
               id="construct_definition"
@@ -160,7 +160,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               {...form.register("construct_definition")}
             />
             {form.formState.errors.construct_definition && (
-              <p className="text-sm text-destructive">
+              <p className="text-sm font-medium text-accent">
                 {form.formState.errors.construct_definition.message}
               </p>
             )}
@@ -174,7 +174,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               {...form.register("target_population")}
             />
             {form.formState.errors.target_population && (
-              <p className="text-sm text-destructive">
+              <p className="text-sm font-medium text-accent">
                 {form.formState.errors.target_population.message}
               </p>
             )}
@@ -184,7 +184,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             <Label htmlFor="response_scale">Response scale</Label>
             <select
               id="response_scale"
-              className="flex h-10 w-full items-center justify-between rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 w-full items-center justify-between rounded-2xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={isPresetResponseScale ? responseScale : "__custom__"}
               onChange={(e) => form.setValue("response_scale", e.target.value === "__custom__" ? "" : e.target.value)}
             >
@@ -206,23 +206,23 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               />
             )}
             {form.formState.errors.response_scale && (
-              <p className="text-sm text-destructive">
+              <p className="text-sm font-medium text-accent">
                 {form.formState.errors.response_scale.message}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="item_count">Item count (10–50)</Label>
+            <Label htmlFor="item_count">Item count (2–50)</Label>
             <Input
               id="item_count"
               type="number"
-              min={10}
+              min={2}
               max={50}
               {...form.register("item_count", { valueAsNumber: true })}
             />
             {form.formState.errors.item_count && (
-              <p className="text-sm text-destructive">
+              <p className="text-sm font-medium text-accent">
                 {form.formState.errors.item_count.message}
               </p>
             )}
@@ -299,6 +299,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             <Button
               type="button"
               variant="secondary"
+              className="bg-primary text-white hover:bg-accent hover:text-white"
               onClick={handleReset}
               disabled={isPending}
             >

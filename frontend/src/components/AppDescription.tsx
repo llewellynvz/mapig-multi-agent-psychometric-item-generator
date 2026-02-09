@@ -33,7 +33,7 @@ export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionP
             <Button
               type="button"
               onClick={onPrimaryCta}
-              className="h-11 rounded-xl bg-accent px-5 font-semibold text-muted-dark hover:bg-accent/90"
+              className="h-11 rounded-xl bg-primary px-5 font-semibold text-white hover:bg-accent hover:text-white"
             >
               Start New Run
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -42,31 +42,31 @@ export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionP
               type="button"
               variant="outline"
               onClick={onSecondaryCta}
-              className="h-11 rounded-xl border-white/40 bg-white/10 px-5 text-white hover:bg-white/20"
+              className="h-11 rounded-xl border-white/40 bg-white/10 px-5 text-white hover:bg-accent hover:text-white"
             >
               Jump to Results
             </Button>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-sm">
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 text-center shadow-sm">
               <p className="text-2xl font-semibold">3</p>
               <p className="text-xs text-slate-100/80">Guided stages</p>
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-sm">
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 text-center shadow-sm">
               <p className="text-2xl font-semibold">100%</p>
               <p className="text-xs text-slate-100/80">Evidence traceable</p>
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-sm">
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 text-center shadow-sm">
               <p className="text-2xl font-semibold">1-click</p>
               <p className="text-xs text-slate-100/80">Rerun refinement</p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-3 rounded-3xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Pipeline Preview</p>
-            <BarChart3 className="h-4 w-4 text-accent-light" />
+        <div className="space-y-4 rounded-3xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md">
+          <div className="flex items-center justify-center gap-2">
+            <BarChart3 className="h-5 w-5 text-white" />
+            <p className="text-lg font-semibold tracking-wide">Pipeline Preview</p>
           </div>
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-white">
             <Image
@@ -78,21 +78,21 @@ export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionP
               priority
             />
           </div>
-          <ul className="space-y-1 text-xs text-slate-100/90">
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
-              Setup, run, and review without context switching.
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
-              Resume sessions using thread IDs and status recovery.
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
-              Keep human feedback history per refinement round.
-            </li>
-          </ul>
         </div>
+      </div>
+      <div className="relative mt-6 grid gap-5 rounded-2xl border border-white/20 bg-white/10 p-4 md:grid-cols-3 md:p-5">
+        <p className="flex items-start gap-3 text-sm leading-relaxed text-slate-100/95 md:text-base">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-white" />
+          Setup, run, and review without context switching.
+        </p>
+        <p className="flex items-start gap-3 text-sm leading-relaxed text-slate-100/95 md:text-base">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-white" />
+          Resume sessions using thread IDs and real-time status recovery.
+        </p>
+        <p className="flex items-start gap-3 text-sm leading-relaxed text-slate-100/95 md:text-base">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-white" />
+          Keep human feedback history visible throughout each refinement round.
+        </p>
       </div>
     </section>
   );

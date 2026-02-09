@@ -195,13 +195,13 @@ export default function HomePage() {
         toast({
           title: "Validation error",
           description: "Check the form for field-specific messages.",
-          variant: "destructive",
+          variant: "default",
         });
       } else {
         toast({
           title: "Error",
           description: err.status >= 500 ? "Server error. Try again later." : err.message,
-          variant: "destructive",
+          variant: "default",
         });
       }
     },
@@ -413,7 +413,7 @@ export default function HomePage() {
           toast({
             title: "Recovered session state",
             description: status.error || "The previous run ended with an error.",
-            variant: "destructive",
+            variant: "default",
           });
         }
       } catch (error) {
@@ -452,7 +452,7 @@ export default function HomePage() {
   }, [activeRun, result]);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-background via-background to-primary/5">
+    <main className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-[#0B2A34] via-[#0F3743] to-[#1A4A53]">
       <div className="mx-auto w-full max-w-[1680px] space-y-7 p-4 pb-8 lg:p-6">
         <AppDescription
           onPrimaryCta={() => setStep("setup")}
@@ -469,11 +469,11 @@ export default function HomePage() {
               threadIdInput={threadIdInput}
               onThreadIdChange={setThreadIdInput}
             />
-            <Card className="border-border/80 bg-card/90 shadow-sm">
-              <CardHeader>
-                <CardTitle>Run Guidance</CardTitle>
+            <Card className="glass-panel shadow-sm">
+              <CardHeader className="border-b border-border/60">
+                <CardTitle className="text-base md:text-lg">Run Guidance</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <CardContent className="space-y-4 pt-5 text-sm text-muted-foreground">
                 <p>
                   Start with precise construct boundaries and constraints. This improves reviewer convergence and
                   reduces revision cycles.
@@ -483,9 +483,9 @@ export default function HomePage() {
                   the current item set.
                 </p>
                 {activeRun?.status === "running" && activeRun.threadId && (
-                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs text-foreground">
+                  <div className="rounded-xl border border-accent/35 bg-white/10 p-3 text-xs text-slate-100">
                     <p className="mb-1 flex items-center gap-1 font-semibold">
-                      <AlertCircle className="h-3.5 w-3.5 text-primary" />
+                      <AlertCircle className="h-3.5 w-3.5 text-accent" />
                       Running session detected
                     </p>
                     <p>Thread ID: {activeRun.threadId}</p>
@@ -520,23 +520,23 @@ export default function HomePage() {
           <section className="animate-fade-up grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-4">
               <ProgressIndicator progress={progress} />
-              <Card className="border-border/80">
-                <CardHeader>
-                  <CardTitle>Running Agent Workflow</CardTitle>
+              <Card className="glass-panel shadow-sm">
+                <CardHeader className="border-b border-border/60">
+                  <CardTitle className="text-base md:text-lg">Running Agent Workflow</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <CardContent className="space-y-2 pt-5 text-sm text-muted-foreground">
                   <p>
                     The system is executing retrieval, drafting, multi-review, and revision stages. This view updates
                     in real time.
                   </p>
                   {activeRun?.threadId && (
                     <p>
-                      Active thread: <span className="font-medium text-foreground">{activeRun.threadId}</span>
+                      Active thread: <span className="font-medium text-white">{activeRun.threadId}</span>
                     </p>
                   )}
                   {activeRun?.runId && (
                     <p>
-                      Active run: <span className="font-medium text-foreground">{activeRun.runId}</span>
+                      Active run: <span className="font-medium text-white">{activeRun.runId}</span>
                     </p>
                   )}
                 </CardContent>
@@ -547,6 +547,7 @@ export default function HomePage() {
               <Button
                 type="button"
                 variant="secondary"
+                className="bg-primary text-white hover:bg-accent hover:text-white"
                 onClick={() => setStep("setup")}
                 disabled={mutation.isPending}
               >
@@ -561,38 +562,17 @@ export default function HomePage() {
           <section className="animate-fade-up grid gap-6 xl:grid-cols-3">
             <div className="space-y-4">
               <SetupSnapshotCard values={submittedSetup} />
-              <Button type="button" variant="secondary" className="w-full" onClick={handleStartNew}>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full bg-primary text-white hover:bg-accent hover:text-white"
+                onClick={handleStartNew}
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Edit setup
               </Button>
             </div>
-            <div>
-              {result ? (
-                <EvidenceAuditPanel audit={result.audit} />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Evidence and Audit</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">Run generation to load evidence and audit details.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
             <div className="space-y-4">
-              {result ? (
-                <GeneratedItemsTable items={result.final_items} fullOutput={result} />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Generated Items</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">No generated items yet.</p>
-                  </CardContent>
-                </Card>
-              )}
               <HumanFeedbackPanel
                 value={humanFeedback}
                 onChange={setHumanFeedback}
@@ -604,6 +584,32 @@ export default function HomePage() {
                 onReuseFeedback={setHumanFeedback}
                 onClearHistory={() => setFeedbackHistory([])}
               />
+              {result ? (
+                <EvidenceAuditPanel audit={result.audit} />
+              ) : (
+                <Card className="glass-panel shadow-sm">
+                  <CardHeader className="border-b border-border/60">
+                    <CardTitle className="text-base md:text-lg">Evidence and Audit</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <p className="text-sm text-muted-foreground">Run generation to load evidence and audit details.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+            <div className="space-y-4">
+              {result ? (
+                <GeneratedItemsTable items={result.final_items} fullOutput={result} />
+              ) : (
+                <Card className="glass-panel shadow-sm">
+                  <CardHeader className="border-b border-border/60">
+                    <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <p className="text-sm text-muted-foreground">No generated items yet.</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </section>
         )}

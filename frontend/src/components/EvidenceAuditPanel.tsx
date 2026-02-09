@@ -61,7 +61,7 @@ function SourceList({ sources }: SourceListProps) {
         return (
           <div
             key={`${source}-${index}`}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-white/15 bg-white/10 p-3"
+            className="bubble-panel flex items-start justify-between gap-3 rounded-2xl p-3"
           >
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2">
@@ -70,7 +70,10 @@ function SourceList({ sources }: SourceListProps) {
                 ) : (
                   <FileText className="h-4 w-4 shrink-0 text-slate-200" />
                 )}
-                <Badge variant={isLink ? "default" : "outline"} className="font-normal">
+                <Badge
+                  variant={isLink ? "default" : "outline"}
+                  className={`font-normal ${isLink ? "" : "border-white/25 bg-white/10 text-slate-100"}`}
+                >
                   {isLink ? "Web source" : "Local source"}
                 </Badge>
               </div>
@@ -79,7 +82,7 @@ function SourceList({ sources }: SourceListProps) {
                   href={source}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 break-all text-sm text-accent-light hover:underline"
+                  className="inline-flex items-center gap-1 break-all text-sm text-accent hover:underline"
                 >
                   {getSourceLabel(source)}
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -120,7 +123,7 @@ function SourceSection({ title, count, icon, defaultOpen = false, children }: So
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
 
   return (
-    <section className="rounded-2xl border border-white/15 bg-white/5 p-3 transition-colors hover:bg-white/10">
+    <section className="bubble-panel rounded-2xl p-3 transition-colors hover:bg-white/15">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -129,7 +132,7 @@ function SourceSection({ title, count, icon, defaultOpen = false, children }: So
         <div className="flex items-center gap-2">
           {icon}
           <p className="text-sm font-semibold text-slate-50">{title}</p>
-          <Badge variant="secondary">{count}</Badge>
+          <Badge variant="secondary" className="bg-white/15 text-slate-100">{count}</Badge>
         </div>
         <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
@@ -172,7 +175,7 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-muted-foreground">Approved sources</p>
-            <Badge variant="secondary">{audit.approved_sources.length}</Badge>
+            <Badge variant="secondary" className="bg-white/15 text-slate-100">{audit.approved_sources.length}</Badge>
           </div>
           {audit.approved_sources.length === 0 ? (
             <p className="text-sm text-muted-foreground">No approved sources were attached to this run.</p>
@@ -214,17 +217,17 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2 rounded-2xl border border-white/15 bg-white/10 p-3">
+          <div className="bubble-panel space-y-2 rounded-2xl p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Thread ID</p>
             <code className="block break-all text-xs">{audit.thread_id}</code>
           </div>
-          <div className="space-y-2 rounded-2xl border border-white/15 bg-white/10 p-3">
+          <div className="bubble-panel space-y-2 rounded-2xl p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Run ID</p>
             <code className="block break-all text-xs">{audit.run_id}</code>
           </div>
         </section>
 
-        <section className="space-y-2 rounded-2xl border border-white/15 bg-white/10 p-3">
+        <section className="bubble-panel space-y-2 rounded-2xl p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Run summary</p>
           <p className="text-sm">
             Iterations: <span className="font-semibold">{audit.iteration_count}</span>

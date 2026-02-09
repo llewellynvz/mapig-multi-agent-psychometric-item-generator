@@ -48,22 +48,22 @@ export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionP
             </Button>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 text-center shadow-sm">
+            <div className="bubble-panel rounded-2xl p-3 text-center">
               <p className="text-2xl font-semibold">3</p>
               <p className="text-xs text-slate-100/80">Guided stages</p>
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 text-center shadow-sm">
+            <div className="bubble-panel rounded-2xl p-3 text-center">
               <p className="text-2xl font-semibold">100%</p>
               <p className="text-xs text-slate-100/80">Evidence traceable</p>
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 text-center shadow-sm">
+            <div className="bubble-panel rounded-2xl p-3 text-center">
               <p className="text-2xl font-semibold">1-click</p>
               <p className="text-xs text-slate-100/80">Rerun refinement</p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4 rounded-3xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md">
+        <div className="bubble-panel space-y-4 rounded-3xl p-4 backdrop-blur-md">
           <div className="flex items-center justify-center gap-2">
             <BarChart3 className="h-5 w-5 text-white" />
             <p className="text-lg font-semibold tracking-wide">Pipeline Preview</p>
@@ -80,7 +80,7 @@ export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionP
           </div>
         </div>
       </div>
-      <div className="relative mt-6 grid gap-5 rounded-2xl border border-white/20 bg-white/10 p-4 md:grid-cols-3 md:p-5">
+      <div className="bubble-panel relative mt-6 grid gap-5 rounded-2xl p-4 md:grid-cols-3 md:p-5">
         <p className="flex items-start gap-3 text-sm leading-relaxed text-slate-100/95 md:text-base">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-white" />
           Setup, run, and review without context switching.

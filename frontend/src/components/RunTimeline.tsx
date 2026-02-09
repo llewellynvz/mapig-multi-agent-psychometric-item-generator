@@ -22,7 +22,7 @@ export function RunTimeline({ iterationCount }: RunTimelineProps) {
       <div className="flex flex-wrap items-center gap-2">
         {STEPS.map((step, i) => (
           <span key={step} className="flex items-center gap-2">
-            <span className="rounded-lg bg-white/10 px-2 py-1 text-xs font-medium text-slate-100">
+            <span className="bubble-panel rounded-lg px-2 py-1 text-xs font-medium text-slate-100">
               {step.replace(/_/g, " ")}
             </span>
             {i < STEPS.length - 1 && (

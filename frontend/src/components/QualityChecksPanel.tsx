@@ -53,7 +53,7 @@ export function QualityChecksPanel({ items }: QualityChecksPanelProps) {
         <ul className="space-y-1">
           {allWarnings.map((w, i) => (
             <li key={i} className="flex items-center gap-2 text-sm">
-              <Badge variant="outline" className="font-normal">
+              <Badge variant="outline" className="border-white/25 bg-white/10 font-normal text-slate-100">
                 Item {w.itemIndex}
               </Badge>
               <span className="text-slate-100">{w.message}</span>

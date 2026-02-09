@@ -16,6 +16,8 @@ It is designed for teams that need:
 MAPIG generates candidate items and review artifacts. It supports expert judgment; it does not replace validation, piloting, or psychometric evaluation.
 
 ## Product Highlights
+
+![Landing Page](./landing_page.png)
 - Guided UI flow: `Setup -> Run -> Results`
 - Run recovery: active sessions can be restored after browser close/reopen
 - Human feedback loop: rerun using prior items + reviewer feedback

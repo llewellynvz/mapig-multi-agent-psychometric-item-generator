@@ -130,7 +130,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           {displayItems.map((item, index) => (
             <div
               key={index}
-              className="rounded-2xl border border-white/15 bg-white/10 p-4 shadow-sm transition-colors hover:bg-white/15"
+              className="bubble-panel rounded-2xl p-4 transition-colors hover:bg-white/15"
             >
               <div className="flex items-start gap-2">
                 <span className="text-sm font-medium text-muted-foreground shrink-0">
@@ -169,7 +169,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                 <button
                   type="button"
                   onClick={() => toggleRationale(index)}
-                  className="flex items-center gap-1 rounded text-sm font-medium text-accent-light hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="flex items-center gap-1 rounded text-sm font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   {expandedRationale.has(index) ? (
                     <ChevronDown className="h-4 w-4" />
@@ -179,13 +179,16 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                   Rationale
                 </button>
                 {expandedRationale.has(index) && (
-                  <p className="mt-1 pl-5 text-sm text-slate-200/90">{item.rationale}</p>
+                  <div className="mt-2 rounded-xl border border-white/20 bg-slate-900/45 p-3 pl-4 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-200/80">Rationale</p>
+                    <p className="mt-1 text-sm text-slate-100">{item.rationale}</p>
+                  </div>
                 )}
               </div>
               {item.evidence_citations.length > 0 && (
-                <div className="flex flex-wrap gap-1 pl-5">
+                <div className="bubble-panel mt-2 flex flex-wrap gap-1 rounded-xl p-2 pl-4">
                   {item.evidence_citations.map((cit, j) => (
-                    <Badge key={j} variant="outline" className="text-xs font-normal">
+                    <Badge key={j} variant="outline" className="border-white/25 bg-white/10 text-xs font-normal text-slate-100">
                       {cit}
                     </Badge>
                   ))}

@@ -38,7 +38,7 @@ export function FeedbackHistoryPanel({
     <Card className="glass-panel shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60">
         <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-          <History className="h-5 w-5 text-primary" />
+          <History className="h-5 w-5 text-white" />
           Feedback History
         </CardTitle>
         <Button
@@ -64,11 +64,14 @@ export function FeedbackHistoryPanel({
             .map(({ entry, index }) => (
               <article
                 key={entry.id}
-                className="space-y-2 rounded-2xl border border-white/15 bg-white/10 p-3"
+                className="bubble-panel space-y-2 rounded-2xl p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">Round {index + 1}</Badge>
-                  <Badge variant={entry.kind === "refinement" ? "default" : "outline"}>
+                  <Badge variant="secondary" className="bg-white/15 text-slate-100">Round {index + 1}</Badge>
+                  <Badge
+                    variant={entry.kind === "refinement" ? "default" : "outline"}
+                    className={entry.kind === "refinement" ? "" : "border-white/25 bg-white/10 text-slate-100"}
+                  >
                     {entry.kind === "refinement" ? "Feedback refinement" : "Initial setup run"}
                   </Badge>
                 </div>
@@ -86,7 +89,7 @@ export function FeedbackHistoryPanel({
                 <p className="text-xs text-muted-foreground">
                   Stop reason: <span className="font-medium text-white">{entry.stopReason || "N/A"}</span>
                 </p>
-                <div className="rounded-xl bg-white/10 p-2">
+                <div className="bubble-panel rounded-xl p-2">
                   <p className="text-xs font-semibold text-muted-foreground">Human feedback</p>
                   <p className="mt-1 text-sm text-slate-100">
                     {entry.feedback || "No explicit human feedback was submitted for this round."}

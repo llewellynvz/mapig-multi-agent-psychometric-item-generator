@@ -50,13 +50,13 @@ export function TagInput({
       {value.map((tag, index) => (
         <span
           key={`${tag}-${index}`}
-          className="inline-flex items-center gap-1 rounded-lg bg-primary-light px-2 py-0.5 text-xs font-medium text-foreground dark:bg-primary-light/20"
+          className="inline-flex items-center gap-1 rounded-lg border border-accent/35 bg-accent/20 px-2 py-0.5 text-xs font-medium text-slate-100"
         >
           {tag}
           <button
             type="button"
             onClick={() => removeTag(index)}
-            className="rounded p-0.5 hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="rounded p-0.5 hover:bg-accent/30 focus:outline-none focus:ring-2 focus:ring-accent"
             aria-label={`Remove ${tag}`}
           >
             <X className="h-3 w-3" />

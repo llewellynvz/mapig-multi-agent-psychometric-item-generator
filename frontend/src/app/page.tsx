@@ -483,7 +483,7 @@ export default function HomePage() {
                   the current item set.
                 </p>
                 {activeRun?.status === "running" && activeRun.threadId && (
-                  <div className="rounded-xl border border-accent/35 bg-white/10 p-3 text-xs text-slate-100">
+                  <div className="bubble-panel rounded-xl p-3 text-xs text-slate-100">
                     <p className="mb-1 flex items-center gap-1 font-semibold">
                       <AlertCircle className="h-3.5 w-3.5 text-accent" />
                       Running session detected

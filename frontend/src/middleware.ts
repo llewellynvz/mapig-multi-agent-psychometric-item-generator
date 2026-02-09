@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
 // #region agent log
 const INGEST_URL = "http://127.0.0.1:7242/ingest/880aa556-4a60-4d2b-b968-9cf36e6efa6b";
 
 function logRequest(req: NextRequest) {
-  fetch(INGEST_URL, {
+  return fetch(INGEST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -20,9 +20,19 @@ function logRequest(req: NextRequest) {
 }
 // #endregion
 
-export function middleware(request: NextRequest) {
+export function middleware(request: NextRequest, event: NextFetchEvent) {
   // #region agent log
-  logRequest(request);
+  event.waitUntil(logRequest(request));
   // #endregion
   return NextResponse.next();
 }
+
+export const config = {
+  matcher: [
+    /*
+     * Exclude Next.js internals and static assets from middleware so chunk/js/css
+     * requests are served directly and cannot be delayed by logging.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)",
+  ],
+};

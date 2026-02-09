@@ -1,8 +1,9 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { SurfaceCard } from "@/components/ui/surface-card";
 import type { FinalItem } from "@/lib/types";
 
 export interface QualityChecksPanelProps {
@@ -39,7 +40,7 @@ export function QualityChecksPanel({ items }: QualityChecksPanelProps) {
   }
 
   return (
-    <Card className="glass-panel shadow-sm">
+    <SurfaceCard>
       <CardHeader className="border-b border-border/60">
         <CardTitle className="flex items-center gap-2 text-base">
           <AlertTriangle className="h-4 w-4 text-white" />
@@ -53,14 +54,14 @@ export function QualityChecksPanel({ items }: QualityChecksPanelProps) {
         <ul className="space-y-1">
           {allWarnings.map((w, i) => (
             <li key={i} className="flex items-center gap-2 text-sm">
-              <Badge variant="outline" className="border-white/25 bg-white/10 font-normal text-slate-100">
+              <Pill className="font-normal">
                 Item {w.itemIndex}
-              </Badge>
+              </Pill>
               <span className="text-slate-100">{w.message}</span>
             </li>
           ))}
         </ul>
       </CardContent>
-    </Card>
+    </SurfaceCard>
   );
 }

@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import { ChevronDown, Copy, ExternalLink, FileText, Globe, Link2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { PrimaryButton } from "@/components/ui/action-buttons";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { useToast } from "@/components/ui/use-toast";
 import type { AuditMetadata } from "@/lib/types";
 import { RunTimeline } from "./RunTimeline";
@@ -61,7 +63,7 @@ function SourceList({ sources }: SourceListProps) {
         return (
           <div
             key={`${source}-${index}`}
-            className="bubble-panel flex items-start justify-between gap-3 rounded-2xl p-3"
+            className="inset-panel flex items-start justify-between gap-3 rounded-2xl p-3"
           >
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2">
@@ -70,12 +72,9 @@ function SourceList({ sources }: SourceListProps) {
                 ) : (
                   <FileText className="h-4 w-4 shrink-0 text-slate-200" />
                 )}
-                <Badge
-                  variant={isLink ? "default" : "outline"}
-                  className={`font-normal ${isLink ? "" : "border-white/25 bg-white/10 text-slate-100"}`}
-                >
+                <Pill className={isLink ? "border-accent/60 bg-accent/20" : ""}>
                   {isLink ? "Web source" : "Local source"}
-                </Badge>
+                </Pill>
               </div>
               {isLink ? (
                 <a
@@ -123,7 +122,7 @@ function SourceSection({ title, count, icon, defaultOpen = false, children }: So
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
 
   return (
-    <section className="bubble-panel rounded-2xl p-3 transition-colors hover:bg-white/15">
+    <InsetPanel className="rounded-2xl p-3 transition-colors hover:bg-white/15">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -132,12 +131,12 @@ function SourceSection({ title, count, icon, defaultOpen = false, children }: So
         <div className="flex items-center gap-2">
           {icon}
           <p className="text-sm font-semibold text-slate-50">{title}</p>
-          <Badge variant="secondary" className="bg-white/15 text-slate-100">{count}</Badge>
+          <Pill>{count}</Pill>
         </div>
         <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && <div className="mt-3">{children}</div>}
-    </section>
+    </InsetPanel>
   );
 }
 
@@ -154,20 +153,19 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
   const orderedDomains = Object.keys(groupedWebSources).sort((a, b) => a.localeCompare(b));
 
   return (
-    <Card className="glass-panel shadow-sm">
+    <SurfaceCard className="border-lime-300/70">
       <CardHeader className="border-b border-border/60">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base md:text-lg">Evidence and Audit Trail</CardTitle>
-          <Button
+          <PrimaryButton
             type="button"
-            variant="secondary"
             size="sm"
             onClick={() => setIsOpen((prev) => !prev)}
-            className="min-w-[120px] bg-primary text-white hover:bg-accent hover:text-white"
+            className="min-w-[120px]"
           >
             {isOpen ? "Hide details" : "Show details"}
             <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-          </Button>
+          </PrimaryButton>
         </div>
       </CardHeader>
       {isOpen && (
@@ -175,7 +173,7 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-muted-foreground">Approved sources</p>
-            <Badge variant="secondary" className="bg-white/15 text-slate-100">{audit.approved_sources.length}</Badge>
+            <Pill>{audit.approved_sources.length}</Pill>
           </div>
           {audit.approved_sources.length === 0 ? (
             <p className="text-sm text-muted-foreground">No approved sources were attached to this run.</p>
@@ -217,17 +215,17 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2">
-          <div className="bubble-panel space-y-2 rounded-2xl p-3">
+          <InsetPanel className="space-y-2 rounded-2xl p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Thread ID</p>
             <code className="block break-all text-xs">{audit.thread_id}</code>
-          </div>
-          <div className="bubble-panel space-y-2 rounded-2xl p-3">
+          </InsetPanel>
+          <InsetPanel className="space-y-2 rounded-2xl p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Run ID</p>
             <code className="block break-all text-xs">{audit.run_id}</code>
-          </div>
+          </InsetPanel>
         </section>
 
-        <section className="bubble-panel space-y-2 rounded-2xl p-3">
+        <InsetPanel className="space-y-2 rounded-2xl p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Run summary</p>
           <p className="text-sm">
             Iterations: <span className="font-semibold">{audit.iteration_count}</span>
@@ -236,7 +234,7 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
             Stop reason: <span className="font-semibold">{audit.stop_reason || "Not provided"}</span>
           </p>
           <RunTimeline iterationCount={audit.iteration_count} />
-        </section>
+        </InsetPanel>
 
         <section className="rounded-2xl border border-accent/35 bg-accent/15 p-3">
           <p className="text-sm font-semibold">About this panel</p>
@@ -247,6 +245,6 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
         </section>
         </CardContent>
       )}
-    </Card>
+    </SurfaceCard>
   );
 }

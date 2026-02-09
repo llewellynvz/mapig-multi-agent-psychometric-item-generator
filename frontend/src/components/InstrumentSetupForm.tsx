@@ -4,10 +4,11 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { UseFormSetError } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/TagInput";
 import {
@@ -129,13 +130,14 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
   );
 
   return (
-    <Card className="glass-panel shadow-sm">
+    <SurfaceCard className="border-cyan-300/70">
       <CardHeader className="border-b border-border/60">
         <CardTitle className="text-base md:text-lg">Instrument Setup</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6 pt-5">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
+      <CardContent className="pt-5">
+        <InsetPanel className="space-y-6 rounded-2xl p-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
             <Label htmlFor="construct_name">Construct name (required)</Label>
             <Input
               id="construct_name"
@@ -149,7 +151,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             )}
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="construct_definition">
               Construct definition (required, min 10 chars)
             </Label>
@@ -166,7 +168,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             )}
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="target_population">Target population (required)</Label>
             <Input
               id="target_population"
@@ -180,7 +182,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             )}
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="response_scale">Response scale</Label>
             <select
               id="response_scale"
@@ -212,7 +214,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             )}
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="item_count">Item count (2–50)</Label>
             <Input
               id="item_count"
@@ -228,7 +230,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             )}
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label>Constraints</Label>
             <TagInput
               value={form.watch("constraints")}
@@ -238,7 +240,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             />
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="construct_exclusions">Construct boundary / overlap exclusions (optional)</Label>
             <Textarea
               id="construct_exclusions"
@@ -248,7 +250,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             />
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="native_construct">Native construct (optional)</Label>
             <Input
               id="native_construct"
@@ -257,7 +259,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             />
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="example_item">Example item (optional)</Label>
             <Input
               id="example_item"
@@ -266,7 +268,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             />
           </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label>Approved domains (optional)</Label>
             <p className="text-xs text-muted-foreground">
               Restrict Perplexity search to these domains. Add or remove as needed.
@@ -280,7 +282,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
           </div>
 
           {onThreadIdChange && (
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label htmlFor="thread_id">Resume thread (X-Thread-ID)</Label>
               <Input
                 id="thread_id"
@@ -292,22 +294,21 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             </div>
           )}
 
-          <div className="flex flex-wrap gap-3 pt-4">
-            <Button type="button" disabled={isPending} onClick={() => handleSubmit()}>
+            <div className="flex flex-wrap gap-3 pt-4">
+            <PrimaryButton type="button" disabled={isPending} onClick={() => handleSubmit()}>
               {isPending ? "Generating…" : "Generate items"}
-            </Button>
-            <Button
+            </PrimaryButton>
+            <SecondaryButton
               type="button"
-              variant="secondary"
-              className="bg-primary text-white hover:bg-accent hover:text-white"
               onClick={handleReset}
               disabled={isPending}
             >
               Reset
-            </Button>
+            </SecondaryButton>
           </div>
-        </form>
+          </form>
+        </InsetPanel>
       </CardContent>
-    </Card>
+    </SurfaceCard>
   );
 });

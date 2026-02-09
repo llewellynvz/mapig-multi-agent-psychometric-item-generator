@@ -7,14 +7,15 @@ import { AppDescription } from "@/components/AppDescription";
 import { DeveloperDrawer } from "@/components/DeveloperDrawer";
 import { EvidenceAuditPanel } from "@/components/EvidenceAuditPanel";
 import { FeedbackHistoryPanel, type FeedbackHistoryEntry } from "@/components/FeedbackHistoryPanel";
-import { FlowStepper } from "@/components/FlowStepper";
 import { GeneratedItemsTable } from "@/components/GeneratedItemsTable";
 import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
 import { InstrumentSetupForm } from "@/components/InstrumentSetupForm";
 import { ProgressIndicator, type ProgressState } from "@/components/ProgressIndicator";
 import { SetupSnapshotCard } from "@/components/SetupSnapshotCard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Stepper } from "@/components/Stepper";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/action-buttons";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { useToast } from "@/components/ui/use-toast";
 import { type ProgressEvent } from "@/lib/api";
 import { fetchRunStatus, formToRequest, generateItemsStream, GenerateError } from "@/lib/generate";
@@ -171,7 +172,7 @@ export default function HomePage() {
       setHumanFeedback("");
       setLastResponseJson(JSON.stringify(data, null, 2));
       setStep("results");
-      toast({ title: "Done", description: "Items generated successfully.", variant: "default" });
+      toast({ title: "Done", description: "Items generated successfully.", variant: "success" });
     },
     onError: (err: GenerateError) => {
       setProgress((prev) => ({
@@ -458,7 +459,7 @@ export default function HomePage() {
           onPrimaryCta={() => setStep("setup")}
           onSecondaryCta={jumpToResults}
         />
-        <FlowStepper current={step} />
+        <Stepper current={step} />
 
         {step === "setup" && (
           <section className="animate-fade-up grid gap-6 xl:grid-cols-[2fr_1fr]">
@@ -469,50 +470,52 @@ export default function HomePage() {
               threadIdInput={threadIdInput}
               onThreadIdChange={setThreadIdInput}
             />
-            <Card className="glass-panel shadow-sm">
+            <SurfaceCard className="border-cyan-300/70">
               <CardHeader className="border-b border-border/60">
                 <CardTitle className="text-base md:text-lg">Run Guidance</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 pt-5 text-sm text-muted-foreground">
-                <p>
-                  Start with precise construct boundaries and constraints. This improves reviewer convergence and
-                  reduces revision cycles.
-                </p>
-                <p>
-                  When results are ready, submit human feedback to run a refinement loop with explicit context from
-                  the current item set.
-                </p>
-                {activeRun?.status === "running" && activeRun.threadId && (
-                  <div className="bubble-panel rounded-xl p-3 text-xs text-slate-100">
-                    <p className="mb-1 flex items-center gap-1 font-semibold">
-                      <AlertCircle className="h-3.5 w-3.5 text-accent" />
-                      Running session detected
-                    </p>
-                    <p>Thread ID: {activeRun.threadId}</p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => setStep("run")}
-                    >
-                      Resume running session
-                    </Button>
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  className="w-full"
-                  onClick={() => {
-                    if (!submittedSetup) return;
-                    handleSetupSubmit(submittedSetup, threadIdInput.trim() || undefined);
-                  }}
-                  disabled={!submittedSetup || mutation.isPending}
-                >
-                  <Rocket className="mr-2 h-4 w-4" />
-                  Rerun last setup
-                </Button>
+              <CardContent className="pt-5 text-sm text-muted-foreground">
+                <InsetPanel className="space-y-4 rounded-2xl p-4">
+                  <p>
+                    Start with precise construct boundaries and constraints. This improves reviewer convergence and
+                    reduces revision cycles.
+                  </p>
+                  <p>
+                    When results are ready, submit human feedback to run a refinement loop with explicit context from
+                    the current item set.
+                  </p>
+                  {activeRun?.status === "running" && activeRun.threadId && (
+                    <InsetPanel className="rounded-xl p-3 text-xs text-slate-100">
+                      <p className="mb-1 flex items-center gap-1 font-semibold">
+                        <AlertCircle className="h-3.5 w-3.5 text-accent" />
+                        Running session detected
+                      </p>
+                      <p>Thread ID: {activeRun.threadId}</p>
+                      <PrimaryButton
+                        type="button"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => setStep("run")}
+                      >
+                        Resume running session
+                      </PrimaryButton>
+                    </InsetPanel>
+                  )}
+                  <PrimaryButton
+                    type="button"
+                    className="w-full"
+                    onClick={() => {
+                      if (!submittedSetup) return;
+                      handleSetupSubmit(submittedSetup, threadIdInput.trim() || undefined);
+                    }}
+                    disabled={!submittedSetup || mutation.isPending}
+                  >
+                    <Rocket className="mr-2 h-4 w-4" />
+                    Rerun last setup
+                  </PrimaryButton>
+                </InsetPanel>
               </CardContent>
-            </Card>
+            </SurfaceCard>
           </section>
         )}
 
@@ -520,40 +523,40 @@ export default function HomePage() {
           <section className="animate-fade-up grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-4">
               <ProgressIndicator progress={progress} />
-              <Card className="glass-panel shadow-sm">
+              <SurfaceCard className="border-sky-300/70">
                 <CardHeader className="border-b border-border/60">
                   <CardTitle className="text-base md:text-lg">Running Agent Workflow</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 pt-5 text-sm text-muted-foreground">
-                  <p>
-                    The system is executing retrieval, drafting, multi-review, and revision stages. This view updates
-                    in real time.
-                  </p>
-                  {activeRun?.threadId && (
+                <CardContent className="pt-5 text-sm text-muted-foreground">
+                  <InsetPanel className="space-y-2 rounded-2xl p-4">
                     <p>
-                      Active thread: <span className="font-medium text-white">{activeRun.threadId}</span>
+                      The system is executing retrieval, drafting, multi-review, and revision stages. This view updates
+                      in real time.
                     </p>
-                  )}
-                  {activeRun?.runId && (
-                    <p>
-                      Active run: <span className="font-medium text-white">{activeRun.runId}</span>
-                    </p>
-                  )}
+                    {activeRun?.threadId && (
+                      <p>
+                        Active thread: <span className="font-medium text-white">{activeRun.threadId}</span>
+                      </p>
+                    )}
+                    {activeRun?.runId && (
+                      <p>
+                        Active run: <span className="font-medium text-white">{activeRun.runId}</span>
+                      </p>
+                    )}
+                  </InsetPanel>
                 </CardContent>
-              </Card>
+              </SurfaceCard>
             </div>
             <div className="space-y-4">
               <SetupSnapshotCard values={submittedSetup} />
-              <Button
+              <SecondaryButton
                 type="button"
-                variant="secondary"
-                className="bg-primary text-white hover:bg-accent hover:text-white"
                 onClick={() => setStep("setup")}
                 disabled={mutation.isPending}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to setup
-              </Button>
+              </SecondaryButton>
             </div>
           </section>
         )}
@@ -562,15 +565,14 @@ export default function HomePage() {
           <section className="animate-fade-up grid gap-6 xl:grid-cols-3">
             <div className="space-y-4">
               <SetupSnapshotCard values={submittedSetup} />
-              <Button
+              <SecondaryButton
                 type="button"
-                variant="secondary"
-                className="w-full bg-primary text-white hover:bg-accent hover:text-white"
+                className="w-full"
                 onClick={handleStartNew}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Edit setup
-              </Button>
+              </SecondaryButton>
             </div>
             <div className="space-y-4">
               <HumanFeedbackPanel
@@ -587,28 +589,28 @@ export default function HomePage() {
               {result ? (
                 <EvidenceAuditPanel audit={result.audit} />
               ) : (
-                <Card className="glass-panel shadow-sm">
+                <SurfaceCard>
                   <CardHeader className="border-b border-border/60">
                     <CardTitle className="text-base md:text-lg">Evidence and Audit</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-5">
                     <p className="text-sm text-muted-foreground">Run generation to load evidence and audit details.</p>
                   </CardContent>
-                </Card>
+                </SurfaceCard>
               )}
             </div>
             <div className="space-y-4">
               {result ? (
                 <GeneratedItemsTable items={result.final_items} fullOutput={result} />
               ) : (
-                <Card className="glass-panel shadow-sm">
+                <SurfaceCard>
                   <CardHeader className="border-b border-border/60">
                     <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-5">
                     <p className="text-sm text-muted-foreground">No generated items yet.</p>
                   </CardContent>
-                </Card>
+                </SurfaceCard>
               )}
             </div>
           </section>

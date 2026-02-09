@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { PrimaryButton } from "@/components/ui/action-buttons";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pill } from "@/components/ui/pill";
+import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { useToast } from "@/components/ui/use-toast";
 import type { FinalItem, FinalOutput } from "@/lib/types";
 import { QualityChecksPanel } from "./QualityChecksPanel";
@@ -91,46 +93,46 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
   };
 
   return (
-    <Card className="glass-panel shadow-sm">
+    <SurfaceCard className="border-lime-300/70">
       <CardHeader className="flex flex-col items-center gap-3 border-b border-border/60 md:flex-row md:items-center md:justify-between">
         <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
         <div className="flex flex-wrap justify-center gap-2 md:justify-end">
-          <Button
+          <PrimaryButton
             size="sm"
             onClick={copyItemsOnly}
-            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+            className="h-9 min-w-[148px]"
           >
             Copy items only
-          </Button>
-          <Button
+          </PrimaryButton>
+          <PrimaryButton
             size="sm"
             onClick={copyFullOutput}
-            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+            className="h-9 min-w-[148px]"
           >
             Copy full output
-          </Button>
-          <Button
+          </PrimaryButton>
+          <PrimaryButton
             size="sm"
             onClick={downloadCsv}
-            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+            className="h-9 min-w-[148px]"
           >
             Download CSV
-          </Button>
-          <Button
+          </PrimaryButton>
+          <PrimaryButton
             size="sm"
             onClick={downloadJson}
-            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+            className="h-9 min-w-[148px]"
           >
             Download JSON
-          </Button>
+          </PrimaryButton>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         <div className="space-y-4">
           {displayItems.map((item, index) => (
-            <div
+            <InsetPanel
               key={index}
-              className="bubble-panel rounded-2xl p-4 transition-colors hover:bg-white/15"
+              className="rounded-2xl p-4 transition-colors hover:bg-white/15"
             >
               <div className="flex items-start gap-2">
                 <span className="text-sm font-medium text-muted-foreground shrink-0">
@@ -179,26 +181,17 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                   Rationale
                 </button>
                 {expandedRationale.has(index) && (
-                  <div className="mt-2 rounded-xl border border-white/20 bg-slate-900/45 p-3 pl-4 shadow-sm">
+                  <InsetPanel className="mt-4 rounded-xl border border-white/20 bg-slate-900/45 p-3 pl-4 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-200/80">Rationale</p>
                     <p className="mt-1 text-sm text-slate-100">{item.rationale}</p>
-                  </div>
+                  </InsetPanel>
                 )}
               </div>
-              {item.evidence_citations.length > 0 && (
-                <div className="bubble-panel mt-2 flex flex-wrap gap-1 rounded-xl p-2 pl-4">
-                  {item.evidence_citations.map((cit, j) => (
-                    <Badge key={j} variant="outline" className="border-white/25 bg-white/10 text-xs font-normal text-slate-100">
-                      {cit}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
+            </InsetPanel>
           ))}
         </div>
         <QualityChecksPanel items={displayItems} />
       </CardContent>
-    </Card>
+    </SurfaceCard>
   );
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 
+import concurrent.futures
 import datetime as _dt
 import uuid
 from typing import List, Literal, Optional
@@ -130,6 +131,44 @@ def content_review_node(state: GraphState) -> GraphState:
         return {"content_comments": resp.comments}
 
 
+def reviewers_fanout_node(state: GraphState) -> GraphState:
+    """Run all three reviewers in parallel."""
+    with step("reviewers_fanout_node", state):
+        user_request = state["user_request"]
+        draft_items = state.get("draft_items", [])
+        iteration = state.get("iteration", 0)
+
+        # Run all three reviewers concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            content_future = executor.submit(
+                review_content, user_request, draft_items, iteration
+            )
+            linguistic_future = executor.submit(
+                review_linguistic, user_request, draft_items, iteration
+            )
+            bias_future = executor.submit(
+                review_bias, user_request, draft_items, iteration
+            )
+
+            # Wait for all to complete and get results
+            content_resp = content_future.result()
+            linguistic_resp = linguistic_future.result()
+            bias_resp = bias_future.result()
+
+        logger.info(
+            "reviewers_fanout: content=%d linguistic=%d bias=%d",
+            len(content_resp.comments),
+            len(linguistic_resp.comments),
+            len(bias_resp.comments),
+        )
+
+        return {
+            "content_comments": content_resp.comments,
+            "linguistic_comments": linguistic_resp.comments,
+            "bias_comments": bias_resp.comments,
+        }
+
+
 def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "finalize_node"]]:
     decision, reason = critic_decide(
         linguistic_comments=state.get("linguistic_comments", []),
@@ -214,9 +253,12 @@ def build_graph(checkpointer=None):
     builder.add_node("init_run", init_run)
     builder.add_node("retrieve_node", retrieve_node)
     builder.add_node("item_writer_node", item_writer_node)
+    # Keep individual reviewer nodes for backward compatibility if needed
     builder.add_node("content_review_node", content_review_node)
     builder.add_node("linguistic_review_node", linguistic_review_node)
     builder.add_node("bias_review_node", bias_review_node)
+    # New parallel reviewers node
+    builder.add_node("reviewers_fanout_node", reviewers_fanout_node)
     builder.add_node("critic_node", critic_node)
     builder.add_node("meta_editor_node", meta_editor_node)
     builder.add_node("finalize_node", finalize_node)
@@ -224,14 +266,13 @@ def build_graph(checkpointer=None):
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
     builder.add_edge("retrieve_node", "item_writer_node")
-    builder.add_edge("item_writer_node", "content_review_node")
-    builder.add_edge("content_review_node", "linguistic_review_node")
-    builder.add_edge("linguistic_review_node", "bias_review_node")
-    builder.add_edge("bias_review_node", "critic_node")
+    # Use parallel reviewers instead of sequential
+    builder.add_edge("item_writer_node", "reviewers_fanout_node")
+    builder.add_edge("reviewers_fanout_node", "critic_node")
 
     # Critic routes to either meta-editor (revise) or finalize (end)
-    # Meta-editor loops back into reviews.
-    builder.add_edge("meta_editor_node", "content_review_node")
+    # Meta-editor loops back into parallel reviewers.
+    builder.add_edge("meta_editor_node", "reviewers_fanout_node")
     builder.add_edge("finalize_node", END)
 
     return builder.compile(checkpointer=checkpointer)

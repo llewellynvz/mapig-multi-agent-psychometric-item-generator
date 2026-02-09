@@ -49,10 +49,14 @@ def _rule_based_fallback(
     if max_sev >= 5:
         return "revise", f"Blocking issue(s) detected (max severity {max_sev})."
 
-    if med_plus >= 1 and max_sev > getattr(settings, "CRITIC_MAX_SEVERITY_TO_ACCEPT", 2):
+    # Early stopping: be more lenient on iteration 2+ (accept severity <= 3 instead of <= 2)
+    base_threshold = getattr(settings, "CRITIC_MAX_SEVERITY_TO_ACCEPT", 2)
+    effective_threshold = base_threshold if iteration < 2 else 3
+
+    if med_plus >= 1 and max_sev > effective_threshold:
         return "revise", f"Medium+ issues detected (count {med_plus}, max severity {max_sev})."
 
-    return "accept", f"Acceptable quality threshold met (max severity {max_sev})."
+    return "accept", f"Acceptable quality threshold met (max severity {max_sev}, threshold {effective_threshold})."
 
 
 def decide(
@@ -83,10 +87,14 @@ def decide(
 
     system_prompt = load_prompt("critic.md")
 
+    # Early stopping: be more lenient on iteration 2+ (accept severity <= 3 instead of <= 2)
+    base_threshold = getattr(settings, "CRITIC_MAX_SEVERITY_TO_ACCEPT", 2)
+    effective_threshold = base_threshold if iteration < 2 else 3
+
     payload = {
         "iteration": iteration,
         "max_iterations": settings.MAX_ITERATIONS,
-        "critic_max_severity_to_accept": getattr(settings, "CRITIC_MAX_SEVERITY_TO_ACCEPT", 2),
+        "critic_max_severity_to_accept": effective_threshold,
         "linguistic_comments": [c.model_dump() for c in linguistic_comments],
         "bias_comments": [c.model_dump() for c in bias_comments],
         "content_comments": [c.model_dump() for c in content_comments],

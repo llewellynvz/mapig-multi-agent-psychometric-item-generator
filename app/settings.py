@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai/v2"
     PERPLEXITY_MODEL: str = "sonar-pro"
     PERPLEXITY_SEARCH_MODE: str = "academic"  # academic | web
-    PERPLEXITY_MAX_RESULTS: int = 50
+    PERPLEXITY_MAX_RESULTS: int = 25
     PERPLEXITY_DOMAIN_FILTER: str = ""
     def perplexity_domains(self) -> list[str]:
         """Return allowlisted domains for Perplexity search."""
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
 
     # Orchestrator tuning
     ITEM_COUNT: int = 10
-    MAX_ITERATIONS: int = 3
+    MAX_ITERATIONS: int = 2
     CRITIC_MAX_SEVERITY_TO_ACCEPT: int = Field(default=2, ge=1, le=5)
 
     # Persistence (LangGraph checkpointer)

@@ -5,7 +5,8 @@
 MAPIG is an implementation inspired by the LM-AIG conceptual framework for LLM-based multi-agent automatic item generation described by Lee, Son, and Jia (2025).  
 It provides an auditable, schema-driven pipeline that drafts Likert-type items and iteratively improves them via specialised review agents.
 
-![MAPIG orchestration diagram](./mapig_architecture.svg)
+![MAPIG orchestration diagram](./mapig_arc.png)
+
 
 ---
 

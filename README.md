@@ -106,11 +106,6 @@ From the repo root:
 ./run_dev.sh
 ```
 
-Or with npm:
-```bash
-npm run dev
-```
-
 You can override ports with environment variables:
 ```bash
 BACKEND_PORT=8001 FRONTEND_PORT=3001 ./run_dev.sh

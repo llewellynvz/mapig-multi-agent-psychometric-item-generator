@@ -28,13 +28,28 @@ MAPIG generates candidate items and review artifacts. It supports expert judgmen
 
 ## Architecture
 Core agents:
-- Retrieval (local curated files + optional allowlisted web retrieval)
-- Item Writer
-- Content Reviewer
-- Linguistic Reviewer
-- Bias Reviewer
-- Meta Editor
-- Critic
+
+- Web Surfer Agent.
+The academic detective. Scours peer-reviewed literature and psychometric databases to ground your construct in real science, identifies boundary conditions with similar constructs, and surfaces measurement precedents without reproducing copyrighted items.
+
+- Item Writer Agent.
+The master craftsperson. Generates Likert-type items following five decades of psychometric principles: unidimensional, bias-minimized, facet-balanced, and written at the right reading level for your population.
+
+- Content Reviewer Agent
+The construct purist. Simulates five independent judges rating each item on correspondence (does it measure what you claim?) and distinctiveness (or is it actually measuring something else?) with brutal honesty about contamination risks.
+
+- Linguistic Reviewer Agent
+The clarity enforcer. Hunts down ambiguous referents, vague quantifiers, double-barreled questions, and unnecessary abstractions that force respondents to guess what you mean.
+
+- Bias Reviewer Agent
+The fairness sentinel. Detects construct equivalence risks, flags differential item functioning concerns across demographic groups, and catches assumptions about work context, culture, language, and socioeconomic status that systematically disadvantage populations.
+
+- Meta Editor Agent
+The diplomatic synthesizer. Reconciles conflicting reviewer feedback, applies surgical edits while preserving construct coverage, and ensures the item set remains balanced across facets and psychometrically defensible.
+
+- Critic Agent
+The quality gatekeeper. Decides whether the item set is ready to ship, needs another revision cycle, has hit iteration limits, or requires human judgment on policy questions the agents can't resolve alone.
+
 
 Execution model:
 - Typed schemas between agents

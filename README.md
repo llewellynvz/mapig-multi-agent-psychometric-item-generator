@@ -2,6 +2,8 @@
 
 Evidence-bounded, human-in-the-loop item generation for psychometric scale development.
 
+MAPIG is a multi-agent platform for designing and generating psychometrically sound assessment items, combining established test-development principles with modern LLM orchestration. It guides you from precise construct and constraint definition through a graph of specialized agents that draft, review, and revise items while recording an auditable evidence trail for every run. Human reviewers stay in the loop via feedback rounds that refine items against the construct definition, constraints, and approved sources, so the final output is transparent, reproducible, and ready for empirical validation.
+
 ![MAPIG architecture](./mapig_arc.png)
 
 ## Overview
@@ -89,7 +91,13 @@ Recommended mode:
 ## Quickstart
 ### 1) Install dependencies
 ```bash
-pip install -r requirements.txt
+# Backend (Python, via Poetry)
+poetry install
+
+# Frontend (Next.js)
+cd frontend
+npm install
+cd ..
 ```
 
 ### 2) Configure environment

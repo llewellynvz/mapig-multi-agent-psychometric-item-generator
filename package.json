@@ -2,7 +2,8 @@
   "name": "mapig-dev",
   "private": true,
   "scripts": {
-    "dev": "./run_dev.sh",
+    "dev": "python run_dev.py",
+    "dev:sh": "./run_dev.sh",
     "backend": "uvicorn app.main:app --reload",
     "frontend": "npm --prefix frontend run dev"
   }

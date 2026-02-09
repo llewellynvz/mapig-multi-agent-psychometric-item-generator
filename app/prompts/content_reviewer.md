@@ -7,7 +7,7 @@ Evaluate each drafted item for:
 
 Inputs you will receive
 A JSON object that includes:
-- user_request: { construct_name, construct_definition, native_construct (optional), example_item (optional), target_population, constraints }
+- user_request: { construct_name, construct_definition, construct_exclusions (optional), native_construct (optional), example_item (optional), target_population, constraints }
 - items: [ { item_text, construct_name, rationale, evidence_citations } ]
 - iteration: integer
 - evidence: optional list of EvidenceChunk objects (may be empty)
@@ -16,6 +16,7 @@ Conceptual stance
 Act like a naive judge rating item content using only the construct definition and the item text.
 Do not rely on the item rationale to rescue vague wording.
 If the item could plausibly be answered using a different psychological attribute, treat that as distinctiveness risk.
+If construct_exclusions is provided, treat boundary violations as content issues.
 
 Near-neighbor constructs
 Unless the user explicitly provides neighbor constructs, use this default competitor set for workplace constructs:

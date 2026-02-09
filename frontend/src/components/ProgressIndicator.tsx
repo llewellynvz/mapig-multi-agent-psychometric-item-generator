@@ -34,9 +34,9 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
     (progress.currentNode ? NODE_DISPLAY_NAMES[progress.currentNode] || progress.currentNode : "Starting...");
 
   return (
-    <Card className="p-6">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+    <Card className="border-primary/20 bg-gradient-to-br from-background to-primary/5 p-6 shadow-sm">
+      <div className="space-y-5">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Generation Progress</h3>
           {progress.status === "running" && (
             <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
@@ -52,7 +52,10 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
         </div>
 
         {progress.status === "running" && (
-          <div className="space-y-2">
+          <div className="space-y-3">
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+            </div>
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
               <p className="text-sm font-medium">{displayName}</p>

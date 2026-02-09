@@ -9,6 +9,9 @@ A JSON object with:
 - example_item (string, optional)
 - item_count (integer)
 - target_population (string, optional)
+- construct_exclusions (string, optional)
+- human_feedback (string, optional)
+- previous_items (array of strings, optional)
 - evidence (array of EvidenceChunk objects)
 
 Output format
@@ -29,10 +32,17 @@ Item count
 - You must output exactly item_count items.
 - If item_count is missing, output 10 items.
 - If item_count is less than 10, output 10 items unless the user explicitly requested fewer.
+- If previous_items are provided, keep the same count unless item_count explicitly differs.
+
+Human feedback refinement
+- If human_feedback is provided, treat this as high-priority guidance and revise the generated set accordingly.
+- If previous_items are provided, use them as baseline candidates and improve them rather than drafting an unrelated set.
+- Keep items aligned to construct_definition even when feedback requests style or wording changes.
 
 Psychometric writing requirements
 A) Construct fidelity and domain coverage
 - Use the provided construct_definition as the authority.
+- If construct_exclusions is provided, treat it as a strict boundary for out-of-scope meaning.
 - Use evidence to identify facets. Ensure coverage across facets, but keep each item unidimensional.
 - Avoid construct contamination from close neighbors. If boundaries are unclear, use conservative wording and note the risk in rationale.
 

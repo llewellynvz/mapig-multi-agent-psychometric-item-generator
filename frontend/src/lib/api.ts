@@ -8,6 +8,8 @@ export const API_BASE_URL =
 export const HEALTH_URL = `${API_BASE_URL}/healthz`;
 export const GENERATE_ITEMS_URL = `${API_BASE_URL}/v1/generate-items`;
 export const GENERATE_ITEMS_STREAM_URL = `${API_BASE_URL}/v1/generate-items-stream`;
+export const RUN_STATUS_URL = (threadId: string) =>
+  `${API_BASE_URL}/v1/runs/${encodeURIComponent(threadId)}/status`;
 
 export interface ProgressEvent {
   type: "start" | "node_start" | "iteration" | "complete" | "error";
@@ -19,4 +21,17 @@ export interface ProgressEvent {
   data?: unknown;
   message?: string;
   trace?: string;
+}
+
+export interface RunStatusResponse {
+  thread_id: string;
+  run_id: string;
+  status: "running" | "complete" | "error";
+  current_node?: string | null;
+  display_name?: string | null;
+  iteration?: number;
+  error?: string | null;
+  final_output?: unknown;
+  started_at?: string;
+  updated_at?: string;
 }

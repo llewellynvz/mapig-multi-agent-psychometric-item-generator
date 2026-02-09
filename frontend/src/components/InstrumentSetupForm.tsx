@@ -71,26 +71,30 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
   threadIdInput = "",
   onThreadIdChange,
 }, ref) {
-  const saved = loadFromStorage();
-  const defaultValues: InstrumentSetupFormValues = {
-    ...defaultInstrumentSetup,
-    ...(saved && {
+  const form = useForm<InstrumentSetupFormValues>({
+    resolver: zodResolver(instrumentSetupSchema),
+    defaultValues: defaultInstrumentSetup,
+  });
+
+  React.useEffect(() => {
+    const saved = loadFromStorage();
+    if (!saved) return;
+    const savedItemCount = Number(saved.item_count ?? 10);
+
+    form.reset({
+      ...defaultInstrumentSetup,
       construct_name: saved.construct_name ?? "",
       construct_definition: saved.construct_definition ?? "",
       target_population: saved.target_population ?? "",
       response_scale: saved.response_scale ?? defaultInstrumentSetup.response_scale,
-      item_count: saved.item_count ?? 10,
-      constraints: Array.isArray(saved.constraints) ? saved.constraints : DEFAULT_CONSTRAINTS,
+      item_count: Number.isFinite(savedItemCount) ? Math.max(10, savedItemCount) : 10,
+      constraints: Array.isArray(saved.constraints) ? saved.constraints : [...DEFAULT_CONSTRAINTS],
+      construct_exclusions: saved.construct_exclusions ?? "",
       native_construct: saved.native_construct ?? "",
       example_item: saved.example_item ?? "",
-      approved_domains: Array.isArray(saved.approved_domains) ? saved.approved_domains : DEFAULT_APPROVED_DOMAINS,
-    }),
-  };
-
-  const form = useForm<InstrumentSetupFormValues>({
-    resolver: zodResolver(instrumentSetupSchema),
-    defaultValues,
-  });
+      approved_domains: Array.isArray(saved.approved_domains) ? saved.approved_domains : [...DEFAULT_APPROVED_DOMAINS],
+    });
+  }, [form]);
 
   React.useImperativeHandle(ref, () => ({
     setErrorsFromApi(detail: unknown) {
@@ -98,16 +102,31 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
     },
   }));
 
-  const handleSubmit = form.handleSubmit((values) => {
+  const submitValues = React.useCallback((values: InstrumentSetupFormValues) => {
     saveToStorage(values);
     const threadId = threadIdInput.trim() || undefined;
     onSubmit(values, threadId);
-  });
+  }, [onSubmit, threadIdInput]);
+
+  const handleSubmit = React.useCallback(
+    (event?: React.BaseSyntheticEvent) => {
+      if (event) {
+        event.preventDefault();
+      }
+      void form.handleSubmit(submitValues)(event);
+    },
+    [form, submitValues]
+  );
 
   const handleReset = () => {
     form.reset(defaultInstrumentSetup);
     onThreadIdChange?.("");
   };
+
+  const responseScale = form.watch("response_scale");
+  const isPresetResponseScale = RESPONSE_SCALE_PRESETS.includes(
+    responseScale as (typeof RESPONSE_SCALE_PRESETS)[number]
+  );
 
   return (
     <Card>
@@ -166,7 +185,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             <select
               id="response_scale"
               className="flex h-10 w-full items-center justify-between rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              value={RESPONSE_SCALE_PRESETS.includes(form.watch("response_scale") as (typeof RESPONSE_SCALE_PRESETS)[number]) ? form.watch("response_scale") : "__custom__"}
+              value={isPresetResponseScale ? responseScale : "__custom__"}
               onChange={(e) => form.setValue("response_scale", e.target.value === "__custom__" ? "" : e.target.value)}
             >
               <option value="" disabled>
@@ -179,10 +198,10 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               ))}
               <option value="__custom__">Custom (enter below)</option>
             </select>
-            {!RESPONSE_SCALE_PRESETS.includes(form.watch("response_scale") as (typeof RESPONSE_SCALE_PRESETS)[number]) && (
+            {!isPresetResponseScale && (
               <Input
                 placeholder="Enter custom response scale"
-                value={form.watch("response_scale")}
+                value={responseScale}
                 onChange={(e) => form.setValue("response_scale", e.target.value)}
               />
             )}
@@ -216,6 +235,16 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               onChange={(v) => form.setValue("constraints", v)}
               placeholder="Add constraint..."
               aria-label="Constraints"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="construct_exclusions">Construct boundary / overlap exclusions (optional)</Label>
+            <Textarea
+              id="construct_exclusions"
+              placeholder="Describe what this construct is NOT, and nearby constructs/items that should be avoided."
+              rows={3}
+              {...form.register("construct_exclusions")}
             />
           </div>
 
@@ -264,7 +293,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
           )}
 
           <div className="flex flex-wrap gap-3 pt-4">
-            <Button type="submit" disabled={isPending}>
+            <Button type="button" disabled={isPending} onClick={() => handleSubmit()}>
               {isPending ? "Generating…" : "Generate items"}
             </Button>
             <Button

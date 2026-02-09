@@ -21,6 +21,7 @@ export const instrumentSetupSchema = z.object({
     .min(10, "Minimum 10 items")
     .max(50, "Maximum 50 items"),
   constraints: z.array(z.string()).default([]),
+  construct_exclusions: z.string().optional(),
   native_construct: z.string().optional(),
   example_item: z.string().optional(),
   approved_domains: z.array(z.string()).default([]),
@@ -61,6 +62,7 @@ export const defaultInstrumentSetup: InstrumentSetupFormValues = {
   response_scale: RESPONSE_SCALE_PRESETS[0],
   item_count: 10,
   constraints: [...DEFAULT_CONSTRAINTS],
+  construct_exclusions: "",
   native_construct: "",
   example_item: "",
   approved_domains: [...DEFAULT_APPROVED_DOMAINS],

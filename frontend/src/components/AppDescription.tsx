@@ -1,99 +1,99 @@
 "use client";
 
-import * as React from "react";
-import { Card } from "@/components/ui/card";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, BarChart3, CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function AppDescription() {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+export interface AppDescriptionProps {
+  onPrimaryCta?: () => void;
+  onSecondaryCta?: () => void;
+}
 
+export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionProps) {
   return (
-    <Card className="mb-6">
-      <div className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold mb-2">
-              MAPIG – Multi-Agent Psychometric Item Generator
+    <section className="animate-fade-up relative overflow-hidden rounded-[2rem] border border-border/60 bg-gradient-to-br from-[#0B2A34] via-[#0F3743] to-[#1A4A53] p-6 text-white shadow-xl md:p-10">
+      <div className="absolute -left-20 -top-20 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" aria-hidden />
+      <div className="absolute -bottom-20 right-0 h-64 w-64 rounded-full bg-lime-200/10 blur-3xl" aria-hidden />
+      <div className="relative grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium">
+            <Sparkles className="h-3.5 w-3.5" />
+            MAPIG Workspace
+          </div>
+          <div className="space-y-4">
+            <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight md:text-5xl">
+              Build auditable psychometric items with a startup-grade workflow.
             </h1>
-            <p className="text-muted-foreground mb-4">
-              Evidence-bounded, multi-agent item drafting for psychometric scale development
+            <p className="max-w-2xl text-sm leading-relaxed text-slate-100/90 md:text-base">
+              Define construct boundaries, run the multi-agent pipeline, review evidence, and refine output with human
+              feedback loops in a single guided interface.
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsExpanded(!isExpanded)}
-            aria-label={isExpanded ? "Collapse description" : "Expand description"}
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-5 w-5" />
-            ) : (
-              <ChevronDown className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-
-        {isExpanded && (
-          <div className="mt-4 space-y-4 text-sm">
-            <div>
-              <h2 className="font-semibold mb-2">What this is</h2>
-              <p className="text-muted-foreground mb-2">
-                Psychometric item writing is sensitive to wording, context assumptions, and construct drift. MAPIG operationalises a conservative workflow:
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-4">
-                <li>Strict JSON schemas between agents to reduce format drift and improve traceability</li>
-                <li>Evidence-bounded retrieval with an approved-source policy</li>
-                <li>Iterative review loops with explicit roles</li>
-                <li>Audit metadata in every response for reproducibility</li>
-              </ul>
-              <p className="text-muted-foreground mt-3 italic">
-                MAPIG produces item drafts and review artefacts. It does not replace human judgment, piloting, or validation.
-              </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              onClick={onPrimaryCta}
+              className="h-11 rounded-xl bg-accent px-5 font-semibold text-muted-dark hover:bg-accent/90"
+            >
+              Start New Run
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onSecondaryCta}
+              className="h-11 rounded-xl border-white/40 bg-white/10 px-5 text-white hover:bg-white/20"
+            >
+              Jump to Results
+            </Button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-sm">
+              <p className="text-2xl font-semibold">3</p>
+              <p className="text-xs text-slate-100/80">Guided stages</p>
             </div>
-
-            <div>
-              <h2 className="font-semibold mb-2">How it works</h2>
-              <p className="text-muted-foreground mb-2">
-                MAPIG uses specialized agents that work together to generate and refine psychometric items:
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-4">
-                <li>
-                  <strong>WebSurfer Agent</strong>: retrieves construct-relevant academic evidence using Perplexity, constrained by an allowlist of approved domains
-                </li>
-                <li>
-                  <strong>Local retrieval</strong>: pulls curated evidence from approved sources
-                </li>
-                <li>
-                  <strong>Item Writer Agent</strong>: drafts items with rationales and evidence citations
-                </li>
-                <li>
-                  <strong>Content Reviewer</strong>: checks construct fidelity and contamination with neighbor constructs
-                </li>
-                <li>
-                  <strong>Linguistic Reviewer</strong>: checks clarity, ambiguity, readability, and wording hazards
-                </li>
-                <li>
-                  <strong>Bias Reviewer</strong>: flags bias risk and likely DIF drivers
-                </li>
-                <li>
-                  <strong>Meta Editor</strong>: revises items using reviewer comments while preserving construct coverage
-                </li>
-                <li>
-                  <strong>Critic Agent</strong>: decides whether to iterate again or finalise, with explicit stop conditions
-                </li>
-              </ul>
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-sm">
+              <p className="text-2xl font-semibold">100%</p>
+              <p className="text-xs text-slate-100/80">Evidence traceable</p>
             </div>
-
-            <div>
-              <h2 className="font-semibold mb-2">Approved sources policy</h2>
-              <p className="text-muted-foreground">
-                MAPIG supports two evidence channels: (1) Local approved sources from markdown files, and (2) Web retrieval restricted to allowlisted domains. Perplexity retrieval is blocked unless an allowlist is provided via environment variables or the API request.
-              </p>
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-sm">
+              <p className="text-2xl font-semibold">1-click</p>
+              <p className="text-xs text-slate-100/80">Rerun refinement</p>
             </div>
           </div>
-        )}
+        </div>
+
+        <div className="space-y-3 rounded-3xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Pipeline Preview</p>
+            <BarChart3 className="h-4 w-4 text-accent-light" />
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-white/15 bg-white">
+            <Image
+              src="/mapig_arc.png"
+              alt="MAPIG architecture"
+              width={1000}
+              height={620}
+              className="h-auto w-full object-cover"
+              priority
+            />
+          </div>
+          <ul className="space-y-1 text-xs text-slate-100/90">
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
+              Setup, run, and review without context switching.
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
+              Resume sessions using thread IDs and status recovery.
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
+              Keep human feedback history per refinement round.
+            </li>
+          </ul>
+        </div>
       </div>
-    </Card>
+    </section>
   );
 }

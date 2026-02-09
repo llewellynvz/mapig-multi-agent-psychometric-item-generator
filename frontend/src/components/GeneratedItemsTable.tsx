@@ -91,9 +91,9 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Generated Items</CardTitle>
+    <Card className="glass-panel shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60">
+        <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={copyItemsOnly}>
             Copy items only
@@ -109,12 +109,12 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-5">
         <div className="space-y-4">
           {displayItems.map((item, index) => (
             <div
               key={index}
-              className="rounded-2xl border bg-card p-4 space-y-2"
+              className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-colors hover:bg-background/80"
             >
               <div className="flex items-start gap-2">
                 <span className="text-sm font-medium text-muted-foreground shrink-0">

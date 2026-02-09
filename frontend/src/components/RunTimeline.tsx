@@ -1,5 +1,7 @@
 "use client";
 
+import { Pill } from "@/components/ui/pill";
+
 const STEPS = [
   "retrieval",
   "item_writer",
@@ -22,9 +24,9 @@ export function RunTimeline({ iterationCount }: RunTimelineProps) {
       <div className="flex flex-wrap items-center gap-2">
         {STEPS.map((step, i) => (
           <span key={step} className="flex items-center gap-2">
-            <span className="bubble-panel rounded-lg px-2 py-1 text-xs font-medium text-slate-100">
+            <Pill className="rounded-lg text-xs font-medium">
               {step.replace(/_/g, " ")}
-            </span>
+            </Pill>
             {i < STEPS.length - 1 && (
               <span className="text-slate-200/80" aria-hidden>
                 →
@@ -33,9 +35,9 @@ export function RunTimeline({ iterationCount }: RunTimelineProps) {
           </span>
         ))}
         {iterationCount > 0 && (
-          <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-white">
+          <Pill className="border-accent/60 bg-accent/30 text-xs font-medium">
             Looped × {1 + iterationCount}
-          </span>
+          </Pill>
         )}
       </div>
     </div>

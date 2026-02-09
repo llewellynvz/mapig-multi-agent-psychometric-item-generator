@@ -43,14 +43,14 @@ export function TagInput({
   return (
     <div
       className={cn(
-        "flex min-h-10 w-full flex-wrap items-center gap-2 rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:border-accent focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2",
+        "flex min-h-10 w-full flex-wrap items-center gap-2 rounded-2xl border border-white/40 bg-white/5 px-3 py-2 text-sm ring-offset-background focus-within:border-accent focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2",
         className
       )}
     >
       {value.map((tag, index) => (
         <span
           key={`${tag}-${index}`}
-          className="inline-flex items-center gap-1 rounded-lg border border-accent/35 bg-accent/20 px-2 py-0.5 text-xs font-medium text-slate-100"
+          className="ui-pill inline-flex items-center gap-1 pr-1.5 text-xs font-medium border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
         >
           {tag}
           <button

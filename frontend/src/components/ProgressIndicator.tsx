@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Pill } from "@/components/ui/pill";
+import { SurfaceCard } from "@/components/ui/surface-card";
 
 export interface ProgressState {
   currentNode: string | null;
@@ -34,7 +34,7 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
     (progress.currentNode ? NODE_DISPLAY_NAMES[progress.currentNode] || progress.currentNode : "Starting...");
 
   return (
-    <Card className="glass-panel p-6 shadow-sm">
+    <SurfaceCard className="border-sky-300/70 p-6">
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Generation Progress</h3>
@@ -42,12 +42,10 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
             <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
           )}
           {progress.status === "complete" && (
-            <Badge variant="default" className="bg-accent text-white">
-              Complete
-            </Badge>
+            <Pill className="border-accent/60 bg-accent/30">Complete</Pill>
           )}
           {progress.status === "error" && (
-            <Badge className="bg-accent text-white">Error</Badge>
+            <Pill className="border-accent/60 bg-accent/30">Error</Pill>
           )}
         </div>
 
@@ -82,6 +80,6 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
           <p className="text-sm text-muted-foreground">Ready to generate items...</p>
         )}
       </div>
-    </Card>
+    </SurfaceCard>
   );
 }

@@ -29,6 +29,26 @@
     --border: #e2e8f0;
     --input: #e2e8f0;
     --ring: #008da1;
+
+    /* Unified UI tokens */
+    --color-accent: #00a3b8;
+    --color-surface-0: #0b2a34;
+    --color-surface-1: #123f4a;
+    --color-surface-2: rgba(255, 255, 255, 0.1);
+    --color-border: rgba(167, 209, 43, 0.28);
+    --color-text: #f8fbfc;
+    --color-text-muted: rgba(226, 238, 241, 0.82);
+    --shadow-1: 0 8px 18px rgba(3, 17, 21, 0.22);
+    --shadow-2: 0 14px 34px rgba(2, 14, 18, 0.34), 0 2px 8px rgba(10, 50, 60, 0.28);
+    --radius-1: 0.75rem;
+    --radius-2: 1rem;
+    --radius-3: 1.5rem;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
   }
 
   .dark {
@@ -93,43 +113,99 @@
     animation: fade-up 0.45s ease-out both;
   }
 
-  .glass-panel {
-    @apply border backdrop-blur shadow-sm;
-    border-color: rgba(167, 209, 43, 0.28);
+  .surface-card {
+    @apply border backdrop-blur;
+    border-color: var(--color-border);
+    border-radius: var(--radius-3);
     background-image: linear-gradient(
       135deg,
       rgba(11, 42, 52, 0.98) 0%,
       rgba(15, 55, 67, 0.96) 56%,
       rgba(26, 74, 83, 0.98) 100%
     );
-    box-shadow:
-      0 14px 34px rgba(2, 14, 18, 0.34),
-      0 2px 8px rgba(10, 50, 60, 0.28);
-    color: #f8fbfc;
+    box-shadow: var(--shadow-2);
+    color: var(--color-text);
   }
 
-  .glass-panel .text-muted-foreground {
-    color: rgba(226, 238, 241, 0.82);
+  .inset-panel {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-2);
+    background: var(--color-surface-2);
+    box-shadow: var(--shadow-1);
+    color: var(--color-text);
   }
 
-  .glass-panel input,
-  .glass-panel textarea,
-  .glass-panel select,
-  .glass-panel [role="combobox"] {
+  .ui-pill {
+    @apply inline-flex items-center rounded-full text-xs font-medium;
+    height: 1.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    padding-inline: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text);
+  }
+
+  .btn-primary-ui {
+    @apply text-white;
+    border-radius: var(--radius-2);
+    background: var(--color-accent);
+    box-shadow: var(--shadow-1);
+  }
+
+  .btn-primary-ui:hover {
+    background: #11b9cf;
+  }
+
+  .btn-secondary-ui {
+    @apply text-white;
+    border-radius: var(--radius-2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .btn-secondary-ui:hover {
+    border-color: rgba(167, 209, 43, 0.65);
+    background: rgba(167, 209, 43, 0.24);
+    color: #fff;
+  }
+
+  .surface-card .text-muted-foreground {
+    color: var(--color-text-muted);
+  }
+
+  .surface-card input,
+  .surface-card textarea,
+  .surface-card select,
+  .surface-card [role="combobox"] {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(167, 209, 43, 0.32);
-    color: #f8fbfc;
+    color: var(--color-text);
   }
 
-  .glass-panel input::placeholder,
-  .glass-panel textarea::placeholder {
+  .surface-card input::placeholder,
+  .surface-card textarea::placeholder {
     color: rgba(226, 238, 241, 0.68);
+  }
+
+  .glass-panel {
+    @apply border backdrop-blur;
+    border-color: var(--color-border);
+    border-radius: var(--radius-3);
+    background-image: linear-gradient(
+      135deg,
+      rgba(11, 42, 52, 0.98) 0%,
+      rgba(15, 55, 67, 0.96) 56%,
+      rgba(26, 74, 83, 0.98) 100%
+    );
+    box-shadow: var(--shadow-2);
+    color: var(--color-text);
   }
 
   .bubble-panel {
     border: 1px solid rgba(255, 255, 255, 0.18);
-    background: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 6px 16px rgba(3, 17, 21, 0.22);
+    border-radius: var(--radius-2);
+    background: var(--color-surface-2);
+    box-shadow: var(--shadow-1);
+    color: var(--color-text);
   }
 
   @keyframes fade-up {

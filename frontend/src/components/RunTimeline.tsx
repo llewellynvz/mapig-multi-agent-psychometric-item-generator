@@ -22,18 +22,18 @@ export function RunTimeline({ iterationCount }: RunTimelineProps) {
       <div className="flex flex-wrap items-center gap-2">
         {STEPS.map((step, i) => (
           <span key={step} className="flex items-center gap-2">
-            <span className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+            <span className="rounded-lg bg-white/10 px-2 py-1 text-xs font-medium text-slate-100">
               {step.replace(/_/g, " ")}
             </span>
             {i < STEPS.length - 1 && (
-              <span className="text-muted-foreground" aria-hidden>
+              <span className="text-slate-200/80" aria-hidden>
                 →
               </span>
             )}
           </span>
         ))}
         {iterationCount > 0 && (
-          <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-foreground">
+          <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-white">
             Looped × {1 + iterationCount}
           </span>
         )}

@@ -5,6 +5,13 @@ from typing import Literal, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+STANDARD_ITEM_CONSTRAINTS = [
+    "No double-barrelled items",
+    "Avoid idioms",
+    "Minimize reading level",
+    "Positively keyed only",
+]
+
 
 class Settings(BaseSettings):
     """App configuration loaded from environment variables and optional .env file."""

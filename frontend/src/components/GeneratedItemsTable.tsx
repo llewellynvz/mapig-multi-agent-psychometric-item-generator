@@ -92,19 +92,35 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
 
   return (
     <Card className="glass-panel shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60">
+      <CardHeader className="flex flex-col items-center gap-3 border-b border-border/60 md:flex-row md:items-center md:justify-between">
         <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={copyItemsOnly}>
+        <div className="flex flex-wrap justify-center gap-2 md:justify-end">
+          <Button
+            size="sm"
+            onClick={copyItemsOnly}
+            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+          >
             Copy items only
           </Button>
-          <Button variant="outline" size="sm" onClick={copyFullOutput}>
+          <Button
+            size="sm"
+            onClick={copyFullOutput}
+            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+          >
             Copy full output
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadCsv}>
+          <Button
+            size="sm"
+            onClick={downloadCsv}
+            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+          >
             Download CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadJson}>
+          <Button
+            size="sm"
+            onClick={downloadJson}
+            className="h-9 min-w-[148px] bg-primary text-white hover:bg-accent hover:text-white"
+          >
             Download JSON
           </Button>
         </div>
@@ -114,7 +130,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           {displayItems.map((item, index) => (
             <div
               key={index}
-              className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-colors hover:bg-background/80"
+              className="rounded-2xl border border-white/15 bg-white/10 p-4 shadow-sm transition-colors hover:bg-white/15"
             >
               <div className="flex items-start gap-2">
                 <span className="text-sm font-medium text-muted-foreground shrink-0">
@@ -134,7 +150,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                   </div>
                 ) : (
                   <div className="flex-1">
-                    <p className="text-sm">{item.item_text}</p>
+                    <p className="text-sm text-slate-100">{item.item_text}</p>
                     {onItemsChange && (
                       <Button
                         variant="ghost"
@@ -153,7 +169,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                 <button
                   type="button"
                   onClick={() => toggleRationale(index)}
-                  className="flex items-center gap-1 text-sm font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary rounded"
+                  className="flex items-center gap-1 rounded text-sm font-medium text-accent-light hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   {expandedRationale.has(index) ? (
                     <ChevronDown className="h-4 w-4" />
@@ -163,7 +179,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                   Rationale
                 </button>
                 {expandedRationale.has(index) && (
-                  <p className="mt-1 text-sm text-muted-foreground pl-5">{item.rationale}</p>
+                  <p className="mt-1 pl-5 text-sm text-slate-200/90">{item.rationale}</p>
                 )}
               </div>
               {item.evidence_citations.length > 0 && (

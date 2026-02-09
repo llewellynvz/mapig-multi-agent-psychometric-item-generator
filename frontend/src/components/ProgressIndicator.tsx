@@ -34,30 +34,30 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
     (progress.currentNode ? NODE_DISPLAY_NAMES[progress.currentNode] || progress.currentNode : "Starting...");
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-background to-primary/5 p-6 shadow-sm">
+    <Card className="glass-panel p-6 shadow-sm">
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Generation Progress</h3>
           {progress.status === "running" && (
-            <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+            <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
           )}
           {progress.status === "complete" && (
-            <Badge variant="default" className="bg-green-500">
+            <Badge variant="default" className="bg-accent text-white">
               Complete
             </Badge>
           )}
           {progress.status === "error" && (
-            <Badge className="bg-red-500 text-white">Error</Badge>
+            <Badge className="bg-accent text-white">Error</Badge>
           )}
         </div>
 
         {progress.status === "running" && (
           <div className="space-y-3">
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+            <div className="h-2 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+              <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               <p className="text-sm font-medium">{displayName}</p>
             </div>
             {progress.iteration > 0 && (
@@ -73,8 +73,8 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
         )}
 
         {progress.status === "error" && progress.errorMessage && (
-          <div className="rounded-md bg-destructive/10 p-3">
-            <p className="text-sm text-destructive">{progress.errorMessage}</p>
+          <div className="rounded-md bg-accent/20 p-3">
+            <p className="text-sm font-medium text-slate-100">{progress.errorMessage}</p>
           </div>
         )}
 

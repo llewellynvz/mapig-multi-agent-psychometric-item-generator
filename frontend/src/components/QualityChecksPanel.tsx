@@ -39,15 +39,15 @@ export function QualityChecksPanel({ items }: QualityChecksPanelProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="glass-panel shadow-sm">
+      <CardHeader className="border-b border-border/60">
         <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4 text-accent" />
+          <AlertTriangle className="h-4 w-4 text-white" />
           Quality checks
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground mb-2">
+      <CardContent className="pt-5">
+        <p className="mb-2 text-sm text-muted-foreground">
           Non-blocking client-side heuristics.
         </p>
         <ul className="space-y-1">
@@ -56,7 +56,7 @@ export function QualityChecksPanel({ items }: QualityChecksPanelProps) {
               <Badge variant="outline" className="font-normal">
                 Item {w.itemIndex}
               </Badge>
-              <span>{w.message}</span>
+              <span className="text-slate-100">{w.message}</span>
             </li>
           ))}
         </ul>

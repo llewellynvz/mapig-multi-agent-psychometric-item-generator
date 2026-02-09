@@ -11,11 +11,11 @@ export interface SetupSnapshotCardProps {
 export function SetupSnapshotCard({ values }: SetupSnapshotCardProps) {
   if (!values) {
     return (
-      <Card className="border-border/80 bg-card/95 shadow-sm">
-        <CardHeader>
-          <CardTitle>Instrument Setup Snapshot</CardTitle>
+      <Card className="glass-panel shadow-sm">
+        <CardHeader className="border-b border-border/60">
+          <CardTitle className="text-base md:text-lg">Instrument Setup Snapshot</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-5">
           <p className="text-sm text-muted-foreground">Run generation to see the submitted setup.</p>
         </CardContent>
       </Card>
@@ -23,11 +23,11 @@ export function SetupSnapshotCard({ values }: SetupSnapshotCardProps) {
   }
 
   return (
-    <Card className="border-border/80 bg-card/95 shadow-sm">
-      <CardHeader>
-        <CardTitle>Instrument Setup Snapshot</CardTitle>
+    <Card className="glass-panel shadow-sm">
+      <CardHeader className="border-b border-border/60">
+        <CardTitle className="text-base md:text-lg">Instrument Setup Snapshot</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-5">
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Construct</p>
           <p className="text-sm font-semibold">{values.construct_name}</p>
@@ -65,7 +65,7 @@ export function SetupSnapshotCard({ values }: SetupSnapshotCardProps) {
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          Requested item count: <span className="font-medium text-foreground">{values.item_count}</span>
+          Requested item count: <span className="font-medium text-white">{values.item_count}</span>
         </p>
       </CardContent>
     </Card>

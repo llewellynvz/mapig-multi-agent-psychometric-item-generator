@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Psynalytics brand */
+    --primary: #008da1;
+    --primary-dark: #006d7c;
+    --primary-light: #e8f5f7;
+    --accent: #a7d12b;
+    --accent-light: #f2f9d9;
+    --muted: #8b8d8e;
+    --muted-dark: #2b2d2e;
+
+    --background: #ffffff;
+    --foreground: #2b2d2e;
+    --card: #ffffff;
+    --card-foreground: #2b2d2e;
+    --popover: #ffffff;
+    --popover-foreground: #2b2d2e;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #2b2d2e;
+    --muted-foreground: #64748b;
+    --accent-foreground: #2b2d2e;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #008da1;
+  }
+
+  .dark {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --card: #1e293b;
+    --card-foreground: #f8fafc;
+    --popover: #1e293b;
+    --popover-foreground: #f8fafc;
+    --primary: #008da1;
+    --primary-dark: #00a8c0;
+    --primary-light: #0c4a6e;
+    --primary-foreground: #ffffff;
+    --secondary: #334155;
+    --secondary-foreground: #f8fafc;
+    --muted: #64748b;
+    --muted-dark: #94a3b8;
+    --muted-foreground: #94a3b8;
+    --accent: #a7d12b;
+    --accent-light: #365314;
+    --accent-foreground: #0f172a;
+    --destructive: #7f1d1d;
+    --destructive-foreground: #fef2f2;
+    --border: #334155;
+    --input: #334155;
+    --ring: #008da1;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}

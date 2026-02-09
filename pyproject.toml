@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "MAPIG: Multi-Agent Psychometric Item Generator"
+version = "0.1.0"
+description = "A multi-agent orchestrator for Psychometric Self-Report Item Generation(LangGraph + Azure OpenAI)"
+authors = ["Prof. Llewellyn E. Van Zyl <llewellyn101@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+langgraph = "==1.0.6"
+langgraph-checkpoint-sqlite = "==3.0.3"
+langchain-core = "==1.2.8"
+langchain-openai = "==1.1.7"
+fastapi = "==0.128.0"
+uvicorn = { version = "==0.40.0", extras = ["standard"] }
+pydantic = "==2.12.5"
+pydantic-settings = "==2.12.0"
+httpx = "==0.28.1"
+python-dotenv = "==1.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "==9.0.2"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"

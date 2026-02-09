@@ -46,11 +46,9 @@ export function FlowStepper({ current }: FlowStepperProps) {
             <article
               key={step.id}
               className={cn(
-                "rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm",
-                status === "done" && "border-white/25 bg-white/10",
-                status === "active" &&
-                  "border-accent bg-white/20 shadow-md",
-                status === "pending" && "border-white/20 bg-white/5"
+                "bubble-panel rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5",
+                status === "active" && "border-accent bg-white/15 shadow-md",
+                status === "pending" && "bg-white/10"
               )}
               style={{ animationDelay: `${index * 70}ms` }}
             >
@@ -60,7 +58,7 @@ export function FlowStepper({ current }: FlowStepperProps) {
                     "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
                     status === "pending" && "bg-white/15 text-slate-100",
                     status === "active" && "bg-accent text-white",
-                    status === "done" && "bg-primary text-primary-foreground"
+                    status === "done" && "bg-accent/80 text-white"
                   )}
                 >
                   {index + 1}

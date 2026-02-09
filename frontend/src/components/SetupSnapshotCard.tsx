@@ -51,7 +51,7 @@ export function SetupSnapshotCard({ values }: SetupSnapshotCardProps) {
               <span className="text-sm text-muted-foreground">None</span>
             ) : (
               values.constraints.map((constraint, index) => (
-                <Badge key={`${constraint}-${index}`} variant="secondary" className="font-normal">
+                <Badge key={`${constraint}-${index}`} variant="secondary" className="bg-white/15 font-normal text-slate-100">
                   {constraint}
                 </Badge>
               ))

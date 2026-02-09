@@ -97,16 +97,39 @@
     @apply border backdrop-blur shadow-sm;
     border-color: rgba(167, 209, 43, 0.28);
     background-image: linear-gradient(
-      155deg,
-      rgba(11, 42, 52, 0.95) 0%,
-      rgba(15, 55, 67, 0.92) 58%,
-      rgba(26, 74, 83, 0.94) 100%
+      135deg,
+      rgba(11, 42, 52, 0.98) 0%,
+      rgba(15, 55, 67, 0.96) 56%,
+      rgba(26, 74, 83, 0.98) 100%
     );
+    box-shadow:
+      0 14px 34px rgba(2, 14, 18, 0.34),
+      0 2px 8px rgba(10, 50, 60, 0.28);
     color: #f8fbfc;
   }
 
   .glass-panel .text-muted-foreground {
     color: rgba(226, 238, 241, 0.82);
+  }
+
+  .glass-panel input,
+  .glass-panel textarea,
+  .glass-panel select,
+  .glass-panel [role="combobox"] {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(167, 209, 43, 0.32);
+    color: #f8fbfc;
+  }
+
+  .glass-panel input::placeholder,
+  .glass-panel textarea::placeholder {
+    color: rgba(226, 238, 241, 0.68);
+  }
+
+  .bubble-panel {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 6px 16px rgba(3, 17, 21, 0.22);
   }
 
   @keyframes fade-up {

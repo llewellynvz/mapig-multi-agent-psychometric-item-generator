@@ -100,6 +100,22 @@ PERPLEXITY_DOMAIN_FILTER=doi.org,psycnet.apa.org,link.springer.com,sciencedirect
 uvicorn app.main:app --reload
 ```
 
+### 4) Run frontend + backend together (dev)
+From the repo root:
+```bash
+./run_dev.sh
+```
+
+Or with npm:
+```bash
+npm run dev
+```
+
+You can override ports with environment variables:
+```bash
+BACKEND_PORT=8001 FRONTEND_PORT=3001 ./run_dev.sh
+```
+
 Swagger UI:
 - http://127.0.0.1:8000/docs
 

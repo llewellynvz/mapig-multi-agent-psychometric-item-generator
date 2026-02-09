@@ -19,7 +19,6 @@ Non-negotiables
 16) Items should avoid colloquialisms that may not be familiar across age, ethnicity, region, gender, and so forth.
 17) Items should be consistent in terms of perspective, ensuring not to mix items that assess behaviors with items that assess affective responses.
 18) Items should avoid vague words such as many, most, often, or sometimes.
-19) 
 
 Handling missing or weak inputs
 - If the construct definition is missing or too vague, treat that as a blocking issue and surface it via review comments at high severity or, if you are the item writer, write conservative items that stick tightly to the provided definition and evidence.

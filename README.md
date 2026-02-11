@@ -214,3 +214,7 @@ GitHub: https://github.com/llewellynvz
 Proprietary software.  
 Personal, academic, and internal research use is permitted.  
 Redistribution and commercial use are not permitted.
+
+## Reference
+
+Lee, P., Son, M., & Jia, Z. (2025). AI-powered automatic item generation for psychological tests: A conceptual framework for an LLM-based multi-agent AIG system. Journal of Business and Psychology, 1-29.

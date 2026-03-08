@@ -350,7 +350,20 @@ def finalize_node(state: GraphState) -> GraphState:
             validation_failures=len([v for v in validation_results if not v.accept]),
         )
 
-        out = FinalOutput(final_items=enriched_items, audit=audit)
+        # Phase 03.1: Extract review feedback from GraphState for complete metadata export
+        user_request = state.get("user_request")
+        linguistic_feedback = state.get("linguistic_comments", [])
+        bias_feedback = state.get("bias_comments", [])
+        content_feedback = state.get("content_comments", [])
+
+        out = FinalOutput(
+            final_items=enriched_items,
+            audit=audit,
+            user_request=user_request,
+            linguistic_feedback=linguistic_feedback,
+            bias_feedback=bias_feedback,
+            content_feedback=content_feedback,
+        )
         return {"final_output": out}
 
 

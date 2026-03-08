@@ -311,6 +311,22 @@ def finalize_node(state: GraphState) -> GraphState:
             if e.url_or_docref not in approved_sources:
                 approved_sources.append(e.url_or_docref)
 
+        # Attach validation results to items
+        draft_items = state.get("draft_items", [])
+        validation_results = state.get("validation_results", [])
+
+        # Create lookup dict for validation results
+        validation_lookup = {v.item_index: v for v in validation_results}
+
+        # Enrich items with validation data
+        enriched_items = []
+        for idx, item in enumerate(draft_items):
+            # Copy item and attach validation result if available
+            enriched_item = item.model_copy(deep=True)
+            if idx in validation_lookup:
+                enriched_item.validation_result = validation_lookup[idx]
+            enriched_items.append(enriched_item)
+
         model_info = {"mode": settings.APP_MODE}
         if settings.APP_MODE == "azure":
             model_info.update(
@@ -321,6 +337,7 @@ def finalize_node(state: GraphState) -> GraphState:
                 }
             )
 
+        # Update audit with validation metadata
         audit = AuditMetadata(
             thread_id=state.get("thread_id", "unknown"),
             run_id=state.get("run_id", "unknown"),
@@ -329,9 +346,11 @@ def finalize_node(state: GraphState) -> GraphState:
             stop_reason=state.get("stop_reason", ""),
             model_info=model_info,
             approved_sources=approved_sources,
+            validation_attempts=state.get("validation_attempt", 1),
+            validation_failures=len([v for v in validation_results if not v.accept]),
         )
 
-        out = FinalOutput(final_items=state.get("draft_items", []), audit=audit)
+        out = FinalOutput(final_items=enriched_items, audit=audit)
         return {"final_output": out}
 
 

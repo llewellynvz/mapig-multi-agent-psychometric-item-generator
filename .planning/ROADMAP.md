@@ -39,9 +39,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Create test scaffolding for TDD workflow (Wave 1) — ✓ 2026-03-08
-- [ ] 01-02-PLAN.md — Add validation schemas, Claude configuration, and LLM factory (Wave 2)
-- [ ] 01-03-PLAN.md — Implement validation agent with multi-dimensional scoring rubric (Wave 3)
-- [ ] 01-04-PLAN.md — Integrate validation gate into graph with conditional routing (Wave 4)
+- [x] 01-02-PLAN.md — Add validation schemas, Claude configuration, and LLM factory (Wave 2) — ✓ 2026-03-08
+- [x] 01-03-PLAN.md — Implement validation agent with multi-dimensional scoring rubric (Wave 3) — ✓ 2026-03-08
+- [x] 01-04-PLAN.md — Integrate validation gate into graph with conditional routing (Wave 4) — ✓ 2026-03-08
 - [ ] 01-05-PLAN.md — Display validation scores and reasoning in Results UI (Wave 5)
 
 ### Phase 2: Agent Architecture Optimization
@@ -146,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. LLM-as-Judge Validation Gate | 1/5 | In progress | - |
+| 1. LLM-as-Judge Validation Gate | 4/5 | In progress | - |
 | 2. Agent Architecture Optimization | 0/TBD | Not started | - |
 | 3. Claude API Migration | 0/TBD | Not started | - |
 | 4. Production Features | 0/TBD | Not started | - |

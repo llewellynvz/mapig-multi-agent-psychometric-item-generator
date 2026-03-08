@@ -22,6 +22,7 @@ from app.schemas import (
     DraftItem,
     EvidenceChunk,
     FinalOutput,
+    ItemValidation,
     ReviewComment,
     RevisionPlan,
     UserRequest,
@@ -48,7 +49,9 @@ class GraphState(TypedDict, total=False):
     bias_comments: List[ReviewComment]
     content_comments: List[ReviewComment]
     revision_plan: Optional[RevisionPlan]
-
+    validation_results: List[ItemValidation]
+    validation_attempt: int
+    failed_item_indices: List[int]
 
     # Control
     iteration: int
@@ -72,6 +75,9 @@ def init_run(state: GraphState) -> GraphState:
             "bias_comments": [],
             "content_comments": [],
             "revision_plan": None,
+            "validation_results": [],
+            "validation_attempt": 1,
+            "failed_item_indices": [],
             "timestamp_utc": state.get("timestamp_utc") or _utc_now(),
             "run_id": state.get("run_id") or str(uuid.uuid4()),
         }
@@ -99,6 +105,89 @@ def item_writer_node(state: GraphState) -> GraphState:
     with step("item_writer_node", state):
         resp = write_items(state["user_request"], state.get("evidence", []))
         return {"draft_items": resp.items}
+
+
+def validation_node(state: GraphState) -> GraphState:
+    """Validate draft items with LLM-as-judge scoring."""
+    with step("validation_node", state):
+        from app.agents.validator import validate_items
+
+        draft_items = state.get("draft_items", [])
+        attempt = state.get("validation_attempt", 1)
+
+        resp = validate_items(
+            request=state["user_request"],
+            items=draft_items,
+            attempt=attempt
+        )
+
+        return {"validation_results": resp.validations}
+
+
+def route_after_validation(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
+    """Route based on validation results."""
+    validation_results = state.get("validation_results", [])
+
+    # Check for failed items
+    failed = [v for v in validation_results if not v.accept]
+    max_attempts = 3
+    current_attempt = state.get("validation_attempt", 1)
+
+    if not failed:
+        # All items passed
+        logger.info("Validation passed: all items scored >= 7.0")
+        return Command(goto="reviewers_fanout_node")
+
+    if current_attempt >= max_attempts:
+        # Max retries exhausted; accept best available
+        logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
+        return Command(goto="reviewers_fanout_node")
+
+    # Route to regeneration
+    logger.info(f"Validation failed: {len(failed)} items below threshold. Attempt {current_attempt}/{max_attempts}")
+    return Command(
+        update={
+            "validation_attempt": current_attempt + 1,
+            "failed_item_indices": [v.item_index for v in failed]
+        },
+        goto="regenerate_items_node"
+    )
+
+
+def regenerate_items_node(state: GraphState) -> GraphState:
+    """Regenerate only items that failed validation."""
+    with step("regenerate_items_node", state):
+        from app.agents.item_writer import write_items
+
+        validation_results = state.get("validation_results", [])
+        draft_items = state.get("draft_items", [])
+        failed_indices = state.get("failed_item_indices", [])
+
+        # Get validation feedback for failed items
+        failed_validations = [v for v in validation_results if not v.accept]
+
+        # Build feedback context for Item Writer
+        feedback_text = "Previous items failed validation:\n"
+        for v in failed_validations:
+            feedback_text += f"\nItem {v.item_index}: {v.item_text}\n"
+            for dim_score in v.dimension_scores:
+                feedback_text += f"  - {dim_score.dimension} ({dim_score.score}/10): {dim_score.reasoning}\n"
+
+        # Create modified request with feedback
+        modified_request = state["user_request"].model_copy(deep=True)
+        modified_request.human_feedback = feedback_text
+        modified_request.previous_items = [draft_items[i].item_text for i in failed_indices]
+        modified_request.item_count = len(failed_indices)
+
+        # Regenerate failed items
+        resp = write_items(modified_request, state.get("evidence", []))
+
+        # Merge: keep accepted items, replace failed items
+        merged_items = draft_items.copy()
+        for idx, new_item in zip(failed_indices, resp.items):
+            merged_items[idx] = new_item
+
+        return {"draft_items": merged_items}
 
 
 def linguistic_review_node(state: GraphState) -> GraphState:
@@ -253,6 +342,8 @@ def build_graph(checkpointer=None):
     builder.add_node("init_run", init_run)
     builder.add_node("retrieve_node", retrieve_node)
     builder.add_node("item_writer_node", item_writer_node)
+    builder.add_node("validation_node", validation_node)
+    builder.add_node("regenerate_items_node", regenerate_items_node)
     # Keep individual reviewer nodes for backward compatibility if needed
     builder.add_node("content_review_node", content_review_node)
     builder.add_node("linguistic_review_node", linguistic_review_node)
@@ -266,8 +357,18 @@ def build_graph(checkpointer=None):
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
     builder.add_edge("retrieve_node", "item_writer_node")
+
+    # Validation gate BEFORE reviewers
+    builder.add_edge("item_writer_node", "validation_node")
+    builder.add_conditional_edges(
+        "validation_node",
+        route_after_validation
+    )
+
+    # Regeneration loops back to validation
+    builder.add_edge("regenerate_items_node", "validation_node")
+
     # Use parallel reviewers instead of sequential
-    builder.add_edge("item_writer_node", "reviewers_fanout_node")
     builder.add_edge("reviewers_fanout_node", "critic_node")
 
     # Critic routes to either meta-editor (revise) or finalize (end)

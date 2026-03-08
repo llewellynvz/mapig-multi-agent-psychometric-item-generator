@@ -201,12 +201,37 @@ class AuditMetadata(BaseModel):
 
 
 class FinalOutput(BaseModel):
-    """Final items plus audit metadata."""
+    """Final items plus audit metadata.
+
+    Phase 03.1 enhancement: Added user_request and review feedback fields
+    to enable complete metadata export without breaking existing consumers.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     final_items: List[DraftItem]
     audit: AuditMetadata
+
+    # Phase 03.1: Optional metadata for complete context export
+    user_request: Optional[UserRequest] = Field(
+        default=None,
+        description="Original user request with construct definition, target population, and constraints. Enables export of context without separate API call."
+    )
+
+    linguistic_feedback: List[ReviewComment] = Field(
+        default_factory=list,
+        description="All linguistic reviewer comments across iterations. Includes item_index, issue, severity, and suggested_edit."
+    )
+
+    bias_feedback: List[ReviewComment] = Field(
+        default_factory=list,
+        description="All bias reviewer comments across iterations. Includes item_index, issue, severity, and suggested_edit."
+    )
+
+    content_feedback: List[ReviewComment] = Field(
+        default_factory=list,
+        description="All content reviewer comments across iterations. Includes item_index, issue, severity, and suggested_edit."
+    )
 
 
 # --- Agent I/O wrappers (contracts) ---

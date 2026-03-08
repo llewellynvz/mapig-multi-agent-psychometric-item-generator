@@ -49,7 +49,7 @@ Plans:
 
 **Depends on**: Phase 1
 
-**Requirements**: AGT-01, AGT-02, AGT-03, AGT-04, AGT-05, AGT-06, AGT-07, AGT-08, AGT-09, AGT-10, AGT-11
+**Requirements**: AGT-01, AGT-02, AGT-03, AGT-04, AGT-05, AGT-06, AGT-07, AGT-08, AGT-09, AGT-10
 
 **Success Criteria** (what must be TRUE):
   1. Item Writer generates items that explicitly demonstrate 10 core psychometric principles (unidimensionality, clarity, reading level, positive keying only, semantic diversity)

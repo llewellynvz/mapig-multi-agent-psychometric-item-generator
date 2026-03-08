@@ -27,7 +27,53 @@ def test_validation_export():
     - ValidationResult can be serialized to JSON
     - All dimension scores and reasoning are preserved in export
     """
-    pytest.skip("Awaiting ValidationResult schema definition in plan 01-02")
+    from app.schemas import DimensionScore, ItemValidation, DraftItem, FinalOutput, AuditMetadata
+
+    # Create dimension scores
+    dim_scores = [
+        DimensionScore(dimension="correspondence", reasoning="Aligns well", score=8),
+        DimensionScore(dimension="distinctiveness", reasoning="Clear boundaries", score=7),
+        DimensionScore(dimension="clarity", reasoning="Easy to understand", score=9),
+        DimensionScore(dimension="specificity", reasoning="Precise wording", score=8),
+    ]
+
+    # Create item validation
+    validation = ItemValidation(
+        item_index=0,
+        item_text="I feel anxious in social situations",
+        dimension_scores=dim_scores,
+        weighted_score=7.95,  # weighted: 8*0.5 + 7*0.25 + 9*0.15 + 8*0.1
+        accept=True,
+        attempt=1,
+    )
+
+    # Create draft item with validation
+    item = DraftItem(
+        item_text="I feel anxious in social situations",
+        construct_name="Social Anxiety",
+        rationale="Measures anxious response",
+        validation_result=validation,
+    )
+
+    # Create final output with validation metadata
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-08T12:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        validation_attempts=1,
+        validation_failures=0,
+    )
+
+    output = FinalOutput(final_items=[item], audit=audit)
+
+    # Verify serialization preserves validation data
+    data = output.model_dump()
+    assert data["final_items"][0]["validation_result"] is not None
+    assert len(data["final_items"][0]["validation_result"]["dimension_scores"]) == 4
+    assert data["final_items"][0]["validation_result"]["weighted_score"] == 7.95
+    assert data["audit"]["validation_attempts"] == 1
 
 
 def test_dimension_score_schema():
@@ -43,4 +89,49 @@ def test_dimension_score_schema():
     - Pydantic raises ValidationError for scores < 1 or > 10
     - Pydantic raises ValidationError for float scores (must be int)
     """
-    pytest.skip("Awaiting DimensionScore schema definition in plan 01-02")
+    from pydantic import ValidationError
+    from app.schemas import DimensionScore, ItemValidation
+
+    # Test valid score
+    valid_score = DimensionScore(
+        dimension="correspondence",
+        reasoning="Strong alignment with construct",
+        score=8
+    )
+    assert valid_score.score == 8
+    assert valid_score.dimension == "correspondence"
+
+    # Test boundary values (1 and 10 are valid)
+    min_score = DimensionScore(dimension="clarity", reasoning="Minimal", score=1)
+    assert min_score.score == 1
+
+    max_score = DimensionScore(dimension="clarity", reasoning="Perfect", score=10)
+    assert max_score.score == 10
+
+    # Test invalid: score < 1
+    with pytest.raises(ValidationError) as exc_info:
+        DimensionScore(dimension="clarity", reasoning="Too low", score=0)
+    assert "greater than or equal to 1" in str(exc_info.value).lower()
+
+    # Test invalid: score > 10
+    with pytest.raises(ValidationError) as exc_info:
+        DimensionScore(dimension="clarity", reasoning="Too high", score=11)
+    assert "less than or equal to 10" in str(exc_info.value).lower()
+
+    # Test ItemValidation requires exactly 4 dimensions (VAL-02)
+    dim_scores_4 = [
+        DimensionScore(dimension="correspondence", reasoning="Good", score=8),
+        DimensionScore(dimension="distinctiveness", reasoning="Good", score=7),
+        DimensionScore(dimension="clarity", reasoning="Good", score=9),
+        DimensionScore(dimension="specificity", reasoning="Good", score=8),
+    ]
+
+    validation = ItemValidation(
+        item_index=0,
+        item_text="Test item",
+        dimension_scores=dim_scores_4,
+        weighted_score=7.95,
+        accept=True,
+        attempt=1,
+    )
+    assert len(validation.dimension_scores) == 4

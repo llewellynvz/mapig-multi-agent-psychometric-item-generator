@@ -42,7 +42,7 @@ Plans:
 - [x] 01-02-PLAN.md — Add validation schemas, Claude configuration, and LLM factory (Wave 2) — ✓ 2026-03-08
 - [x] 01-03-PLAN.md — Implement validation agent with multi-dimensional scoring rubric (Wave 3) — ✓ 2026-03-08
 - [x] 01-04-PLAN.md — Integrate validation gate into graph with conditional routing (Wave 4) — ✓ 2026-03-08
-- [ ] 01-05-PLAN.md — Display validation scores and reasoning in Results UI (Wave 5)
+- [x] 01-05-PLAN.md — Display validation scores and reasoning in Results UI (Wave 5) — ✓ 2026-03-08
 
 ### Phase 2: Agent Architecture Optimization
 **Goal**: All 7 agents apply research-backed psychometric principles through optimized prompts that enforce item quality standards, semantic diversity, and comprehensive bias detection
@@ -53,15 +53,19 @@ Plans:
 
 **Success Criteria** (what must be TRUE):
   1. Item Writer generates items that explicitly demonstrate 10 core psychometric principles (unidimensionality, clarity, reading level, positive keying only, semantic diversity)
-  2. Generated items meet targeted reading levels automatically (6th-8th grade general, 5th-6th clinical, 10th-12th specialized) as measured by Flesch-Kincaid
-  3. Bias Reviewer detects all 7 bias types with separate evaluation passes per type, including intersectional bias for combined identities
+  2. Generated items meet targeted reading levels automatically (6th-8th grade general, 5th-6th clinical, 10th-12th specialized) as agent judgment
+  3. Bias Reviewer detects all 7 bias types via structured checklist evaluation, including intersectional bias for combined identities
   4. Content Reviewer enforces construct correspondence with explicit facet balancing
-  5. Critic makes routing decisions based on severity thresholds, enabling early termination for high-quality items
+  5. Critic makes routing decisions based on adaptive severity thresholds by iteration, enabling early termination for high-quality items
 
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 02-01-PLAN.md — Create test scaffolds for prompt optimizations (Wave 0)
+- [ ] 02-02-PLAN.md — Optimize Item Writer prompt with 10 psychometric principles (Wave 1)
+- [ ] 02-03-PLAN.md — Optimize Bias Reviewer prompt with 7-type taxonomy (Wave 1)
+- [ ] 02-04-PLAN.md — Optimize Content and Linguistic Reviewer prompts (Wave 1)
+- [ ] 02-05-PLAN.md — Optimize Meta Editor and Critic with adaptive thresholds (Wave 2)
 
 ### Phase 3: Claude API Migration
 **Goal**: MAPIG runs on Claude API by default with smart model allocation (Opus for validation, Sonnet for other agents) while maintaining OpenAI as user-selectable fallback
@@ -147,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
-| 2. Agent Architecture Optimization | 0/TBD | Not started | - |
+| 2. Agent Architecture Optimization | 0/5 | Not started | - |
 | 3. Claude API Migration | 0/TBD | Not started | - |
 | 4. Production Features | 0/TBD | Not started | - |
 | 5. Vercel Deployment | 0/TBD | Not started | - |

@@ -135,3 +135,142 @@ def test_dimension_score_schema():
         attempt=1,
     )
     assert len(validation.dimension_scores) == 4
+
+
+def test_finaloutput_enhanced_schema():
+    """Phase 03.1: FinalOutput accepts optional metadata fields."""
+    from app.schemas import UserRequest, ReviewComment, DraftItem, FinalOutput, AuditMetadata
+
+    # Arrange: Create mock data
+    user_req = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Definition here",
+        target_population="General adult",
+        response_scale="1-5 Likert",
+        item_count=5,
+        constraints=[]
+    )
+
+    review_comment = ReviewComment(
+        type="linguistic",
+        item_index=0,
+        issue="Test issue",
+        severity=3,
+        suggested_edit="Test edit"
+    )
+
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test Construct",
+        rationale="Test rationale for the item",
+        evidence_citations=[]
+    )
+
+    audit = AuditMetadata(
+        thread_id="test-thread",
+        run_id="test-run",
+        timestamp_utc="2026-03-08T00:00:00Z",
+        iteration_count=1,
+        stop_reason="max_iterations",
+        model_info={"mode": "openai"},
+        approved_sources=[],
+        validation_attempts=1,
+        validation_failures=0
+    )
+
+    # Act: Create FinalOutput with enhanced fields
+    output = FinalOutput(
+        final_items=[draft_item],
+        audit=audit,
+        user_request=user_req,
+        linguistic_feedback=[review_comment],
+        bias_feedback=[],
+        content_feedback=[]
+    )
+
+    # Assert: All fields populated correctly
+    assert output.user_request == user_req
+    assert len(output.linguistic_feedback) == 1
+    assert output.linguistic_feedback[0].issue == "Test issue"
+    assert output.bias_feedback == []
+    assert output.content_feedback == []
+
+
+def test_finaloutput_backward_compatibility():
+    """Phase 03.1: FinalOutput maintains backward compatibility without optional fields."""
+    from app.schemas import DraftItem, FinalOutput, AuditMetadata
+
+    # Arrange: Create minimal valid FinalOutput (existing pattern)
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test",
+        rationale="Test rationale for the item",
+        evidence_citations=[]
+    )
+
+    audit = AuditMetadata(
+        thread_id="test-thread",
+        run_id="test-run",
+        timestamp_utc="2026-03-08T00:00:00Z",
+        iteration_count=1,
+        stop_reason="max_iterations",
+        model_info={"mode": "openai"},
+        approved_sources=[],
+        validation_attempts=1,
+        validation_failures=0
+    )
+
+    # Act: Create FinalOutput WITHOUT new fields (backward compatibility)
+    output = FinalOutput(
+        final_items=[draft_item],
+        audit=audit
+    )
+
+    # Assert: New fields use defaults (None or empty list)
+    assert output.user_request is None
+    assert output.linguistic_feedback == []
+    assert output.bias_feedback == []
+    assert output.content_feedback == []
+
+
+def test_finaloutput_mutable_defaults():
+    """Phase 03.1: FinalOutput feedback arrays are not shared across instances."""
+    from app.schemas import ReviewComment, DraftItem, FinalOutput, AuditMetadata
+
+    # Arrange: Create two FinalOutput instances without feedback
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test",
+        rationale="Test rationale for the item",
+        evidence_citations=[]
+    )
+
+    audit = AuditMetadata(
+        thread_id="test-thread",
+        run_id="test-run",
+        timestamp_utc="2026-03-08T00:00:00Z",
+        iteration_count=1,
+        stop_reason="max_iterations",
+        model_info={"mode": "openai"},
+        approved_sources=[],
+        validation_attempts=1,
+        validation_failures=0
+    )
+
+    output1 = FinalOutput(final_items=[draft_item], audit=audit)
+    output2 = FinalOutput(final_items=[draft_item], audit=audit)
+
+    # Act: Modify one instance's feedback
+    comment = ReviewComment(
+        type="bias",
+        item_index=0,
+        issue="Test",
+        severity=2,
+        suggested_edit="Edit"
+    )
+    output1.bias_feedback.append(comment)
+
+    # Assert: Other instance unaffected (not shared reference)
+    assert len(output1.bias_feedback) == 1
+    assert len(output2.bias_feedback) == 0
+    assert output1.bias_feedback is not output2.bias_feedback

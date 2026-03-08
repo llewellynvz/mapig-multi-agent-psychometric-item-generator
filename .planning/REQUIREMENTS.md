@@ -118,12 +118,55 @@ Mapping requirements to phases. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAL-01 to VAL-09 | Phase 1 | Pending |
-| AGT-01 to AGT-11 | Phase 2 | Pending |
-| API-01 to API-07 | Phase 3 | Pending |
-| FEAT-01 to FEAT-06 | Phase 4 | Pending |
-| DEP-01 to DEP-08 | Phase 5 | Pending |
-| EVAL-01 to EVAL-08 | Phase 6 | Pending |
+| VAL-01 | Phase 1 | Pending |
+| VAL-02 | Phase 1 | Pending |
+| VAL-03 | Phase 1 | Pending |
+| VAL-04 | Phase 1 | Pending |
+| VAL-05 | Phase 1 | Pending |
+| VAL-06 | Phase 1 | Pending |
+| VAL-07 | Phase 1 | Pending |
+| VAL-08 | Phase 1 | Pending |
+| VAL-09 | Phase 1 | Pending |
+| AGT-01 | Phase 2 | Pending |
+| AGT-02 | Phase 2 | Pending |
+| AGT-03 | Phase 2 | Pending |
+| AGT-04 | Phase 2 | Pending |
+| AGT-05 | Phase 2 | Pending |
+| AGT-06 | Phase 2 | Pending |
+| AGT-07 | Phase 2 | Pending |
+| AGT-08 | Phase 2 | Pending |
+| AGT-09 | Phase 2 | Pending |
+| AGT-10 | Phase 2 | Pending |
+| AGT-11 | Phase 2 | Pending |
+| API-01 | Phase 3 | Pending |
+| API-02 | Phase 3 | Pending |
+| API-03 | Phase 3 | Pending |
+| API-04 | Phase 3 | Pending |
+| API-05 | Phase 3 | Pending |
+| API-06 | Phase 3 | Pending |
+| API-07 | Phase 3 | Pending |
+| FEAT-01 | Phase 4 | Pending |
+| FEAT-02 | Phase 4 | Pending |
+| FEAT-03 | Phase 4 | Pending |
+| FEAT-04 | Phase 4 | Pending |
+| FEAT-05 | Phase 4 | Pending |
+| FEAT-06 | Phase 4 | Pending |
+| DEP-01 | Phase 5 | Pending |
+| DEP-02 | Phase 5 | Pending |
+| DEP-03 | Phase 5 | Pending |
+| DEP-04 | Phase 5 | Pending |
+| DEP-05 | Phase 5 | Pending |
+| DEP-06 | Phase 5 | Pending |
+| DEP-07 | Phase 5 | Pending |
+| DEP-08 | Phase 5 | Pending |
+| EVAL-01 | Phase 6 | Pending |
+| EVAL-02 | Phase 6 | Pending |
+| EVAL-03 | Phase 6 | Pending |
+| EVAL-04 | Phase 6 | Pending |
+| EVAL-05 | Phase 6 | Pending |
+| EVAL-06 | Phase 6 | Pending |
+| EVAL-07 | Phase 6 | Pending |
+| EVAL-08 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 54 total
@@ -132,4 +175,4 @@ Mapping requirements to phases. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-08*
-*Last updated: 2026-03-08 after research synthesis*
+*Last updated: 2026-03-08 after roadmap creation*

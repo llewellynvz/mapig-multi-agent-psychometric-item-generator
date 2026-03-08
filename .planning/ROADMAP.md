@@ -65,7 +65,7 @@ Plans:
 - [x] 02-02-PLAN.md — Optimize Item Writer prompt with 10 psychometric principles (Wave 1)
 - [x] 02-03-PLAN.md — Optimize Bias Reviewer prompt with 7-type taxonomy (Wave 1)
 - [x] 02-04-PLAN.md — Optimize Content and Linguistic Reviewer prompts (Wave 1)
-- [ ] 02-05-PLAN.md — Optimize Meta Editor and Critic with adaptive thresholds (Wave 2)
+- [x] 02-05-PLAN.md — Optimize Meta Editor and Critic with adaptive thresholds (Wave 2)
 
 ### Phase 3: Claude API Migration
 **Goal**: MAPIG runs on Claude API by default with smart model allocation (Opus for validation, Sonnet for other agents) while maintaining OpenAI as user-selectable fallback

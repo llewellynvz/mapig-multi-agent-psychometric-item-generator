@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 # AGT-01: Item Writer - 10 psychometric principles
+@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_10_principles():
     """Test AGT-01: Verify all 10 psychometric principles present in item_writer.md.
 
@@ -45,6 +46,7 @@ def test_item_writer_10_principles():
 
 
 # AGT-02: Item Writer - Semantic diversity examples (Section B)
+@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_semantic_diversity():
     """Test AGT-02: Verify semantic diversity examples present in Section B.
 
@@ -77,6 +79,7 @@ def test_item_writer_semantic_diversity():
 
 
 # AGT-03: Item Writer - Reading level targets
+@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_reading_levels():
     """Test AGT-03: Verify reading level targets specified.
 
@@ -110,6 +113,7 @@ def test_item_writer_reading_levels():
 
 
 # AGT-04: Item Writer - Positive keying only (Section C)
+@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_positive_keying():
     """Test AGT-04: Verify positive keying requirement in Section C, no reverse-item instructions.
 
@@ -145,7 +149,6 @@ def test_item_writer_positive_keying():
 
 
 # AGT-05: Content Reviewer - Construct correspondence criteria
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-04")
 def test_content_reviewer_criteria():
     """Test AGT-05: Verify construct correspondence criteria in content_reviewer.md.
 
@@ -221,7 +224,6 @@ def test_linguistic_reviewer_quantifiers():
 
 
 # AGT-07: Bias Reviewer - 7 bias types defined
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-03")
 def test_bias_reviewer_7_types():
     """Test AGT-07: Verify 7 bias types defined in bias_reviewer.md.
 

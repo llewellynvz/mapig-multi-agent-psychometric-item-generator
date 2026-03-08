@@ -9,8 +9,51 @@ import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { useToast } from "@/components/ui/use-toast";
-import type { FinalItem, FinalOutput } from "@/lib/types";
+import type { FinalItem, FinalOutput, ItemValidation } from "@/lib/types";
 import { QualityChecksPanel } from "./QualityChecksPanel";
+
+function ValidationScoreDisplay({ validation }: { validation: ItemValidation }) {
+  const [expanded, setExpanded] = React.useState(false);
+
+  return (
+    <div className="validation-score mt-2">
+      <div className="flex items-center gap-2">
+        <span className={`font-semibold ${validation.accept ? 'text-green-600' : 'text-red-600'}`}>
+          Score: {validation.weighted_score.toFixed(2)}/10
+        </span>
+        <span className={`px-2 py-1 rounded text-sm ${validation.accept ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {validation.accept ? 'Accepted' : 'Rejected'}
+        </span>
+        {validation.attempt > 1 && (
+          <span className="text-sm text-gray-600">
+            (Attempt {validation.attempt})
+          </span>
+        )}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          {expanded ? 'Hide details' : 'Show reasoning'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-2 space-y-2 text-sm">
+          {validation.dimension_scores.map((dim, idx) => (
+            <div key={idx} className="border-l-2 border-gray-300 pl-3">
+              <div className="font-medium">
+                {dim.dimension.charAt(0).toUpperCase() + dim.dimension.slice(1)}: {dim.score}/10
+              </div>
+              <div className="text-gray-700 italic">
+                {dim.reasoning}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface GeneratedItemsTableProps {
   items: FinalItem[];
@@ -167,6 +210,9 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                   </div>
                 )}
               </div>
+              {item.validation_result && (
+                <ValidationScoreDisplay validation={item.validation_result} />
+              )}
               <div>
                 <button
                   type="button"
@@ -191,6 +237,13 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           ))}
         </div>
         <QualityChecksPanel items={displayItems} />
+        {fullOutput?.audit?.validation_attempts && fullOutput.audit.validation_attempts > 0 && (
+          <div className="mt-4 p-4 bg-blue-50 rounded">
+            <h3 className="font-semibold text-slate-900">Validation Summary</h3>
+            <p className="text-sm text-slate-700">Total validation attempts: {fullOutput.audit.validation_attempts}</p>
+            <p className="text-sm text-slate-700">Items regenerated: {fullOutput.audit.validation_failures || 0}</p>
+          </div>
+        )}
       </CardContent>
     </SurfaceCard>
   );

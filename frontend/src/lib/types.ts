@@ -18,11 +18,27 @@ export interface UserRequest {
   previous_items?: string[];
 }
 
+export interface DimensionScore {
+  dimension: string;
+  reasoning: string;
+  score: number;
+}
+
+export interface ItemValidation {
+  item_index: number;
+  item_text: string;
+  dimension_scores: DimensionScore[];
+  weighted_score: number;
+  accept: boolean;
+  attempt: number;
+}
+
 export interface FinalItem {
   item_text: string;
   construct_name: string;
   rationale: string;
   evidence_citations: string[];
+  validation_result?: ItemValidation;
 }
 
 export interface AuditMetadata {
@@ -33,6 +49,8 @@ export interface AuditMetadata {
   stop_reason: string;
   model_info: Record<string, unknown>;
   approved_sources: string[];
+  validation_attempts?: number;
+  validation_failures?: number;
 }
 
 export interface FinalOutput {

@@ -10,12 +10,12 @@ Requirements for production deployment milestone. Research-backed optimization f
 ### Phase 1: LLM-as-Judge Validation Gate
 
 - [ ] **VAL-01**: Validation agent executes immediately after Item Writer, before reviewers
-- [ ] **VAL-02**: Multi-dimensional scoring (correspondence 50%, distinctiveness 25%, clarity 15%, specificity 10%)
+- [x] **VAL-02**: Multi-dimensional scoring (correspondence 50%, distinctiveness 25%, clarity 15%, specificity 10%)
 - [ ] **VAL-03**: Chain-of-thought prompting with explicit reasoning before scores
-- [ ] **VAL-04**: 1-10 categorical scale with clear criterion definitions per level
+- [x] **VAL-04**: 1-10 categorical scale with clear criterion definitions per level
 - [ ] **VAL-05**: Automatic rejection threshold ≥7.0 for item acceptance
 - [ ] **VAL-06**: Immediate retry logic (regenerate rejected items only, max 3 attempts)
-- [ ] **VAL-07**: Claude Opus model for validation agent (highest accuracy)
+- [x] **VAL-07**: Claude Opus model for validation agent (highest accuracy)
 - [ ] **VAL-08**: Validation scores and reasoning visible in results UI
 - [ ] **VAL-09**: Export validation metadata (all dimension scores, reasoning, attempt count)
 
@@ -119,12 +119,12 @@ Mapping requirements to phases. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | VAL-01 | Phase 1 | Pending |
-| VAL-02 | Phase 1 | Pending |
+| VAL-02 | Phase 1 | Complete |
 | VAL-03 | Phase 1 | Pending |
-| VAL-04 | Phase 1 | Pending |
+| VAL-04 | Phase 1 | Complete |
 | VAL-05 | Phase 1 | Pending |
 | VAL-06 | Phase 1 | Pending |
-| VAL-07 | Phase 1 | Pending |
+| VAL-07 | Phase 1 | Complete |
 | VAL-08 | Phase 1 | Pending |
 | VAL-09 | Phase 1 | Pending |
 | AGT-01 | Phase 2 | Pending |

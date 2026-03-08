@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Pencil } from "lucide-react";
 import { PrimaryButton } from "@/components/ui/action-buttons";
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import type { FinalItem, FinalOutput, ItemValidation } from "@/lib/types";
+import { exportToCsv, exportToJson, exportToMarkdown, generateFilename } from "@/lib/export";
 import { QualityChecksPanel } from "./QualityChecksPanel";
 
 function ValidationScoreDisplay({ validation }: { validation: ItemValidation }) {
@@ -66,10 +68,24 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
   const [editedItems, setEditedItems] = React.useState<FinalItem[]>(items);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [expandedRationale, setExpandedRationale] = React.useState<Set<number>>(new Set());
+  const [selectedFormat, setSelectedFormat] = React.useState<'csv' | 'json' | 'markdown'>('csv');
 
   React.useEffect(() => {
     setEditedItems(items);
   }, [items]);
+
+  // Load format preference from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return; // SSR guard
+    try {
+      const saved = localStorage.getItem('mapig-export-format');
+      if (saved && ['csv', 'json', 'markdown'].includes(saved)) {
+        setSelectedFormat(saved as 'csv' | 'json' | 'markdown');
+      }
+    } catch {
+      // Ignore localStorage errors (private browsing, quota exceeded)
+    }
+  }, []);
 
   const handleEdit = (index: number, newText: string) => {
     const next = [...editedItems];
@@ -98,32 +114,43 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
     );
   };
 
-  const downloadJson = () => {
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "mapig-output.json";
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleFormatChange = (format: 'csv' | 'json' | 'markdown') => {
+    setSelectedFormat(format);
+    try {
+      localStorage.setItem('mapig-export-format', format);
+    } catch {
+      // Ignore errors
+    }
   };
 
-  const downloadCsv = () => {
-    const headers = ["index", "item_text", "rationale", "citations"];
-    const rows = displayItems.map((item, i) => [
-      i + 1,
-      `"${item.item_text.replace(/"/g, '""')}"`,
-      `"${item.rationale.replace(/"/g, '""')}"`,
-      item.evidence_citations.join("; "),
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+  const handleDownload = () => {
+    if (!fullOutput) return;
+
+    const content = selectedFormat === 'csv'
+      ? exportToCsv(fullOutput)
+      : selectedFormat === 'json'
+      ? exportToJson(fullOutput)
+      : exportToMarkdown(fullOutput);
+
+    const mimeTypes = {
+      csv: 'text/csv;charset=utf-8',
+      json: 'application/json;charset=utf-8',
+      markdown: 'text/markdown;charset=utf-8'
+    };
+
+    const extension = selectedFormat === 'markdown' ? 'md' : selectedFormat;
+    const filename = generateFilename(
+      fullOutput.final_items[0]?.construct_name ?? 'items',
+      extension
+    );
+
+    const blob = new Blob([content], { type: mimeTypes[selectedFormat] });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = "mapig-items.csv";
+    a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url); // Clean up memory
   };
 
   const toggleRationale = (index: number) => {
@@ -153,20 +180,6 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
             className="h-9 min-w-[148px]"
           >
             Copy full output
-          </PrimaryButton>
-          <PrimaryButton
-            size="sm"
-            onClick={downloadCsv}
-            className="h-9 min-w-[148px]"
-          >
-            Download CSV
-          </PrimaryButton>
-          <PrimaryButton
-            size="sm"
-            onClick={downloadJson}
-            className="h-9 min-w-[148px]"
-          >
-            Download JSON
           </PrimaryButton>
         </div>
       </CardHeader>
@@ -245,6 +258,33 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           </div>
         )}
       </CardContent>
+      <CardFooter className="flex flex-col gap-3 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          {displayItems.length} items generated
+          {fullOutput?.audit?.validation_failures
+            ? ` (${fullOutput.audit.validation_failures} rejected, ${
+                (fullOutput.audit.validation_attempts ?? 0) - (fullOutput.audit.validation_failures ?? 0)
+              } from regeneration)`
+            : ''
+          }
+        </p>
+        <div className="flex items-center gap-2">
+          <Select value={selectedFormat} onValueChange={handleFormatChange}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Format" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="csv">CSV</SelectItem>
+              <SelectItem value="json">JSON</SelectItem>
+              <SelectItem value="markdown">Markdown</SelectItem>
+            </SelectContent>
+          </Select>
+          <PrimaryButton onClick={handleDownload} size="sm" disabled={!fullOutput}>
+            <Download className="mr-2 h-4 w-4" />
+            Download
+          </PrimaryButton>
+        </div>
+      </CardFooter>
     </SurfaceCard>
   );
 }

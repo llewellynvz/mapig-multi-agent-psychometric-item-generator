@@ -9,7 +9,6 @@ from pathlib import Path
 
 
 # AGT-01: Item Writer - 10 psychometric principles
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_10_principles():
     """Test AGT-01: Verify all 10 psychometric principles present in item_writer.md.
 
@@ -46,7 +45,6 @@ def test_item_writer_10_principles():
 
 
 # AGT-02: Item Writer - Semantic diversity examples (Section B)
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_semantic_diversity():
     """Test AGT-02: Verify semantic diversity examples present in Section B.
 
@@ -79,7 +77,6 @@ def test_item_writer_semantic_diversity():
 
 
 # AGT-03: Item Writer - Reading level targets
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_reading_levels():
     """Test AGT-03: Verify reading level targets specified.
 
@@ -113,7 +110,6 @@ def test_item_writer_reading_levels():
 
 
 # AGT-04: Item Writer - Positive keying only (Section C)
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-02")
 def test_item_writer_positive_keying():
     """Test AGT-04: Verify positive keying requirement in Section C, no reverse-item instructions.
 

@@ -52,12 +52,12 @@ Requirements for production deployment milestone. Research-backed optimization f
 
 ### Phase 4: Production Features
 
-- [ ] **FEAT-01**: Download button with format selector (Markdown, CSV, JSON)
-- [ ] **FEAT-02**: Export full metadata (items + construct + constraints + evidence sources)
-- [ ] **FEAT-03**: Include validation scores in export (all 4 dimensions + reasoning)
-- [ ] **FEAT-04**: Include review feedback history in export
-- [ ] **FEAT-05**: Export format selector UI component
-- [ ] **FEAT-06**: Audit trail export (thread_id, run_id, iteration_count, model info)
+- [x] **FEAT-01**: Download button with format selector (Markdown, CSV, JSON)
+- [x] **FEAT-02**: Export full metadata (items + construct + constraints + evidence sources)
+- [x] **FEAT-03**: Include validation scores in export (all 4 dimensions + reasoning)
+- [x] **FEAT-04**: Include review feedback history in export
+- [x] **FEAT-05**: Export format selector UI component
+- [x] **FEAT-06**: Audit trail export (thread_id, run_id, iteration_count, model info)
 
 ### Phase 5: Vercel Deployment
 
@@ -156,12 +156,12 @@ Mapping requirements to phases. Updated during roadmap creation.
 | SCHEMA-02 | Phase 3.1 | Complete |
 | SCHEMA-03 | Phase 3.1 | Complete |
 | SCHEMA-04 | Phase 3.1 | Complete |
-| FEAT-01 | Phase 4 | Pending |
-| FEAT-02 | Phase 4 | Pending |
-| FEAT-03 | Phase 4 | Pending |
-| FEAT-04 | Phase 4 | Pending |
-| FEAT-05 | Phase 4 | Pending |
-| FEAT-06 | Phase 4 | Pending |
+| FEAT-01 | Phase 4 | Complete (04-01) |
+| FEAT-02 | Phase 4 | Complete (04-01) |
+| FEAT-03 | Phase 4 | Complete (04-01) |
+| FEAT-04 | Phase 4 | Complete (04-01) |
+| FEAT-05 | Phase 4 | Complete (04-01) |
+| FEAT-06 | Phase 4 | Complete (04-01) |
 | DEP-01 | Phase 5 | Pending |
 | DEP-02 | Phase 5 | Pending |
 | DEP-03 | Phase 5 | Pending |

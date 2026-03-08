@@ -22,7 +22,30 @@ def test_validator_uses_opus():
     - API key is configured from settings.CLAUDE_API_KEY
     - Function is cached (lru_cache) for performance
     """
-    pytest.skip("Awaiting LLM factory Claude integration in plan 01-02")
+    from unittest.mock import patch
+    from app.agents.llm_factory import get_validator_model, get_claude_chat_model
+    from app.settings import settings
+    from langchain_anthropic import ChatAnthropic
+
+    # Mock the settings object's CLAUDE_API_KEY
+    with patch.object(settings, 'CLAUDE_API_KEY', "test-key-12345"):
+        # Clear any cached instances
+        if hasattr(get_claude_chat_model, 'cache_clear'):
+            get_claude_chat_model.cache_clear()
+
+        model = get_validator_model()
+
+        # Verify type
+        assert isinstance(model, ChatAnthropic), "get_validator_model should return ChatAnthropic"
+
+        # Verify model name
+        assert model.model == "claude-opus-4-6", "Validator should use claude-opus-4-6"
+
+        # Verify temperature
+        assert model.temperature == 0.2, "Temperature should be 0.2 for deterministic scoring"
+
+        # Verify max_retries
+        assert model.max_retries == 3, "Max retries should be 3"
 
 
 def test_claude_api_key_required():
@@ -36,4 +59,19 @@ def test_claude_api_key_required():
     - Error message is clear: "CLAUDE_API_KEY required for Claude models"
     - No API calls are made if key is missing
     """
-    pytest.skip("Awaiting LLM factory Claude integration in plan 01-02")
+    from unittest.mock import patch
+    from app.agents.llm_factory import get_validator_model, get_claude_chat_model
+    from app.settings import settings
+
+    # Mock settings to have no API key
+    with patch.object(settings, 'CLAUDE_API_KEY', None):
+        # Clear cache
+        if hasattr(get_claude_chat_model, 'cache_clear'):
+            get_claude_chat_model.cache_clear()
+
+        with pytest.raises(ValueError) as exc_info:
+            get_validator_model()
+
+        error_msg = str(exc_info.value).lower()
+        assert "claude_api_key" in error_msg or "claude" in error_msg, \
+            "Error message should mention CLAUDE_API_KEY or Claude models"

@@ -21,16 +21,16 @@ Requirements for production deployment milestone. Research-backed optimization f
 
 ### Phase 2: Agent Architecture Optimization
 
-- [ ] **AGT-01**: Refine Item Writer prompt with 10 core psychometric principles
-- [ ] **AGT-02**: Add semantic diversity instructions to prevent over-paraphrasing
-- [ ] **AGT-03**: Enforce reading level targeting (6th-8th grade general, 5th-6th clinical, 10th-12th specialized)
-- [ ] **AGT-04**: Positive keying only (eliminate reverse-scored item generation)
-- [ ] **AGT-05**: Refine Content Reviewer with construct correspondence criteria
-- [ ] **AGT-06**: Refine Linguistic Reviewer with vague quantifier context rules
-- [ ] **AGT-07**: Refine Bias Reviewer with 7-type taxonomy + intersectionality check
-- [ ] **AGT-08**: Implement multi-pass bias review (separate evaluations per bias type)
-- [ ] **AGT-09**: Update Meta Editor with facet balancing enforcement
-- [ ] **AGT-10**: Enhance Critic with adaptive iteration thresholds (severity-based routing)
+- [x] **AGT-01**: Refine Item Writer prompt with 10 core psychometric principles
+- [x] **AGT-02**: Add semantic diversity instructions to prevent over-paraphrasing
+- [x] **AGT-03**: Enforce reading level targeting (6th-8th grade general, 5th-6th clinical, 10th-12th specialized)
+- [x] **AGT-04**: Positive keying only (eliminate reverse-scored item generation)
+- [x] **AGT-05**: Refine Content Reviewer with construct correspondence criteria
+- [x] **AGT-06**: Refine Linguistic Reviewer with vague quantifier context rules
+- [x] **AGT-07**: Refine Bias Reviewer with 7-type taxonomy + intersectionality check
+- [x] **AGT-08**: Implement multi-pass bias review (separate evaluations per bias type)
+- [x] **AGT-09**: Update Meta Editor with facet balancing enforcement
+- [x] **AGT-10**: Enhance Critic with adaptive iteration thresholds (severity-based routing)
 - [ ] **AGT-11**: Optional: A/B test Content + Bias reviewer consolidation (7→6 agents)
 
 ### Phase 3: Claude API Migration
@@ -127,16 +127,16 @@ Mapping requirements to phases. Updated during roadmap creation.
 | VAL-07 | Phase 1 | Complete |
 | VAL-08 | Phase 1 | Complete |
 | VAL-09 | Phase 1 | Complete |
-| AGT-01 | Phase 2 | Pending |
-| AGT-02 | Phase 2 | Pending |
-| AGT-03 | Phase 2 | Pending |
-| AGT-04 | Phase 2 | Pending |
-| AGT-05 | Phase 2 | Pending |
-| AGT-06 | Phase 2 | Pending |
-| AGT-07 | Phase 2 | Pending |
-| AGT-08 | Phase 2 | Pending |
-| AGT-09 | Phase 2 | Pending |
-| AGT-10 | Phase 2 | Pending |
+| AGT-01 | Phase 2 | Complete |
+| AGT-02 | Phase 2 | Complete |
+| AGT-03 | Phase 2 | Complete |
+| AGT-04 | Phase 2 | Complete |
+| AGT-05 | Phase 2 | Complete |
+| AGT-06 | Phase 2 | Complete |
+| AGT-07 | Phase 2 | Complete |
+| AGT-08 | Phase 2 | Complete |
+| AGT-09 | Phase 2 | Complete |
+| AGT-10 | Phase 2 | Complete |
 | AGT-11 | Phase 2 | Pending |
 | API-01 | Phase 3 | Pending |
 | API-02 | Phase 3 | Pending |

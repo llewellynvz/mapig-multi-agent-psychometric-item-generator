@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Union
 
+from langchain_anthropic import ChatAnthropic
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 from app.settings import settings
@@ -49,6 +50,43 @@ def get_azure_chat_model() -> AzureChatOpenAI:
         max_retries=3,
         timeout=60,
     )
+
+
+@lru_cache(maxsize=2)
+def get_claude_chat_model(model: str = "claude-opus-4-6") -> ChatAnthropic:
+    """Create (and cache) the Claude ChatAnthropic client.
+
+    Args:
+        model: Claude model name (e.g., "claude-opus-4-6", "claude-sonnet-4-5")
+
+    Returns:
+        ChatAnthropic instance configured for the specified model
+
+    Raises:
+        ValueError: If CLAUDE_API_KEY is not configured
+    """
+    if not settings.CLAUDE_API_KEY:
+        raise ValueError("CLAUDE_API_KEY required for Claude models")
+
+    return ChatAnthropic(
+        model=model,
+        api_key=settings.CLAUDE_API_KEY,
+        temperature=0.2,
+        max_retries=3,
+        timeout=60,
+    )
+
+
+def get_validator_model() -> ChatAnthropic:
+    """Get validation model (always Opus for highest accuracy).
+
+    Returns:
+        ChatAnthropic instance configured with claude-opus-4-6
+
+    Raises:
+        ValueError: If CLAUDE_API_KEY is not configured
+    """
+    return get_claude_chat_model(model=settings.VALIDATOR_MODEL)
 
 
 def get_chat_model() -> Union[ChatOpenAI, AzureChatOpenAI]:

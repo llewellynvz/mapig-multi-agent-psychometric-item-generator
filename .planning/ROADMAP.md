@@ -61,10 +61,10 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Create test scaffolds for prompt optimizations (Wave 0)
-- [ ] 02-02-PLAN.md — Optimize Item Writer prompt with 10 psychometric principles (Wave 1)
-- [ ] 02-03-PLAN.md — Optimize Bias Reviewer prompt with 7-type taxonomy (Wave 1)
-- [ ] 02-04-PLAN.md — Optimize Content and Linguistic Reviewer prompts (Wave 1)
+- [x] 02-01-PLAN.md — Create test scaffolds for prompt optimizations (Wave 0)
+- [x] 02-02-PLAN.md — Optimize Item Writer prompt with 10 psychometric principles (Wave 1)
+- [x] 02-03-PLAN.md — Optimize Bias Reviewer prompt with 7-type taxonomy (Wave 1)
+- [x] 02-04-PLAN.md — Optimize Content and Linguistic Reviewer prompts (Wave 1)
 - [ ] 02-05-PLAN.md — Optimize Meta Editor and Critic with adaptive thresholds (Wave 2)
 
 ### Phase 3: Claude API Migration

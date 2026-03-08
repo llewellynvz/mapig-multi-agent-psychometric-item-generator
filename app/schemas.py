@@ -99,6 +99,10 @@ class DraftItem(BaseModel):
         default_factory=list,
         description="List of EvidenceChunk.source_id values that support this item.",
     )
+    validation_result: Optional["ItemValidation"] = Field(
+        default=None,
+        description="Optional validation result if item has been validated.",
+    )
 
 
 ReviewType = Literal["linguistic", "bias", "content"]
@@ -140,6 +144,46 @@ class RevisionPlan(BaseModel):
     edits: List[RevisionEdit] = Field(default_factory=list)
 
 
+class DimensionScore(BaseModel):
+    """A single dimension score with chain-of-thought reasoning.
+
+    Represents one of four validation dimensions: correspondence, distinctiveness,
+    clarity, or specificity. Reasoning must come before score to encourage
+    deliberate evaluation.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dimension: str = Field(..., description="One of: correspondence, distinctiveness, clarity, specificity")
+    reasoning: str = Field(..., min_length=3, description="Chain-of-thought explanation before scoring")
+    score: int = Field(..., ge=1, le=10, description="Score from 1-10 for this dimension")
+
+
+class ItemValidation(BaseModel):
+    """Validation result for a single item.
+
+    Contains four dimension scores (correspondence, distinctiveness, clarity, specificity),
+    a weighted score, and accept/reject decision.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_index: int = Field(..., ge=0, description="Index of the item in the batch")
+    item_text: str = Field(..., min_length=5, description="The validated item text")
+    dimension_scores: List[DimensionScore] = Field(..., description="Exactly 4 dimension scores")
+    weighted_score: float = Field(..., description="Weighted average: correspondence*0.5 + distinctiveness*0.25 + clarity*0.15 + specificity*0.1")
+    accept: bool = Field(..., description="True if weighted_score >= 7.0")
+    attempt: int = Field(..., ge=1, le=3, description="Which regeneration attempt (1-3)")
+
+
+class ValidationResponse(BaseModel):
+    """Validator agent output containing all item validations."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    validations: List[ItemValidation] = Field(default_factory=list, description="Validation results for all items")
+
+
 class AuditMetadata(BaseModel):
     """Minimal audit trail."""
 
@@ -152,6 +196,8 @@ class AuditMetadata(BaseModel):
     stop_reason: str
     model_info: Dict[str, Any] = Field(default_factory=dict)
     approved_sources: List[str] = Field(default_factory=list)
+    validation_attempts: int = Field(default=0, description="Total validation attempts across all items")
+    validation_failures: int = Field(default=0, description="Number of items that failed validation")
 
 
 class FinalOutput(BaseModel):

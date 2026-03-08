@@ -127,3 +127,116 @@ def test_retry_limit():
     }
     result = route_after_validation(state_max_retries)
     assert result.goto == "reviewers_fanout_node", "Max retries should accept and route to reviewers"
+
+
+def test_finalize_node_enhanced_output():
+    """Phase 03.1: finalize_node populates enhanced FinalOutput fields from GraphState."""
+    from app.graph import finalize_node
+    from app.schemas import (
+        UserRequest, ReviewComment, DraftItem, EvidenceChunk,
+        ItemValidation, DimensionScore
+    )
+
+    # Arrange: Create GraphState with all enhanced metadata
+    user_req = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Definition",
+        target_population="Adults",
+        response_scale="1-5 Likert",
+        item_count=3,
+        constraints=[]
+    )
+
+    linguistic_comment = ReviewComment(
+        type="linguistic",
+        item_index=0,
+        issue="Linguistic issue",
+        severity=2,
+        suggested_edit="Edit suggestion"
+    )
+
+    bias_comment = ReviewComment(
+        type="bias",
+        item_index=1,
+        issue="Bias detected",
+        severity=4,
+        suggested_edit="Remove bias"
+    )
+
+    content_comment = ReviewComment(
+        type="content",
+        item_index=None,
+        issue="General content issue",
+        severity=3,
+        suggested_edit="Revise"
+    )
+
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test Construct",
+        rationale="Test rationale for the item",
+        evidence_citations=["source1"]
+    )
+
+    evidence = EvidenceChunk(
+        source_id="source1",
+        title="Test Source",
+        snippet="Evidence text",
+        url_or_docref="https://example.com/source1",
+        quote="Exact quote from source"
+    )
+
+    dim_scores = [
+        DimensionScore(dimension="correspondence", reasoning="Good alignment", score=9),
+        DimensionScore(dimension="distinctiveness", reasoning="Clear boundaries", score=8),
+        DimensionScore(dimension="clarity", reasoning="Easy to understand", score=8),
+        DimensionScore(dimension="specificity", reasoning="Precise wording", score=9),
+    ]
+
+    validation = ItemValidation(
+        item_index=0,
+        item_text="Item text",
+        dimension_scores=dim_scores,
+        weighted_score=8.5,
+        accept=True,
+        attempt=1
+    )
+
+    state = {
+        "user_request": user_req,
+        "thread_id": "test-thread",
+        "run_id": "test-run",
+        "timestamp_utc": "2026-03-08T00:00:00Z",
+        "draft_items": [draft_item],
+        "linguistic_comments": [linguistic_comment],
+        "bias_comments": [bias_comment],
+        "content_comments": [content_comment],
+        "evidence": [evidence],
+        "validation_results": [validation],
+        "iteration": 2,
+        "stop_reason": "max_iterations",
+        "validation_attempt": 1
+    }
+
+    # Act: Call finalize_node
+    result = finalize_node(state)
+
+    # Assert: FinalOutput populated with enhanced fields
+    final_output = result["final_output"]
+
+    assert final_output.user_request == user_req
+    assert final_output.user_request.construct_name == "Test Construct"
+
+    assert len(final_output.linguistic_feedback) == 1
+    assert final_output.linguistic_feedback[0].issue == "Linguistic issue"
+
+    assert len(final_output.bias_feedback) == 1
+    assert final_output.bias_feedback[0].severity == 4
+
+    assert len(final_output.content_feedback) == 1
+    assert final_output.content_feedback[0].item_index is None
+
+    # Existing fields still work
+    assert len(final_output.final_items) == 1
+    assert final_output.audit.thread_id == "test-thread"
+    assert final_output.audit.iteration_count == 2

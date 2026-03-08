@@ -39,13 +39,25 @@ Human feedback refinement
 - Keep items aligned to construct_definition even when feedback requests style or wording changes.
 
 Psychometric writing requirements
-A) Construct fidelity and domain coverage
+Section A: Construct fidelity and domain coverage
 - Use the provided construct_definition as the authority.
 - If construct_exclusions is provided, treat it as a strict boundary for out-of-scope meaning.
 - Use evidence to identify facets. Ensure coverage across facets, but keep each item unidimensional.
 - Avoid construct contamination from close neighbors. If boundaries are unclear, use conservative wording and note the risk in rationale.
 
-B) Wording and comprehension
+10 Core Psychometric Principles:
+1. Unidimensionality: Each item measures single facet; avoid double-barreled content
+2. Construct correspondence: Content directly reflects definition boundaries
+3. Distinctiveness: Clearly about target construct, not neighbors
+4. Reading level control: Target 6th-8th general, 5th-6th clinical, 10th-12th specialized (see examples below)
+5. Semantic diversity: Vary facets not synonyms (see examples below)
+6. Concrete language: Short, simple, concrete sentences
+7. Temporal clarity: Anchor vague quantifiers or avoid them
+8. Positive keying only: No reverse-scored items
+9. Cultural neutrality: Avoid idioms, culture-specific references
+10. Accessibility: No assumptions about work, family, citizenship, resources
+
+Section B: Wording and comprehension
 - Short, simple, concrete sentences.
 - Avoid abstract language that requires inference.
 - Avoid double-barreled content.
@@ -54,11 +66,43 @@ B) Wording and comprehension
 - Avoid jargon, slang, idioms, culturally specific references.
 - Use first-person agreement statements suitable for Likert responding.
 
-C) Keying and polarity
-- Prefer positively keyed items.
-- Do not write reverse-coded items or negative stems unless explicitly requested.
+Semantic Diversity Examples:
+❌ BAD (redundant set - synonym substitution):
+- "I feel confident in my abilities"
+- "I am confident in my capabilities"
+- "I have confidence in my skills"
 
-D) Bias minimization pre-check
+✓ GOOD (diverse facets - facet variation):
+- "I feel confident in my abilities" (self-efficacy)
+- "I handle setbacks without losing confidence" (resilience)
+- "I speak up even when my ideas differ" (assertiveness)
+
+Vary wording while targeting different facets. Avoid near-synonyms.
+
+Reading Level Guidelines:
+Use as agent judgment guidelines (no automated measurement):
+
+- General population: 6th-8th grade
+  Avg sentence length: 15-20 words, ≤2 syllables/word
+  Example: "I feel comfortable sharing my ideas with my team"
+
+- Clinical population: 5th-6th grade
+  Avg sentence length: 12-15 words, avoid medical jargon
+  Example: "I worry about things that might go wrong"
+
+- Specialized/professional: 10th-12th grade
+  Avg sentence length: 20-25 words, domain terminology acceptable
+  Example: "I proactively identify strategic opportunities that align with organizational priorities"
+
+Apply guidelines during drafting. Prioritize clarity over rigid adherence.
+
+Section C: Keying and polarity
+- Generate ONLY positively keyed items
+- DO NOT write reverse-coded items or negative stems
+- Rationale: Recent research (2025) shows reverse items introduce linguistic complexity, cognitive load, and measurement error
+- Achieve construct breadth through facet diversity, not item reversal
+
+Section D: Bias minimization pre-check
 - Do not assume a specific work arrangement, culture, family structure, citizenship status, religion, or socioeconomic status.
 - Avoid sensitive protected attribute references.
 - Avoid items that could systematically disadvantage groups due to context access differences unless the construct explicitly requires that context, and then generalize the referent.
@@ -75,5 +119,10 @@ Evidence citations
 - If evidence is empty, evidence_citations must be [].
 
 Rationales
-- Each rationale must explain which facet of the construct the item targets and why the wording reduces ambiguity or bias risk.
-- Keep rationales short and technical.
+Each rationale must explain:
+1. Facet targeting: Which facet of the construct this item measures and why
+2. Wording choices: How language reduces ambiguity (concrete vs abstract, temporal clarity)
+3. Distinctiveness: Why this item measures target construct and not neighbors
+4. Bias pre-check: How item avoids cultural/socioeconomic assumptions
+
+Keep rationales technical and concise (2-4 sentences).

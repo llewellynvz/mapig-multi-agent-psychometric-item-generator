@@ -117,11 +117,16 @@ describe('GeneratedItemsTable export UI', () => {
     const formatSelector = selectTriggers[selectTriggers.length - 1];
     await user.click(formatSelector);
 
-    // Wait for options to appear
+    // Wait for options to appear - use getAllByText since text appears in both trigger and options
     await waitFor(() => {
-      expect(screen.getByText('CSV')).toBeDefined();
-      expect(screen.getByText('JSON')).toBeDefined();
-      expect(screen.getByText('Markdown')).toBeDefined();
+      const csvOptions = screen.getAllByText('CSV');
+      const jsonOptions = screen.getAllByText('JSON');
+      const markdownOptions = screen.getAllByText('Markdown');
+
+      // Should have at least one of each (in the dropdown menu)
+      expect(csvOptions.length).toBeGreaterThan(0);
+      expect(jsonOptions.length).toBeGreaterThan(0);
+      expect(markdownOptions.length).toBeGreaterThan(0);
     });
   });
 

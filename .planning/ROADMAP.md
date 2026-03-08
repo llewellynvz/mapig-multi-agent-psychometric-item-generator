@@ -90,7 +90,7 @@ Plans:
 - [ ] 03-03-PLAN.md — End-to-end integration and Vercel documentation (Wave 2)
 
 ### Phase 4: Production Features
-**Goal**: Users can export complete item sets with full metadata in their preferred format (Markdown, CSV, JSON) including validation scores, review feedback, and audit trails
+**Goal**: Users can export complete item sets with full metadata in their preferred format (Markdown, CSV, JSON) including validation scores and audit trails
 
 **Depends on**: Phase 3
 
@@ -103,10 +103,10 @@ Plans:
   4. Review feedback from all agents (Content, Linguistic, Bias, Meta Editor) is preserved in export with agent attribution
   5. User can download results immediately after generation completes without additional configuration
 
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 04-01-PLAN.md — Multi-format export implementation with RFC 4180-compliant CSV, JSON, and Markdown formats
 
 ### Phase 5: Vercel Deployment
 **Goal**: MAPIG runs on Vercel serverless infrastructure with production URL, maintaining all functionality including SSE streaming and SQLite checkpoints
@@ -156,7 +156,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
 | 2. Agent Architecture Optimization | 5/6 | In Progress|  |
 | 3. Claude API Migration | 0/3 | Not started | - |
-| 4. Production Features | 0/TBD | Not started | - |
+| 4. Production Features | 0/1 | Not started | - |
 | 5. Vercel Deployment | 0/TBD | Not started | - |
 | 6. Comprehensive Evaluation Framework | 0/TBD | Not started | - |
 

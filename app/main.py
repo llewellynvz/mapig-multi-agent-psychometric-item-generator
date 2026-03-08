@@ -349,6 +349,19 @@ async def generate_items_stream(
                         yield f"data: {json.dumps({'type': 'node_start', 'node': node_name, 'display_name': node_display_name, 'iteration': current_iteration})}\n\n"
                         seen_in_iteration[current_iteration].add(node_name)
 
+                        # Add friendly messages for validation nodes
+                        if node_name == "validation_node":
+                            yield f"data: {json.dumps({'type': 'status', 'message': 'Validating item quality...'})}\n\n"
+                        elif node_name == "regenerate_items_node":
+                            yield f"data: {json.dumps({'type': 'status', 'message': 'Regenerating low-scoring items...'})}\n\n"
+
+                    # Emit validation results summary after validation_node completes
+                    if node_name == "validation_node" and "validation_results" in node_state:
+                        validation_results = node_state.get("validation_results", [])
+                        failed_count = len([v for v in validation_results if not v.accept])
+                        if failed_count > 0:
+                            yield f"data: {json.dumps({'type': 'warning', 'message': f'{failed_count} items below quality threshold, regenerating...'})}\n\n"
+
                     # Emit iteration change event
                     if current_iteration != last_iteration and current_iteration > 0:
                         _set_run_status(

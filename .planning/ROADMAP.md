@@ -89,6 +89,19 @@ Plans:
 - [ ] 03-02-PLAN.md — Frontend model selector and cost tracking UI (Wave 1)
 - [ ] 03-03-PLAN.md — End-to-end integration and Vercel documentation (Wave 2)
 
+### Phase 03.1: Enhance FinalOutput schema with user metadata and review feedback (INSERTED)
+
+**Goal:** FinalOutput schema includes user_request and review feedback arrays enabling complete metadata export without breaking backward compatibility
+
+**Requirements**: None (schema enhancement for Phase 4 export requirements)
+
+**Depends on:** None (independent schema enhancement)
+
+**Plans:** 1 plan
+
+Plans:
+- [ ] 03.1-01-PLAN.md — Add optional metadata fields to FinalOutput and update finalize_node (Wave 1)
+
 ### Phase 4: Production Features
 **Goal**: Users can export complete item sets with full metadata in their preferred format (Markdown, CSV, JSON) including validation scores and audit trails
 
@@ -149,13 +162,14 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
 | 2. Agent Architecture Optimization | 5/6 | In Progress|  |
 | 3. Claude API Migration | 0/3 | Not started | - |
+| 3.1. Enhance FinalOutput schema | 0/1 | Not started | - |
 | 4. Production Features | 0/1 | Not started | - |
 | 5. Vercel Deployment | 0/TBD | Not started | - |
 | 6. Comprehensive Evaluation Framework | 0/TBD | Not started | - |

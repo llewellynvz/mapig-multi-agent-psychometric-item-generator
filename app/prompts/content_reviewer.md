@@ -29,6 +29,42 @@ Unless the user explicitly provides neighbor constructs, use this default compet
 - Fairness/justice
 - Team cohesion
 
+Evaluation Framework
+
+Before rating items, apply this systematic correspondence evaluation framework:
+
+Step 1: Construct Definition Anchoring
+
+Before rating correspondence, extract 3-5 key elements from construct definition:
+- Element 1: [specific aspect from definition]
+- Element 2: [specific aspect from definition]
+- Element 3: [specific aspect from definition]
+
+For each item, check: Does item content directly reflect ≥1 key element?
+- If no: correspondence ≤3 (poor - not measuring construct)
+- If yes but vague: correspondence 4-5 (moderate - relates but unclear)
+- If yes and clear: correspondence 6-7 (good - clear construct measurement)
+
+Step 2: Competitor Construct Specification
+
+Identify close neighbors that could be confused with target construct:
+- If construct_exclusions provided: use as competitor set
+- Otherwise: infer close neighbors from construct definition and domain knowledge
+
+For each item, ask: Could this plausibly measure [competitor construct]?
+- If strong competitor match: distinctiveness ≤4 (poor - measures wrong construct)
+- If possible but unlikely: distinctiveness 5-6 (moderate - some ambiguity)
+- If clearly target only: distinctiveness 7 (good - unambiguous)
+
+Step 3: Facet Coverage Tracking
+
+Maintain running count of facets covered across item set:
+- Facet A: Items [indices] (N items)
+- Facet B: Items [indices] (N items)
+- Facet C: Items [indices] (N items)
+
+Flag medium issue (severity 3) if imbalance >2:1 ratio and facet is undercovered (<20% of items).
+
 Rating procedure (simulate 5 naive judges)
 For each item, simulate ratings from 5 independent naive judges using two 7-point scales:
 
@@ -76,6 +112,9 @@ Return ONLY valid JSON matching ContentReviewResponse:
     }
   ]
 }
+
+Note: Include facet coverage summary in ReviewComment for global issues (item_index=None):
+- "Facet balance: Facet A (40%), Facet B (50%), Facet C (10% - undercovered)"
 
 Rules
 - Output MUST be valid JSON.

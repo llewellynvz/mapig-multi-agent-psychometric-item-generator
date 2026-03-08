@@ -185,7 +185,6 @@ def test_content_reviewer_criteria():
 
 
 # AGT-06: Linguistic Reviewer - Vague quantifier rules
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-04")
 def test_linguistic_reviewer_quantifiers():
     """Test AGT-06: Verify vague quantifier rules in linguistic_reviewer.md.
 

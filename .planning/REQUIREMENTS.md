@@ -43,6 +43,13 @@ Requirements for production deployment milestone. Research-backed optimization f
 - [ ] **API-06**: UI model selector (Claude vs OpenAI, default Claude)
 - [ ] **API-07**: Cost tracking per model (Opus vs Sonnet vs OpenAI)
 
+### Phase 3.1: Enhance FinalOutput Schema
+
+- [ ] **SCHEMA-01**: Add optional user_request field to FinalOutput schema with backward compatibility
+- [ ] **SCHEMA-02**: Add review feedback arrays (linguistic, bias, content) to FinalOutput schema
+- [ ] **SCHEMA-03**: Update finalize_node to populate enhanced fields from GraphState
+- [ ] **SCHEMA-04**: Mirror schema changes in frontend TypeScript FinalOutput interface
+
 ### Phase 4: Production Features
 
 - [ ] **FEAT-01**: Download button with format selector (Markdown, CSV, JSON)
@@ -145,6 +152,10 @@ Mapping requirements to phases. Updated during roadmap creation.
 | API-05 | Phase 3 | Pending |
 | API-06 | Phase 3 | Pending |
 | API-07 | Phase 3 | Pending |
+| SCHEMA-01 | Phase 3.1 | Pending |
+| SCHEMA-02 | Phase 3.1 | Pending |
+| SCHEMA-03 | Phase 3.1 | Pending |
+| SCHEMA-04 | Phase 3.1 | Pending |
 | FEAT-01 | Phase 4 | Pending |
 | FEAT-02 | Phase 4 | Pending |
 | FEAT-03 | Phase 4 | Pending |
@@ -169,10 +180,10 @@ Mapping requirements to phases. Updated during roadmap creation.
 | EVAL-08 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 54 total
-- Mapped to phases: 54
+- v1 requirements: 58 total (added 4 for Phase 3.1)
+- Mapped to phases: 58
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-08*
-*Last updated: 2026-03-08 after roadmap creation*
+*Last updated: 2026-03-08 (Phase 3.1 requirements added)*

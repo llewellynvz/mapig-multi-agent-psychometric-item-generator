@@ -93,19 +93,27 @@ Plans:
 
 **Goal:** FinalOutput schema includes user_request and review feedback arrays enabling complete metadata export without breaking backward compatibility
 
-**Requirements**: None (schema enhancement for Phase 4 export requirements)
+**Requirements**: SCHEMA-01, SCHEMA-02, SCHEMA-03, SCHEMA-04
 
-**Depends on:** None (independent schema enhancement)
+**Depends on:** None (independent schema enhancement for Phase 4 dependencies)
 
-**Plans:** 1 plan
+**Success Criteria** (what must be TRUE):
+  1. FinalOutput schema contains optional user_request field with backward-compatible defaults
+  2. FinalOutput schema contains review feedback arrays (linguistic, bias, content) with Field(default_factory=list)
+  3. finalize_node populates all enhanced fields from GraphState without breaking existing logic
+  4. Frontend TypeScript types mirror backend schema changes exactly
+  5. Existing API consumers continue working without modification (null/empty arrays for new fields)
+
+**Plans:** 2 plans
 
 Plans:
+- [ ] 03.1-00-PLAN.md — Create test scaffolds for schema validation and graph integration (Wave 0)
 - [ ] 03.1-01-PLAN.md — Add optional metadata fields to FinalOutput and update finalize_node (Wave 1)
 
 ### Phase 4: Production Features
 **Goal**: Users can export complete item sets with full metadata in their preferred format (Markdown, CSV, JSON) including validation scores and audit trails
 
-**Depends on**: Phase 3
+**Depends on**: Phase 3.1 (requires enhanced FinalOutput schema)
 
 **Requirements**: FEAT-01, FEAT-02, FEAT-03, FEAT-04, FEAT-05, FEAT-06
 
@@ -169,11 +177,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
 | 2. Agent Architecture Optimization | 5/6 | In Progress|  |
 | 3. Claude API Migration | 0/3 | Not started | - |
-| 3.1. Enhance FinalOutput schema | 0/1 | Not started | - |
+| 3.1. Enhance FinalOutput schema | 0/2 | Not started | - |
 | 4. Production Features | 0/1 | Not started | - |
 | 5. Vercel Deployment | 0/TBD | Not started | - |
 | 6. Comprehensive Evaluation Framework | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-08*
+*Last updated: 2026-03-08 (Phase 3.1 requirements and dependency added)*

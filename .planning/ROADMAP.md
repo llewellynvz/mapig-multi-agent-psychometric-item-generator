@@ -82,10 +82,12 @@ Plans:
   4. Item generation workflow completes successfully using Claude models end-to-end
   5. Cost tracking displays total API spend broken down by model (Opus vs Sonnet vs OpenAI) in results UI
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 03-01-PLAN.md — Backend model infrastructure with smart allocation (Wave 1)
+- [ ] 03-02-PLAN.md — Frontend model selector and cost tracking UI (Wave 1)
+- [ ] 03-03-PLAN.md — End-to-end integration and Vercel documentation (Wave 2)
 
 ### Phase 4: Production Features
 **Goal**: Users can export complete item sets with full metadata in their preferred format (Markdown, CSV, JSON) including validation scores, review feedback, and audit trails
@@ -153,7 +155,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
 | 2. Agent Architecture Optimization | 5/6 | In Progress|  |
-| 3. Claude API Migration | 0/TBD | Not started | - |
+| 3. Claude API Migration | 0/3 | Not started | - |
 | 4. Production Features | 0/TBD | Not started | - |
 | 5. Vercel Deployment | 0/TBD | Not started | - |
 | 6. Comprehensive Evaluation Framework | 0/TBD | Not started | - |

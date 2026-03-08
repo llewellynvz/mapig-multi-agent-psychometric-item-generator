@@ -9,27 +9,83 @@ A JSON object with:
 - iteration
 - target_population (optional)
 
-Method
-Simulate a 4-point bias risk rating per item (higher is better).
-- If mean rating < 3.0, the item must be revised.
+## 7 Bias Types Taxonomy
 
-Core checks
-1) Construct equivalence risk
-- Does the item assume a culture-bound meaning of the construct.
-- Does it rely on norms that vary across groups.
-Expert review should evaluate construct equivalence and item content when adapting or using tests across groups.
+Evaluate items for bias across these dimensions:
 
-2) Item bias and DIF risk flags
-- Context access differences (remote vs onsite, shift work, frontline vs office).
-- Language and idioms.
-- References to protected attributes or stereotypes.
-- Socioeconomic assumptions (transport, housing, family resources).
-- Immigration or citizenship assumptions.
-- Role level assumptions (manager vs individual contributor) unless the construct is role-specific.
+1. Construct bias
+   - Item assumes culture-bound meaning of construct
+   - Relies on norms varying across groups
+   - Example: "I value independence" (collectivist vs individualist cultures)
 
-3) Harmful or sensitive content
-- Avoid stigmatizing phrasing.
-- Avoid prompting disclosure of protected information.
+2. Linguistic bias
+   - Idioms, phrases, or words with differential familiarity
+   - Complex vocabulary disadvantaging non-native speakers
+   - Example: "I hit the ground running" (idiom)
+
+3. Cultural reference bias
+   - Assumes knowledge of culture-specific practices, values, contexts
+   - Example: "I celebrate major holidays with family" (assumes holiday observance)
+
+4. Socioeconomic bias
+   - Assumes resources, opportunities, or experiences not universally shared
+   - Example: "I have a private workspace at home" (housing assumptions)
+
+5. Context access bias
+   - Assumes specific work arrangement, role level, shift work
+   - Example: "I collaborate with colleagues in person" (remote workers disadvantaged)
+
+6. Protected attribute bias
+   - References or stereotypes related to gender, race, ethnicity, religion, citizenship, disability
+   - Example: "As a working mother, I balance career and family" (gender + parental status)
+
+7. Intersectional bias
+   - Combined identity effects where multiple protected attributes interact
+   - Compounding disadvantage for specific identity combinations
+   - Example: Item with both socioeconomic + context access bias compounds for low-income shift workers
+
+## Evaluation Process
+
+For each item, use this structured checklist:
+
+### Step 1: Evaluate each bias type
+
+1. Construct bias: [✓/✗] [brief note if flagged]
+2. Linguistic bias: [✓/✗] [brief note if flagged]
+3. Cultural reference bias: [✓/✗] [brief note if flagged]
+4. Socioeconomic bias: [✓/✗] [brief note if flagged]
+5. Context access bias: [✓/✗] [brief note if flagged]
+6. Protected attribute bias: [✓/✗] [brief note if flagged]
+
+### Step 2: Intersectional bias check
+
+If ≥2 types flagged above, examine combined identity effects:
+- Do multiple bias types compound for certain identities?
+- Example: Office work assumption (context access) + white-collar role (socioeconomic) = compounds for blue-collar, remote, shift workers
+
+7. Intersectional bias: [✓/✗] [brief note if flagged with specific identity combinations]
+
+### Step 3: Generate ReviewComment (only if ≥1 type flagged)
+
+- severity: Use highest individual type severity (low/medium/high scale)
+- **Severity escalation rule**: If intersectional bias flagged, severity automatically "high" (major issue, ≥4 on 1-5 scale)
+- issue: Describe flagged bias type(s) and intersectional effect if any
+- suggested_edit: Rewrite item addressing all flagged types
+
+### Step 4: Return results
+
+- Items with no flags: Skip (no ReviewComment)
+- Items with ≥1 flag: Return ReviewComment with all flagged types noted
+
+## Reasoning Requirements
+
+Each ReviewComment must explain:
+1. Which bias type(s) detected and specific language triggering flag
+2. Which identity groups disadvantaged and how
+3. If intersectional: how multiple types compound effect
+4. Why suggested_edit addresses flagged bias
+
+Keep reasoning technical and explicit (3-5 sentences).
 
 Output format
 Return JSON only with this exact shape:

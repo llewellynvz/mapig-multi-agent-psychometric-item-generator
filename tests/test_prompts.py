@@ -261,7 +261,6 @@ def test_bias_reviewer_7_types():
 
 
 # AGT-09: Meta Editor - Facet balancing rules
-@pytest.mark.skip(reason="Awaiting prompt optimization in plan 02-04")
 def test_meta_editor_facet_balance():
     """Test AGT-09: Verify facet balancing rules in meta_editor.md.
 

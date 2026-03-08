@@ -45,10 +45,10 @@ Requirements for production deployment milestone. Research-backed optimization f
 
 ### Phase 3.1: Enhance FinalOutput Schema
 
-- [ ] **SCHEMA-01**: Add optional user_request field to FinalOutput schema with backward compatibility
-- [ ] **SCHEMA-02**: Add review feedback arrays (linguistic, bias, content) to FinalOutput schema
-- [ ] **SCHEMA-03**: Update finalize_node to populate enhanced fields from GraphState
-- [ ] **SCHEMA-04**: Mirror schema changes in frontend TypeScript FinalOutput interface
+- [x] **SCHEMA-01**: Add optional user_request field to FinalOutput schema with backward compatibility
+- [x] **SCHEMA-02**: Add review feedback arrays (linguistic, bias, content) to FinalOutput schema
+- [x] **SCHEMA-03**: Update finalize_node to populate enhanced fields from GraphState
+- [x] **SCHEMA-04**: Mirror schema changes in frontend TypeScript FinalOutput interface
 
 ### Phase 4: Production Features
 
@@ -152,10 +152,10 @@ Mapping requirements to phases. Updated during roadmap creation.
 | API-05 | Phase 3 | Pending |
 | API-06 | Phase 3 | Pending |
 | API-07 | Phase 3 | Pending |
-| SCHEMA-01 | Phase 3.1 | Pending |
-| SCHEMA-02 | Phase 3.1 | Pending |
-| SCHEMA-03 | Phase 3.1 | Pending |
-| SCHEMA-04 | Phase 3.1 | Pending |
+| SCHEMA-01 | Phase 3.1 | Complete |
+| SCHEMA-02 | Phase 3.1 | Complete |
+| SCHEMA-03 | Phase 3.1 | Complete |
+| SCHEMA-04 | Phase 3.1 | Complete |
 | FEAT-01 | Phase 4 | Pending |
 | FEAT-02 | Phase 4 | Pending |
 | FEAT-03 | Phase 4 | Pending |

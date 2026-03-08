@@ -53,9 +53,23 @@ export interface AuditMetadata {
   validation_failures?: number;
 }
 
+export interface ReviewComment {
+  type: 'linguistic' | 'bias' | 'content';
+  item_index?: number;
+  issue: string;
+  severity: number;  // 1-5
+  suggested_edit: string;
+}
+
 export interface FinalOutput {
   final_items: FinalItem[];
   audit: AuditMetadata;
+
+  // Phase 03.1 enhancements: Optional metadata for complete export
+  user_request?: UserRequest;
+  linguistic_feedback?: ReviewComment[];
+  bias_feedback?: ReviewComment[];
+  content_feedback?: ReviewComment[];
 }
 
 export interface HealthResponse {

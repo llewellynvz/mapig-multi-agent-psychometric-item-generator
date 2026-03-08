@@ -56,17 +56,17 @@ describe('GeneratedItemsTable export UI', () => {
     content_feedback: [],
   };
 
-  let mockCreateObjectURL: ReturnType<typeof vi.fn>;
-  let mockRevokeObjectURL: ReturnType<typeof vi.fn>;
-  let mockClick: ReturnType<typeof vi.fn>;
+  let mockCreateObjectURL: any;
+  let mockRevokeObjectURL: any;
+  let mockClick: any;
   let mockLocalStorage: Record<string, string>;
 
   beforeEach(() => {
     // Mock URL.createObjectURL and revokeObjectURL
     mockCreateObjectURL = vi.fn(() => 'blob:mock-url');
     mockRevokeObjectURL = vi.fn();
-    global.URL.createObjectURL = mockCreateObjectURL;
-    global.URL.revokeObjectURL = mockRevokeObjectURL;
+    (global.URL.createObjectURL as unknown) = mockCreateObjectURL;
+    (global.URL.revokeObjectURL as unknown) = mockRevokeObjectURL;
 
     // Mock createElement to track download clicks
     mockClick = vi.fn();
@@ -74,7 +74,7 @@ describe('GeneratedItemsTable export UI', () => {
     vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
       const element = originalCreateElement(tagName);
       if (tagName === 'a') {
-        element.click = mockClick;
+        element.click = mockClick as () => void;
       }
       return element;
     });

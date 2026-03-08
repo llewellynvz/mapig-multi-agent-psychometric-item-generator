@@ -35,10 +35,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. System attempts up to 3 regenerations per rejected item before accepting the best-scoring version
   5. Results UI displays validation scores across 4 dimensions (correspondence 50%, distinctiveness 25%, clarity 15%, specificity 10%) with reasoning for each item
 
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 01-01-PLAN.md — Create test scaffolding for TDD workflow (Wave 1)
+- [ ] 01-02-PLAN.md — Add validation schemas, Claude configuration, and LLM factory (Wave 2)
+- [ ] 01-03-PLAN.md — Implement validation agent with multi-dimensional scoring rubric (Wave 3)
+- [ ] 01-04-PLAN.md — Integrate validation gate into graph with conditional routing (Wave 4)
+- [ ] 01-05-PLAN.md — Display validation scores and reasoning in Results UI (Wave 5)
 
 ### Phase 2: Agent Architecture Optimization
 **Goal**: All 7 agents apply research-backed psychometric principles through optimized prompts that enforce item quality standards, semantic diversity, and comprehensive bias detection
@@ -142,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. LLM-as-Judge Validation Gate | 0/TBD | Not started | - |
+| 1. LLM-as-Judge Validation Gate | 0/5 | Planned | - |
 | 2. Agent Architecture Optimization | 0/TBD | Not started | - |
 | 3. Claude API Migration | 0/TBD | Not started | - |
 | 4. Production Features | 0/TBD | Not started | - |

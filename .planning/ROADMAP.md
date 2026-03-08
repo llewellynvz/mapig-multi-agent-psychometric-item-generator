@@ -58,7 +58,7 @@ Plans:
   4. Content Reviewer enforces construct correspondence with explicit facet balancing
   5. Critic makes routing decisions based on adaptive severity thresholds by iteration, enabling early termination for high-quality items
 
-**Plans**: 5 plans
+**Plans**: 6 plans
 
 Plans:
 - [x] 02-01-PLAN.md — Create test scaffolds for prompt optimizations (Wave 0)
@@ -66,6 +66,7 @@ Plans:
 - [x] 02-03-PLAN.md — Optimize Bias Reviewer prompt with 7-type taxonomy (Wave 1)
 - [x] 02-04-PLAN.md — Optimize Content and Linguistic Reviewer prompts (Wave 1)
 - [x] 02-05-PLAN.md — Optimize Meta Editor and Critic with adaptive thresholds (Wave 2)
+- [ ] 02-06-PLAN.md — Remove test skip decorators from Item Writer tests (Wave 1, gap closure)
 
 ### Phase 3: Claude API Migration
 **Goal**: MAPIG runs on Claude API by default with smart model allocation (Opus for validation, Sonnet for other agents) while maintaining OpenAI as user-selectable fallback
@@ -151,7 +152,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
-| 2. Agent Architecture Optimization | 4/5 | In Progress|  |
+| 2. Agent Architecture Optimization | 5/6 | In Progress|  |
 | 3. Claude API Migration | 0/TBD | Not started | - |
 | 4. Production Features | 0/TBD | Not started | - |
 | 5. Vercel Deployment | 0/TBD | Not started | - |

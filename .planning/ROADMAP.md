@@ -12,7 +12,7 @@ Transform MAPIG from an OpenAI-powered prototype into a production-ready psychom
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: LLM-as-Judge Validation Gate** - Automated construct validity scoring with rejection/retry logic
+- [x] **Phase 1: LLM-as-Judge Validation Gate** - Automated construct validity scoring with rejection/retry logic (completed 2026-03-08)
 - [ ] **Phase 2: Agent Architecture Optimization** - Research-backed prompt refinement with psychometric principles
 - [ ] **Phase 3: Claude API Migration** - Smart model allocation with OpenAI fallback and UI selector
 - [ ] **Phase 4: Production Features** - Multi-format export with validation scores and audit trails
@@ -146,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. LLM-as-Judge Validation Gate | 4/5 | In progress | - |
+| 1. LLM-as-Judge Validation Gate | 5/5 | Complete   | 2026-03-08 |
 | 2. Agent Architecture Optimization | 0/TBD | Not started | - |
 | 3. Claude API Migration | 0/TBD | Not started | - |
 | 4. Production Features | 0/TBD | Not started | - |

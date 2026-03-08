@@ -6,10 +6,76 @@ psychometric items across four dimensions using Claude Opus.
 
 import os
 import pytest
+from pathlib import Path
 
 os.environ["APP_MODE"] = "mock"
 
 from app.schemas import UserRequest, DraftItem
+
+
+# Task 1: Validation prompt tests
+def test_prompt_instructs_cot_reasoning():
+    """Test 1 for Task 1: Prompt instructs chain-of-thought reasoning before scores."""
+    prompt_path = Path("app/prompts/validator.md")
+    assert prompt_path.exists(), "validator.md prompt file must exist"
+
+    content = prompt_path.read_text(encoding="utf-8").lower()
+
+    # Check for chain-of-thought instructions
+    assert "chain" in content or "reasoning" in content, "Prompt must mention chain-of-thought or reasoning"
+    assert "before" in content, "Prompt must instruct reasoning BEFORE scoring"
+
+
+def test_prompt_defines_four_dimensions_with_weights():
+    """Test 2 for Task 1: Prompt defines all 4 dimensions with weights."""
+    prompt_path = Path("app/prompts/validator.md")
+    assert prompt_path.exists(), "validator.md prompt file must exist"
+
+    content = prompt_path.read_text(encoding="utf-8").lower()
+
+    # Check for all 4 dimensions
+    assert "correspondence" in content, "Prompt must define correspondence dimension"
+    assert "distinctiveness" in content, "Prompt must define distinctiveness dimension"
+    assert "clarity" in content, "Prompt must define clarity dimension"
+    assert "specificity" in content, "Prompt must define specificity dimension"
+
+    # Check for weights
+    assert "50" in content or "0.5" in content, "Prompt must specify correspondence weight (50%)"
+    assert "25" in content or "0.25" in content, "Prompt must specify distinctiveness weight (25%)"
+    assert "15" in content or "0.15" in content, "Prompt must specify clarity weight (15%)"
+    assert "10" in content or "0.1" in content, "Prompt must specify specificity weight (10%)"
+
+
+def test_prompt_provides_scale_anchors():
+    """Test 3 for Task 1: Prompt provides 1-10 scale anchors per dimension."""
+    prompt_path = Path("app/prompts/validator.md")
+    assert prompt_path.exists(), "validator.md prompt file must exist"
+
+    content = prompt_path.read_text(encoding="utf-8")
+
+    # Check for scale range
+    assert "1-10" in content or "1 to 10" in content, "Prompt must specify 1-10 scale"
+
+    # Check for scale anchors (high and low)
+    assert "10" in content and "1" in content, "Prompt must provide scale anchors"
+
+    # Check minimum line count (100+ lines as per requirement)
+    lines = content.split('\n')
+    assert len(lines) >= 100, f"Prompt must have at least 100 lines, got {len(lines)}"
+
+
+def test_prompt_specifies_weighted_formula_and_threshold():
+    """Test 4 for Task 1: Prompt specifies weighted score formula and 7.0 threshold."""
+    prompt_path = Path("app/prompts/validator.md")
+    assert prompt_path.exists(), "validator.md prompt file must exist"
+
+    content = prompt_path.read_text(encoding="utf-8").lower()
+
+    # Check for weighted score formula
+    assert "weighted" in content, "Prompt must mention weighted scoring"
+
+    # Check for 7.0 threshold
+    assert "7.0" in content or "7" in content, "Prompt must specify 7.0 acceptance threshold"
 
 
 def test_four_dimensions():

@@ -12,6 +12,8 @@ langgraph = "==1.0.6"
 langgraph-checkpoint-sqlite = "==3.0.3"
 langchain-core = "==1.2.8"
 langchain-openai = "==1.1.7"
+langchain-anthropic = ">=1.3.4"
+anthropic = ">=0.84.0"
 fastapi = "==0.128.0"
 uvicorn = { version = "==0.40.0", extras = ["standard"] }
 pydantic = "==2.12.5"

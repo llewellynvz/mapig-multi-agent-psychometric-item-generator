@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT: Optional[str] = Field(default=None)
     AZURE_OPENAI_API_VERSION: str = "2023-06-01-preview"
 
+    # Anthropic Claude (used for validation)
+    CLAUDE_API_KEY: Optional[str] = Field(default=None)
+    VALIDATOR_MODEL: str = "claude-opus-4-6"  # Highest accuracy for validation
+
     # Web search (optional)
     SEARCH_PROVIDER: str = "perplexity"  # local | perplexity | hybrid
     PERPLEXITY_API_KEY: Optional[str] = None

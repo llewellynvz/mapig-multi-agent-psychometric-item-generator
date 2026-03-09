@@ -89,10 +89,45 @@ def get_validator_model() -> ChatAnthropic:
     return get_claude_chat_model(model=settings.VALIDATOR_MODEL)
 
 
-def get_chat_model() -> Union[ChatOpenAI, AzureChatOpenAI]:
+def get_chat_model_for_agent(
+    agent_name: str,
+    model_provider: str = "claude"
+) -> Union[ChatOpenAI, AzureChatOpenAI, ChatAnthropic]:
+    """Get LLM for specific agent with smart model allocation.
+
+    Smart allocation for Claude provider:
+    - validator agent: claude-opus-4-6 (highest accuracy for critical validation)
+    - all other agents: claude-sonnet-4-5 (cost-effective for drafting/reviewing)
+
+    Args:
+        agent_name: Agent identifier (e.g., "validator", "item_writer", "bias_reviewer")
+        model_provider: "claude" or "openai"
+
+    Returns:
+        Configured chat model instance
+
+    Raises:
+        ValueError: If required API key missing for selected provider
+    """
+    if model_provider == "claude":
+        if agent_name == "validator":
+            return get_claude_chat_model(model="claude-opus-4-6")
+        else:
+            # All other agents use Sonnet for cost optimization
+            return get_claude_chat_model(model="claude-sonnet-4-5")
+    elif model_provider == "openai":
+        return get_openai_chat_model()
+    else:
+        raise ValueError(f"Unsupported model_provider: {model_provider}")
+
+
+def get_chat_model() -> Union[ChatOpenAI, AzureChatOpenAI, ChatAnthropic]:
     """Return the configured chat model for the current APP_MODE."""
     if settings.APP_MODE == "openai":
         return get_openai_chat_model()
     if settings.APP_MODE == "azure":
         return get_azure_chat_model()
+    if settings.APP_MODE == "claude":
+        # Default to Sonnet for general use
+        return get_claude_chat_model(model="claude-sonnet-4-5")
     raise RuntimeError("get_chat_model called in mock mode. Use the mock agents instead.")

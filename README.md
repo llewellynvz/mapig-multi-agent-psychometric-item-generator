@@ -198,6 +198,65 @@ Backend tests (if installed):
 pytest -q
 ```
 
+## Deployment
+
+### Vercel
+
+MAPIG can be deployed to Vercel serverless infrastructure:
+
+**1. Environment Variables**
+
+Add the following to Vercel environment variables (Settings > Environment Variables):
+
+**Required:**
+- `CLAUDE_API_KEY` - Your Anthropic API key (get from https://console.anthropic.com)
+  - Used by default for item generation
+  - Opus for validation agent, Sonnet for other agents
+- `OPENAI_API_KEY` - Your OpenAI API key (optional, for fallback)
+  - Used when user selects OpenAI provider in UI
+
+**Optional:**
+- `PERPLEXITY_API_KEY` - For web evidence search
+- `PERPLEXITY_DOMAIN_FILTER` - Comma-separated allowlist of domains
+
+**2. Deploy Backend**
+
+```bash
+# From project root
+vercel --prod
+```
+
+**3. Deploy Frontend**
+
+```bash
+# From frontend directory
+cd frontend
+vercel --prod
+```
+
+**4. Verify Deployment**
+
+1. Visit your Vercel production URL
+2. Open browser DevTools > Console
+3. Select "Claude" in model provider dropdown (default)
+4. Generate items for a test construct
+5. Verify costs display in Results panel after generation
+
+**Error Handling:**
+
+- Missing `CLAUDE_API_KEY`: Generation blocked with error: "CLAUDE_API_KEY not configured. Add to Vercel environment variables or switch to OpenAI."
+- API failures: Automatic retry with exponential backoff (3 attempts, 60s timeout)
+- Rate limits: SSE progress shows retry status in real-time
+
+**Cost Monitoring:**
+
+After each generation run, the Results panel displays:
+- Claude Opus cost (validation agent)
+- Claude Sonnet cost (other agents)
+- Total API spend
+
+Costs calculated from token usage and displayed in USD with 2 decimal precision.
+
 ## Contributing
 Issues and pull requests are welcome for:
 - Stability fixes

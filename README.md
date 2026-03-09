@@ -27,6 +27,8 @@ MAPIG generates candidate items and review artifacts. It supports expert judgmen
 - Audit metadata on every run: `thread_id`, `run_id`, `iteration_count`, `stop_reason`, model info
 
 ## Architecture
+**Note**: The Python backend is in the `backend/` directory (renamed from `app/` to avoid conflicts with Next.js App Router).
+
 Core agents:
 
 - Web Surfer Agent.

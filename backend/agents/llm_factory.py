@@ -6,7 +6,7 @@ from typing import Union
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
-from app.settings import settings
+from backend.settings import settings
 
 
 @lru_cache(maxsize=1)

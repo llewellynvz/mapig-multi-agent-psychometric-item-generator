@@ -11,13 +11,13 @@ from typing_extensions import TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
-from app.agents.bias_reviewer import review_bias
-from app.agents.critic import decide as critic_decide
-from app.agents.item_writer import write_items
-from app.agents.linguistic_reviewer import review_linguistic
-from app.agents.meta_editor import revise_items
-from app.agents.retrieval_agent import retrieve_evidence
-from app.schemas import (
+from backend.agents.bias_reviewer import review_bias
+from backend.agents.critic import decide as critic_decide
+from backend.agents.item_writer import write_items
+from backend.agents.linguistic_reviewer import review_linguistic
+from backend.agents.meta_editor import revise_items
+from backend.agents.retrieval_agent import retrieve_evidence
+from backend.schemas import (
     AuditMetadata,
     DraftItem,
     EvidenceChunk,
@@ -27,10 +27,10 @@ from app.schemas import (
     RevisionPlan,
     UserRequest,
 )
-from app.settings import settings
-from app.logging_utils import step
-from app.agents.web_surfer import surf as web_surf
-from app.agents.content_reviewer import review_content
+from backend.settings import settings
+from backend.logging_utils import step
+from backend.agents.web_surfer import surf as web_surf
+from backend.agents.content_reviewer import review_content
 
 logger = logging.getLogger("lmaig")
 
@@ -118,7 +118,7 @@ def item_writer_node(state: GraphState) -> GraphState:
 def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
     """Validate draft items with LLM-as-judge scoring and route based on results."""
     with step("validation_node", state):
-        from app.agents.validator import validate_items
+        from backend.agents.validator import validate_items
 
         draft_items = state.get("draft_items", [])
         attempt = state.get("validation_attempt", 1)
@@ -165,7 +165,7 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
 def regenerate_items_node(state: GraphState) -> GraphState:
     """Regenerate only items that failed validation."""
     with step("regenerate_items_node", state):
-        from app.agents.item_writer import write_items
+        from backend.agents.item_writer import write_items
 
         validation_results = state.get("validation_results", [])
         draft_items = state.get("draft_items", [])

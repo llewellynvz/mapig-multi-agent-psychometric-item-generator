@@ -3,16 +3,16 @@ from __future__ import annotations
 import logging
 from typing import List
 
-from app.agents.llm_factory import get_validator_model
-from app.agents.prompt_loader import load_prompt
-from app.schemas import (
+from backend.agents.llm_factory import get_validator_model
+from backend.agents.prompt_loader import load_prompt
+from backend.schemas import (
     DimensionScore,
     DraftItem,
     ItemValidation,
     UserRequest,
     ValidationResponse,
 )
-from app.settings import settings
+from backend.settings import settings
 
 logger = logging.getLogger(__name__)
 

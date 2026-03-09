@@ -37,11 +37,11 @@ def _debug_log(message: str, data: dict, hypothesis_id: str = "H1") -> None:
         pass
 # #endregion
 
-from app.graph import build_graph
-from app.logging_setup import configure_logging
-from app.logging_utils import get_performance_summary
-from app.schemas import FinalOutput, UserRequest
-from app.settings import STANDARD_ITEM_CONSTRAINTS, settings
+from backend.graph import build_graph
+from backend.logging_setup import configure_logging
+from backend.logging_utils import get_performance_summary
+from backend.schemas import FinalOutput, UserRequest
+from backend.settings import STANDARD_ITEM_CONSTRAINTS, settings
 from langgraph.checkpoint.memory import MemorySaver
 
 # TODO: Token tracking implementation

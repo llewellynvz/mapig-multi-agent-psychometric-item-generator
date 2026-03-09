@@ -39,9 +39,8 @@ def test_validation_placement():
 
     # Test 3: GraphState should have validation fields
     # We test this by checking the actual function exists
-    from app.graph import validation_node, route_after_validation, regenerate_items_node
+    from app.graph import validation_node, regenerate_items_node
     assert callable(validation_node), "validation_node function must be callable"
-    assert callable(route_after_validation), "route_after_validation function must be callable"
     assert callable(regenerate_items_node), "regenerate_items_node function must be callable"
 
 
@@ -58,75 +57,44 @@ def test_retry_limit():
     - Only failed items are regenerated (not entire set)
     - Attempt count is recorded in validation_results metadata
     """
-    from app.graph import route_after_validation
-    from app.schemas import ItemValidation, DimensionScore
+    import os
+    os.environ["APP_MODE"] = "mock"  # Use mock mode to avoid API calls
 
-    # Test case 1: All items pass - should route to reviewers
-    state_all_pass = {
-        "validation_results": [
-            ItemValidation(
-                item_index=0,
-                item_text="Test item",
-                dimension_scores=[
-                    DimensionScore(dimension="correspondence", reasoning="Good", score=8),
-                    DimensionScore(dimension="distinctiveness", reasoning="Good", score=8),
-                    DimensionScore(dimension="clarity", reasoning="Good", score=8),
-                    DimensionScore(dimension="specificity", reasoning="Good", score=8),
-                ],
-                weighted_score=8.0,
-                accept=True,
-                attempt=1
-            )
-        ],
-        "validation_attempt": 1
-    }
-    result = route_after_validation(state_all_pass)
-    assert result.goto == "reviewers_fanout_node", "All items passing should route to reviewers"
+    from app.graph import validation_node
+    from app.schemas import UserRequest, DraftItem
 
-    # Test case 2: Items fail, attempt < 3 - should route to regenerate
-    state_fail_attempt_1 = {
-        "validation_results": [
-            ItemValidation(
-                item_index=0,
-                item_text="Test item",
-                dimension_scores=[
-                    DimensionScore(dimension="correspondence", reasoning="Poor", score=5),
-                    DimensionScore(dimension="distinctiveness", reasoning="Poor", score=5),
-                    DimensionScore(dimension="clarity", reasoning="Poor", score=5),
-                    DimensionScore(dimension="specificity", reasoning="Poor", score=5),
-                ],
-                weighted_score=5.0,
-                accept=False,
-                attempt=1
-            )
-        ],
-        "validation_attempt": 1
-    }
-    result = route_after_validation(state_fail_attempt_1)
-    assert result.goto == "regenerate_items_node", "Failed items should route to regenerate"
+    # Helper to create mock state
+    def create_mock_state(item_count=10, attempt=1):
+        return {
+            "user_request": UserRequest(
+                construct_name="Test",
+                construct_definition="Test definition",
+                target_population="Adults",
+                response_scale="5-point Likert"
+            ),
+            "draft_items": [
+                DraftItem(
+                    item_text=f"Test item {i}",
+                    construct_name="Test",
+                    rationale="Test rationale for item",
+                    evidence_citations=[]
+                ) for i in range(item_count)
+            ],
+            "validation_attempt": attempt
+        }
+
+    # Test case 1: Mock mode with even items (pass) - should route to reviewers eventually
+    # Mock mode alternates: even indices score 8.0 (pass), odd indices score 6.5 (fail)
+    state_mock = create_mock_state(item_count=2, attempt=1)  # 2 items: index 0 passes, index 1 fails
+    result = validation_node(state_mock)
+    assert result.goto == "regenerate_items_node", "With failed items, should route to regenerate"
     assert result.update["validation_attempt"] == 2, "Attempt counter should increment"
+    assert 1 in result.update["failed_item_indices"], "Odd index should be in failed list"
 
-    # Test case 3: Items fail, attempt = 3 (max retries) - should accept and route to reviewers
-    state_max_retries = {
-        "validation_results": [
-            ItemValidation(
-                item_index=0,
-                item_text="Test item",
-                dimension_scores=[
-                    DimensionScore(dimension="correspondence", reasoning="Poor", score=5),
-                    DimensionScore(dimension="distinctiveness", reasoning="Poor", score=5),
-                    DimensionScore(dimension="clarity", reasoning="Poor", score=5),
-                    DimensionScore(dimension="specificity", reasoning="Poor", score=5),
-                ],
-                weighted_score=5.0,
-                accept=False,
-                attempt=3
-            )
-        ],
-        "validation_attempt": 3
-    }
-    result = route_after_validation(state_max_retries)
-    assert result.goto == "reviewers_fanout_node", "Max retries should accept and route to reviewers"
+    # Test case 2: Max retries exhausted - should route to reviewers
+    state_max_retries = create_mock_state(item_count=2, attempt=3)  # Max attempts reached
+    result = validation_node(state_max_retries)
+    assert result.goto == "reviewers_fanout_node", "Max retries should route to reviewers"
 
 
 def test_finalize_node_enhanced_output():

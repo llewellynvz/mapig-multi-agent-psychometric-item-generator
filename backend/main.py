@@ -49,6 +49,7 @@ from backend.logging_setup import configure_logging
 from backend.logging_utils import get_performance_summary
 from backend.schemas import FinalOutput, UserRequest
 from backend.settings import STANDARD_ITEM_CONSTRAINTS, settings
+from backend.evaluation.baseline_runner import run_baseline_comparison, BaselineComparison
 from langgraph.checkpoint.memory import MemorySaver
 
 # TODO: Token tracking implementation
@@ -475,3 +476,76 @@ async def generate_items_stream(
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
+
+
+@app.post("/v1/run-evaluation", tags=["evaluation"])
+async def run_evaluation(model_provider: str = "claude") -> dict:
+    """Run evaluation suite and return baseline comparison results.
+
+    Args:
+        model_provider: "claude" or "openai"
+
+    Returns:
+        JSON with evaluation metrics and baseline comparison:
+        {
+          "current": {
+            "item_quality_score": 8.2,
+            "agent_performance_score": 8.5,
+            "workflow_efficiency_score": 8.1,
+            "construct_validity_score": 8.3,
+            "overall_score": 8.275,
+            "total_comparisons": 25
+          },
+          "baseline": { ... },
+          "improvement": {
+            "overall_improvement": 18.5,
+            "item_quality_improvement": 20.1,
+            "agent_performance_improvement": 22.3,
+            "workflow_efficiency_improvement": 15.2,
+            "construct_validity_improvement": 16.8
+          },
+          "success_criteria": {
+            "meets_improvement_threshold": true,
+            "all_dimensions_passing": true,
+            "success": true
+          }
+        }
+    """
+    try:
+        comparison = run_baseline_comparison(model_provider)
+
+        return {
+            "current": {
+                "item_quality_score": comparison.current.item_quality_score,
+                "agent_performance_score": comparison.current.agent_performance_score,
+                "workflow_efficiency_score": comparison.current.workflow_efficiency_score,
+                "construct_validity_score": comparison.current.construct_validity_score,
+                "overall_score": comparison.current.overall_score,
+                "total_comparisons": comparison.current.total_comparisons
+            },
+            "baseline": {
+                "item_quality_score": comparison.baseline.item_quality_score,
+                "agent_performance_score": comparison.baseline.agent_performance_score,
+                "workflow_efficiency_score": comparison.baseline.workflow_efficiency_score,
+                "construct_validity_score": comparison.baseline.construct_validity_score,
+                "overall_score": comparison.baseline.overall_score,
+                "total_comparisons": comparison.baseline.total_comparisons
+            },
+            "improvement": {
+                "overall_improvement": comparison.overall_improvement,
+                "item_quality_improvement": comparison.item_quality_improvement,
+                "agent_performance_improvement": comparison.agent_performance_improvement,
+                "workflow_efficiency_improvement": comparison.workflow_efficiency_improvement,
+                "construct_validity_improvement": comparison.construct_validity_improvement
+            },
+            "success_criteria": {
+                "meets_improvement_threshold": comparison.meets_improvement_threshold,
+                "all_dimensions_passing": comparison.all_dimensions_passing,
+                "success": comparison.success
+            }
+        }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Evaluation suite failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")

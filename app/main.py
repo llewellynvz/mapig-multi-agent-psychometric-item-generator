@@ -42,6 +42,7 @@ from app.logging_setup import configure_logging
 from app.logging_utils import get_performance_summary
 from app.schemas import FinalOutput, UserRequest
 from app.settings import STANDARD_ITEM_CONSTRAINTS, settings
+from langgraph.checkpoint.memory import MemorySaver
 
 # TODO: Token tracking implementation
 # Currently cost fields remain None until token usage tracking is added.
@@ -94,18 +95,15 @@ def _set_run_status(thread_id: str, run_id: str, **updates: Any) -> None:
 async def lifespan(app: FastAPI):
     configure_logging()
 
-    # Checkpointer (SQLite) for durable thread state
-    try:
-        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-    except Exception as e:
-        raise RuntimeError(
-            "Missing AsyncSqliteSaver. Ensure langgraph-checkpoint-sqlite and aiosqlite are installed."
-        ) from e
+    # Use in-memory checkpointer for serverless deployment
+    # Checkpoints are ephemeral (lost on cold start) but functional during single run
+    # This is acceptable for v1 per user decision in 05-CONTEXT.md
+    # Future v2: Can migrate to Vercel Postgres with LangGraph Postgres checkpoint adapter
+    checkpointer = MemorySaver()
+    app.state.graph = build_graph(checkpointer=checkpointer)
 
-    # Keep DB open for the life of the app.
-    async with AsyncSqliteSaver.from_conn_string(settings.CHECKPOINT_DB_PATH) as checkpointer:
-        app.state.graph = build_graph(checkpointer=checkpointer)
-        yield
+    yield
+    # No cleanup needed for MemorySaver (in-memory only)
 
 
 app = FastAPI(

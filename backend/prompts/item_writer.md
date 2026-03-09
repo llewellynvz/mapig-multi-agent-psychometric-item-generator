@@ -125,4 +125,5 @@ Each rationale must explain:
 3. Distinctiveness: Why this item measures target construct and not neighbors
 4. Bias pre-check: How item avoids cultural/socioeconomic assumptions
 
-Keep rationales technical and concise (2-4 sentences).
+**CRITICAL: Be concise. Maximum 50 words per rationale.**
+Keep rationales technical and focused (2-3 sentences max).

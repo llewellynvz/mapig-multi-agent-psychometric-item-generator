@@ -54,4 +54,9 @@ def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> ItemWrit
         ("human", f"Draft {item_count} items using ONLY the evidence provided.\n\nINPUT:\n{user_payload}"),
     ]
 
-    return invoke_structured(ItemWriterResponse, messages)
+    return invoke_structured(
+        ItemWriterResponse,
+        messages,
+        agent_name="item_writer",
+        model_provider=request.model_provider,
+    )

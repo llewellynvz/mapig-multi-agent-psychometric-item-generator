@@ -20,9 +20,9 @@
 
 </details>
 
-### 📋 v1.1 Deployment (Planned)
+### 📋 v1.1 Deployment (In Progress)
 
-- [ ] Phase 5: Vercel Deployment (4 plans)
+- [x] Phase 5: Vercel Deployment (4/4 plans) — completed 2026-03-09
 - [ ] Phase 6: Comprehensive Evaluation Framework (TBD plans)
 
 ## Phase Details
@@ -46,10 +46,13 @@
 **Plans**: 4 plans
 
 Plans:
-- [ ] 05-00-PLAN.md — Create test scaffolds for Vercel deployment (Wave 0)
-- [ ] 05-01-PLAN.md — Backend serverless conversion with MemorySaver and CORS configuration (Wave 2)
-- [ ] 05-02-PLAN.md — Frontend Vercel configuration and deployment documentation (Wave 3)
-- [ ] 05-03-PLAN.md — Vercel deployment, verification, and cold start baseline (Wave 4)
+- [x] 05-00-PLAN.md — Create test scaffolds for Vercel deployment (Wave 0)
+- [x] 05-01-PLAN.md — Backend serverless conversion with MemorySaver and CORS configuration (Wave 2)
+- [x] 05-02-PLAN.md — Frontend Vercel configuration and deployment documentation (Wave 3)
+- [x] 05-03-PLAN.md — Vercel deployment, verification, and cold start baseline (Wave 4)
+
+**Production URL**: https://lmaig-langgraph.vercel.app/
+**Deployment**: Single-project monorepo pattern (Next.js + Python in one Vercel project)
 
 ### Phase 6: Comprehensive Evaluation Framework
 **Goal**: System quality is validated through automated evaluation suite measuring item quality, agent performance, workflow efficiency, and construct validity against published scales with documented success criteria
@@ -82,7 +85,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 | 3. Claude API Migration | v1.0 | 3/3 | Complete | 2026-03-09 |
 | 3.1. Enhanced FinalOutput Schema | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Production Features | v1.0 | 1/1 | Complete | 2026-03-08 |
-| 5. Vercel Deployment | v1.1 | 0/4 | Not started | - |
+| 5. Vercel Deployment | v1.1 | 4/4 | Complete | 2026-03-09 |
 | 6. Comprehensive Evaluation Framework | v1.1 | 0/TBD | Not started | - |
 
 ---

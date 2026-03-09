@@ -9,6 +9,7 @@ This file provides persistent context for Claude Code across sessions. It docume
 - **Backend**: FastAPI + LangGraph (Python 3.12+)
 - **Frontend**: Next.js 14 (App Router, TypeScript)
 - **Deployment**: Vercel (single-project monorepo)
+- **Production URL**: https://lmaig-langgraph.vercel.app/
 
 ## Critical Architectural Decisions
 
@@ -194,8 +195,25 @@ NEXT_PUBLIC_API_URL=https://your-project.vercel.app
 Project uses Get Shit Done (GSD) workflow for structured execution:
 - `.planning/` directory contains all planning artifacts
 - Phases executed sequentially with atomic commits
-- Current milestone: **v1.1 Deployment** (Phases 5-6)
+- Current milestone: **v1.1 Deployment** (Phase 5 ✅ complete, Phase 6 pending)
 - See `.planning/ROADMAP.md` for full plan
+
+## Production Deployment Status
+
+**Live URL**: https://lmaig-langgraph.vercel.app/
+
+**Deployment Architecture**:
+- Single Vercel project (monorepo pattern)
+- Next.js at root + Python serverless functions in `/api`
+- Same-origin architecture (no CORS needed)
+
+**Status**: ✅ Deployed and verified (Phase 5 complete)
+- Backend health check: Working
+- Frontend UI: Working
+- SSE streaming: Working
+- Item generation: End-to-end verified
+
+**Completed**: 2026-03-09
 
 ## Common Tasks
 
@@ -388,7 +406,7 @@ python -m uvicorn backend.main:app --reload
 
 ---
 
-**Last Updated**: 2026-03-09 (Session: Restructuring & Bug Fixes)
+**Last Updated**: 2026-03-09 (Phase 5 Complete - Production Deployment)
 **Maintainer**: Psynalytics team
-**GSD Milestone**: v1.1 Deployment (Phase 5 in progress)
-**Git Commits**: aea306a, f3395fe, b41f6c1, e2008d7
+**GSD Milestone**: v1.1 Deployment (Phase 5 ✅ complete, Phase 6 pending)
+**Production**: https://lmaig-langgraph.vercel.app/

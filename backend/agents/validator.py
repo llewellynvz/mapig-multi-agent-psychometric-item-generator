@@ -159,11 +159,34 @@ def validate_items(
         if isinstance(response, dict) and "parsed" in response and "raw" in response:
             result = response["parsed"]
             raw_message = response["raw"]
+
+            # CRITICAL: Check if parsing failed (returns None when schema doesn't match)
+            if result is None:
+                logger.error(
+                    f"Structured output parsing failed for validator. "
+                    f"Model: {model_name}, Attempt: {attempt}/3. "
+                    f"Raw response available but couldn't parse into ValidationResponse schema."
+                )
+                raise RuntimeError(
+                    f"Validator structured output parsing failed - LLM returned invalid format. "
+                    f"Model: {model_name}, Attempt: {attempt}/3. "
+                    f"This may indicate the LLM returned malformed JSON or broke the expected schema. "
+                    f"Check logs for raw response details."
+                )
+
             usage = _extract_token_usage(raw_message, model_name)
         else:
-            # Fallback: no raw message available
+            # Fallback: no raw message available (older LangChain behavior)
             result = response
             usage = TokenUsage(model_name=model_name)
+
+            # Also validate fallback path
+            if result is None:
+                logger.error(f"Validator returned None response (no LLM output)")
+                raise RuntimeError(
+                    f"Validator returned None - no response from LLM. "
+                    f"Model: {model_name}, Attempt: {attempt}/3."
+                )
 
         accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(

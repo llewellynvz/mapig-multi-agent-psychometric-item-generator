@@ -70,6 +70,12 @@ class UserRequest(BaseModel):
         description="Optional list of sources/terms to avoid in web search.",
     )
 
+    # Phase 03: Claude API Migration - Model provider selection
+    model_provider: Literal["claude", "openai"] = Field(
+        default="claude",
+        description="LLM provider selection (claude or openai)."
+    )
+
 
 class EvidenceChunk(BaseModel):
     """A small evidence unit from an approved source."""

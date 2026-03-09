@@ -33,3 +33,14 @@ def test_aggregate_empty_list_raises_error():
     """Empty comparison list raises ValueError."""
     with pytest.raises(ValueError, match="Cannot aggregate empty"):
         aggregate_comparison_results([])
+
+def test_eval_suite_runs_in_mock_mode():
+    """Evaluation suite completes in mock mode (APP_MODE=mock is set at top of file)."""
+    from backend.evaluation.eval_suite import run_evaluation_suite
+
+    # APP_MODE=mock is set at module level, so agents will use mock responses
+    metrics = run_evaluation_suite(model_provider="claude")
+
+    assert isinstance(metrics, EvaluationMetrics)
+    assert metrics.total_comparisons > 0
+    assert 1.0 <= metrics.overall_score <= 10.0

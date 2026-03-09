@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Union
+from typing import Optional, Union
 
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
@@ -9,14 +9,31 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from backend.settings import settings
 
 
-@lru_cache(maxsize=1)
-def get_openai_chat_model() -> ChatOpenAI:
-    """Create (and cache) the OpenAI ChatOpenAI client."""
+# Agent model overrides for cost optimization
+# Format: "agent_name": ("provider", "model_name")
+AGENT_MODEL_OVERRIDES = {
+    "bias_reviewer": ("openai", "gpt-4o-mini"),  # 20x cheaper than Sonnet, async OK
+    "critic": ("openai", "gpt-4o-mini"),  # 20x cheaper, has rule fallback
+}
+
+
+@lru_cache(maxsize=3)
+def get_openai_chat_model(model: Optional[str] = None) -> ChatOpenAI:
+    """Create (and cache) the OpenAI ChatOpenAI client.
+
+    Args:
+        model: Optional model name override. If not provided, uses settings.OPENAI_MODEL.
+
+    Returns:
+        ChatOpenAI instance configured for the specified model
+    """
     if not settings.OPENAI_API_KEY:
-        raise ValueError("APP_MODE=openai but missing required setting: OPENAI_API_KEY")
+        raise ValueError("OpenAI API key required for OpenAI models")
+
+    model_name = model or settings.OPENAI_MODEL
 
     kwargs = {
-        "model": settings.OPENAI_MODEL,
+        "model": model_name,
         "api_key": settings.OPENAI_API_KEY,
         "temperature": 0.2,
         "max_retries": 3,
@@ -103,6 +120,10 @@ def get_chat_model_for_agent(
     - validator agent: claude-opus-4-6 (highest accuracy for critical validation)
     - all other agents: claude-sonnet-4-5 (cost-effective for drafting/reviewing)
 
+    Agent overrides (when AGENT_MODEL_OVERRIDES_ENABLED):
+    - bias_reviewer: gpt-4o-mini (20x cheaper than Sonnet, fairness detection OK)
+    - critic: gpt-4o-mini (20x cheaper, has rule fallback)
+
     Args:
         agent_name: Agent identifier (e.g., "validator", "item_writer", "bias_reviewer")
         model_provider: "claude" or "openai"
@@ -113,6 +134,15 @@ def get_chat_model_for_agent(
     Raises:
         ValueError: If required API key missing for selected provider
     """
+    # Check for agent-specific overrides first
+    if settings.AGENT_MODEL_OVERRIDES_ENABLED and agent_name in AGENT_MODEL_OVERRIDES:
+        override_provider, override_model = AGENT_MODEL_OVERRIDES[agent_name]
+        if override_provider == "openai":
+            return get_openai_chat_model(model=override_model)
+        elif override_provider == "claude":
+            return get_claude_chat_model(model=override_model)
+
+    # Default allocation based on provider
     if model_provider == "claude":
         if agent_name == "validator":
             return get_claude_chat_model(model="claude-opus-4-6")

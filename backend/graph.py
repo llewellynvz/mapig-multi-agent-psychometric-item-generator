@@ -425,16 +425,23 @@ def finalize_node(state: GraphState) -> GraphState:
                 }
             )
 
-        # Calculate API costs (approximate pricing as of 2025)
+        # Calculate API costs (pricing as of 2025)
         opus_tokens = state.get("opus_tokens_used", 0)
         sonnet_tokens = state.get("sonnet_tokens_used", 0)
         openai_tokens = state.get("openai_tokens_used", 0)
 
-        # Claude pricing (per 1M tokens): Opus $15 input + $75 output, Sonnet $3 input + $15 output
-        # Simplified: average input/output ratio ~1:1, use blended rate
-        opus_cost = (opus_tokens / 1_000_000) * 45.0  # Blended rate
-        sonnet_cost = (sonnet_tokens / 1_000_000) * 9.0  # Blended rate
-        openai_cost = (openai_tokens / 1_000_000) * 10.0  # GPT-4 tier blended rate
+        # Claude pricing (per 1M tokens):
+        # - Opus: $15 input + $75 output → blended ~$45
+        # - Sonnet: $3 input + $15 output → blended ~$9
+        # OpenAI pricing (per 1M tokens):
+        # - GPT-4o-mini: $0.15 input + $0.60 output → blended ~$0.375 (20x cheaper than Sonnet!)
+        # - GPT-4: $5 input + $15 output → blended ~$10
+        # Note: Assuming ~1:1 input/output ratio for blended rate
+
+        opus_cost = (opus_tokens / 1_000_000) * 45.0  # Blended rate for Opus
+        sonnet_cost = (sonnet_tokens / 1_000_000) * 9.0  # Blended rate for Sonnet
+        # Use GPT-4o-mini pricing (most agents use this via overrides)
+        openai_cost = (openai_tokens / 1_000_000) * 0.375  # Blended rate for GPT-4o-mini
 
         total_cost = opus_cost + sonnet_cost + openai_cost
 

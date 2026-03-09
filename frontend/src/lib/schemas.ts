@@ -4,6 +4,7 @@ import { z } from "zod";
  * Zod schema aligned with MAPIG API UserRequest.
  */
 export const instrumentSetupSchema = z.object({
+  model_provider: z.enum(["claude", "openai"]).default("claude"),
   construct_name: z
     .string()
     .min(2, "Construct name must be at least 2 characters"),
@@ -28,6 +29,11 @@ export const instrumentSetupSchema = z.object({
 });
 
 export type InstrumentSetupFormValues = z.infer<typeof instrumentSetupSchema>;
+
+export const MODEL_PROVIDER_OPTIONS = [
+  { value: "claude", label: "Claude (Default)" },
+  { value: "openai", label: "OpenAI" },
+] as const;
 
 export const RESPONSE_SCALE_PRESETS = [
   "5-point Likert: Strongly disagree → Strongly agree",
@@ -56,6 +62,7 @@ export const DEFAULT_APPROVED_DOMAINS = [
 ];
 
 export const defaultInstrumentSetup: InstrumentSetupFormValues = {
+  model_provider: "claude",
   construct_name: "",
   construct_definition: "",
   target_population: "",

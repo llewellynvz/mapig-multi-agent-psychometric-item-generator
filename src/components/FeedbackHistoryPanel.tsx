@@ -42,14 +42,14 @@ export function FeedbackHistoryPanel({
           <History className="h-5 w-5 text-white" />
           Feedback History
         </CardTitle>
-        <SecondaryButton
+        <PrimaryButton
           type="button"
           size="sm"
           onClick={onClearHistory}
           disabled={entries.length === 0}
         >
           Clear history
-        </SecondaryButton>
+        </PrimaryButton>
       </CardHeader>
       <CardContent className="pt-5">
         {entries.length === 0 ? (

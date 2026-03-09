@@ -185,6 +185,8 @@ export function formToRequest(values: {
   approved_domains: string[];
   human_feedback?: string;
   previous_items?: string[];
+  model_provider?: "claude" | "openai";
+  use_chatgpt_critics?: boolean;
 }): UserRequest {
   const req: UserRequest = {
     construct_name: values.construct_name,
@@ -195,6 +197,8 @@ export function formToRequest(values: {
     constraints: values.constraints.length ? values.constraints : undefined,
     approved_domains: values.approved_domains.length ? values.approved_domains : undefined,
     previous_items: values.previous_items?.length ? values.previous_items : undefined,
+    model_provider: values.model_provider || "claude",
+    use_chatgpt_critics: values.use_chatgpt_critics || false,
   };
   if (values.construct_exclusions?.trim()) req.construct_exclusions = values.construct_exclusions.trim();
   if (values.native_construct?.trim()) req.native_construct = values.native_construct.trim();

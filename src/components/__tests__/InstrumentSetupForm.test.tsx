@@ -26,94 +26,34 @@ beforeEach(() => {
   };
 });
 
-describe('InstrumentSetupForm - Model Provider Selector (API-06)', () => {
-  it('renders model provider selector as first field', () => {
+describe('InstrumentSetupForm - Basic Form Functionality', () => {
+  it('renders required form fields', () => {
     const mockOnSubmit = vi.fn();
     render(<InstrumentSetupForm onSubmit={mockOnSubmit} />);
 
-    // Find LLM Provider label
-    const providerLabel = screen.getByText('LLM Provider');
-    expect(providerLabel).toBeDefined();
-
-    // Find the select trigger (combobox)
-    const selectTriggers = screen.getAllByRole('combobox');
-    expect(selectTriggers.length).toBeGreaterThan(0);
-
-    // Verify help text is displayed
-    const helpText = screen.getByText(/Choose Claude for smart model allocation/i);
-    expect(helpText).toBeDefined();
+    // Verify core required fields are present
+    expect(screen.getByLabelText(/Construct name/i)).toBeDefined();
+    expect(screen.getByLabelText(/Construct definition/i)).toBeDefined();
+    expect(screen.getByLabelText(/Target population/i)).toBeDefined();
+    expect(screen.getByLabelText(/Response scale/i)).toBeDefined();
+    expect(screen.getByLabelText(/Item count/i)).toBeDefined();
   });
 
-  it('model provider selector has claude and openai options', async () => {
+  it('form validates required fields on submission', async () => {
     const mockOnSubmit = vi.fn();
     render(<InstrumentSetupForm onSubmit={mockOnSubmit} />);
 
     const user = userEvent.setup();
 
-    // Get all comboboxes - first one should be model_provider
-    const selectTriggers = screen.getAllByRole('combobox');
-    const modelProviderSelect = selectTriggers[0];
+    // Try to submit without filling required fields
+    const submitButton = screen.getByRole('button', { name: /Generate items/i });
+    await user.click(submitButton);
 
-    // Click to open dropdown
-    await user.click(modelProviderSelect);
-
-    // Wait for options to appear
-    await waitFor(() => {
-      // Look for both options in the dropdown
-      const claudeOptions = screen.getAllByText(/Claude.*Default/i);
-      const openaiOptions = screen.getAllByText('OpenAI');
-
-      expect(claudeOptions.length).toBeGreaterThan(0);
-      expect(openaiOptions.length).toBeGreaterThan(0);
-    });
+    // Form should not call onSubmit with invalid data
+    expect(mockOnSubmit).not.toHaveBeenCalled();
   });
 
-  it('model provider defaults to claude', async () => {
-    const mockOnSubmit = vi.fn();
-    render(<InstrumentSetupForm onSubmit={mockOnSubmit} />);
-
-    // Get all comboboxes - first one should be model_provider
-    const selectTriggers = screen.getAllByRole('combobox');
-    const modelProviderSelect = selectTriggers[0];
-
-    // Check the displayed value (should show Claude Default)
-    await waitFor(() => {
-      const displayedValue = modelProviderSelect.textContent;
-      expect(displayedValue).toContain('Claude');
-    });
-  });
-
-  it('model provider selection updates form state', async () => {
-    const mockOnSubmit = vi.fn();
-    render(<InstrumentSetupForm onSubmit={mockOnSubmit} />);
-
-    const user = userEvent.setup();
-
-    // Get model provider selector
-    const selectTriggers = screen.getAllByRole('combobox');
-    const modelProviderSelect = selectTriggers[0];
-
-    // Open dropdown
-    await user.click(modelProviderSelect);
-
-    // Wait for options and select OpenAI - use getAllByText to handle multiple instances
-    await waitFor(() => {
-      const openaiOptions = screen.getAllByText('OpenAI');
-      expect(openaiOptions.length).toBeGreaterThan(0);
-    });
-
-    // Click on the last OpenAI option (the one in the dropdown menu)
-    const openaiOptions = screen.getAllByText('OpenAI');
-    await user.click(openaiOptions[openaiOptions.length - 1]);
-
-    // Verify selection changed
-    await waitFor(() => {
-      const displayedValue = modelProviderSelect.textContent;
-      expect(displayedValue).toContain('OpenAI');
-    });
-  });
-
-  it('model provider selection persists to localStorage on form submission', async () => {
+  it('form submits with valid data', async () => {
     const mockOnSubmit = vi.fn();
     render(<InstrumentSetupForm onSubmit={mockOnSubmit} isPending={false} />);
 
@@ -128,22 +68,42 @@ describe('InstrumentSetupForm - Model Provider Selector (API-06)', () => {
     await user.type(constructDefInput, 'Definition here for testing');
     await user.type(targetPopInput, 'Adults');
 
-    // Select OpenAI provider
-    const selectTriggers = screen.getAllByRole('combobox');
-    const modelProviderSelect = selectTriggers[0];
-    await user.click(modelProviderSelect);
+    // Submit form
+    const submitButton = screen.getByRole('button', { name: /Generate items/i });
+    await user.click(submitButton);
+
+    // Verify form submission
     await waitFor(() => {
-      const openaiOptions = screen.getAllByText('OpenAI');
-      expect(openaiOptions.length).toBeGreaterThan(0);
+      expect(mockOnSubmit).toHaveBeenCalled();
+      const submitData = mockOnSubmit.mock.calls[0][0];
+      expect(submitData.construct_name).toBe('Test Construct');
+      expect(submitData.construct_definition).toBe('Definition here for testing');
+      expect(submitData.target_population).toBe('Adults');
+      // Model provider should default to claude
+      expect(submitData.model_provider).toBe('claude');
     });
-    const openaiOptions = screen.getAllByText('OpenAI');
-    await user.click(openaiOptions[openaiOptions.length - 1]);
+  });
+
+  it('form data persists to localStorage on submission', async () => {
+    const mockOnSubmit = vi.fn();
+    render(<InstrumentSetupForm onSubmit={mockOnSubmit} isPending={false} />);
+
+    const user = userEvent.setup();
+
+    // Fill required fields
+    const constructNameInput = screen.getByLabelText(/Construct name/i);
+    const constructDefInput = screen.getByLabelText(/Construct definition/i);
+    const targetPopInput = screen.getByLabelText(/Target population/i);
+
+    await user.type(constructNameInput, 'Test Construct');
+    await user.type(constructDefInput, 'Definition here for testing');
+    await user.type(targetPopInput, 'Adults');
 
     // Submit form
     const submitButton = screen.getByRole('button', { name: /Generate items/i });
     await user.click(submitButton);
 
-    // Verify localStorage was called with model_provider
+    // Verify localStorage was updated
     await waitFor(() => {
       expect(global.localStorage.setItem).toHaveBeenCalled();
       const setItemCalls = (global.localStorage.setItem as any).mock.calls;
@@ -152,7 +112,8 @@ describe('InstrumentSetupForm - Model Provider Selector (API-06)', () => {
 
       if (savedData) {
         const parsedData = JSON.parse(savedData[1]);
-        expect(parsedData.model_provider).toBe('openai');
+        expect(parsedData.construct_name).toBe('Test Construct');
+        expect(parsedData.model_provider).toBe('claude');
       }
     });
   });

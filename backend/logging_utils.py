@@ -1,12 +1,40 @@
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Optional
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Iterator, Optional
 
 logger = logging.getLogger("lmaig")
 
 # Performance tracking
 _performance_log: Dict[str, list] = {}
+
+
+def emit_log_event(
+    level: str,
+    source: str,
+    message: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Create a log event dictionary for SSE streaming.
+
+    Args:
+        level: "info", "warning", or "error"
+        source: Agent name or step name
+        message: Log message
+        metadata: Optional metadata (tokens, duration, etc.)
+
+    Returns:
+        Dictionary representing a log event
+    """
+    return {
+        "type": "log",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": level,
+        "source": source,
+        "message": message,
+        "metadata": metadata or {},
+    }
 
 
 @contextmanager

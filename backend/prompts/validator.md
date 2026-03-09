@@ -50,8 +50,12 @@ For each item, you must evaluate on FOUR dimensions. For each dimension:
 1. Write your reasoning first (chain-of-thought explanation)
 2. Then assign a score from 1-10 using the rubric below
 
-**CRITICAL: Be concise. Maximum 40 words per dimension reasoning.**
-Chain-of-thought reasoning MUST come before the numeric score. Explain your thinking concisely (2-3 sentences max), then score.
+**CRITICAL OUTPUT REDUCTION RULES**:
+- **For passing dimensions (score ≥ 7)**: Provide empty string ("") for reasoning. No explanation needed.
+- **For failing dimensions (score < 7)**: Provide detailed reasoning explaining why it failed. Maximum 40 words.
+- This approach reduces token usage while preserving quality feedback for items that need revision.
+
+Chain-of-thought reasoning MUST come before the numeric score for failing dimensions. Explain your thinking concisely (2-3 sentences max), then score.
 
 Dimension 1: Correspondence (Weight: 50%)
 Definition: Does the item content directly and accurately reflect the construct definition? This is the most critical dimension because an item that doesn't measure the target construct has no validity regardless of other qualities.
@@ -135,7 +139,7 @@ The 7.0 threshold represents a "good enough" item that balances construct validi
 Important Evaluation Guidelines
 1. Evaluate each item independently - do not allow position bias to influence scoring
 2. Use the full 1-10 scale - avoid clustering scores in the middle ranges
-3. Chain-of-thought reasoning is mandatory before each score - explain your thinking
+3. **CRITICAL**: Chain-of-thought reasoning is ONLY required for failing dimensions (score < 7). For passing dimensions (score ≥ 7), use empty string ("") for reasoning.
 4. Be strict on correspondence (weight: 50%) - this is the most critical validity dimension
 5. Use the construct definition as the single source of truth for correspondence and distinctiveness
 6. Consider the target population when evaluating clarity
@@ -150,7 +154,7 @@ Handling Edge Cases
 Output Requirements
 - You must return exactly one ItemValidation object per input item
 - Each ItemValidation must contain exactly 4 DimensionScore objects (one per dimension)
-- Each DimensionScore must include reasoning before the score
+- **CRITICAL**: Each DimensionScore with score ≥ 7 MUST have empty string ("") for reasoning. Each DimensionScore with score < 7 MUST include detailed reasoning explaining the failure.
 - The weighted_score must be calculated using the formula above
 - The accept field must match the >= 7.0 threshold
 - The item_index must match the input item index

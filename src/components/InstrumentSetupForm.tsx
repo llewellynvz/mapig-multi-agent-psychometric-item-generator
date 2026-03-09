@@ -11,13 +11,7 @@ import { Label } from "@/components/ui/label";
 import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/TagInput";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   instrumentSetupSchema,
   type InstrumentSetupFormValues,
@@ -25,7 +19,6 @@ import {
   RESPONSE_SCALE_PRESETS,
   DEFAULT_CONSTRAINTS,
   DEFAULT_APPROVED_DOMAINS,
-  MODEL_PROVIDER_OPTIONS,
 } from "@/lib/schemas";
 
 const STORAGE_KEY = "mapig-instrument-setup";
@@ -92,7 +85,6 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
 
     form.reset({
       ...defaultInstrumentSetup,
-      model_provider: saved.model_provider ?? "claude",
       construct_name: saved.construct_name ?? "",
       construct_definition: saved.construct_definition ?? "",
       target_population: saved.target_population ?? "",
@@ -146,29 +138,6 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
       <CardContent className="pt-5">
         <InsetPanel className="space-y-6 rounded-2xl p-4">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Model Provider Selection - FIRST FIELD */}
-            <div className="space-y-2">
-              <Label htmlFor="model_provider">LLM Provider</Label>
-              <Select
-                value={form.watch("model_provider")}
-                onValueChange={(value) => form.setValue("model_provider", value as "claude" | "openai")}
-              >
-                <SelectTrigger id="model_provider" className="w-full">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODEL_PROVIDER_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Choose Claude for smart model allocation (Opus for validation, Sonnet for other agents) or OpenAI as fallback.
-              </p>
-            </div>
-
             <div className="space-y-2">
             <Label htmlFor="construct_name">Construct name (required)</Label>
             <Input
@@ -260,6 +229,30 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
                 {form.formState.errors.item_count.message}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="use_chatgpt_critics" className="cursor-pointer">
+                Critic model
+              </Label>
+              <Switch
+                id="use_chatgpt_critics"
+                checked={form.watch("use_chatgpt_critics")}
+                onCheckedChange={(checked) => form.setValue("use_chatgpt_critics", checked)}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {form.watch("use_chatgpt_critics") ? (
+                <>
+                  <span className="font-medium text-accent">GPT 5.2 (ChatGPT)</span> — Critics use OpenAI for cost savings. Item writer uses Claude Sonnet.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">Claude</span> — Critics use Claude Opus/Sonnet (default). Item writer uses Claude Sonnet.
+                </>
+              )}
+            </p>
           </div>
 
             <div className="space-y-2">

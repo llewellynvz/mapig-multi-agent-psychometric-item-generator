@@ -1,0 +1,77 @@
+[
+  {
+    "name": "IPIP-NEO-60",
+    "author": "Goldberg et al.",
+    "year": 1999,
+    "domain": "personality",
+    "citation": "Goldberg, L. R. (1999). A broad-bandwidth, public domain, personality inventory measuring the lower-level facets of several five-factor models. Personality Psychology in Europe, 7, 7-28.",
+    "items": [
+      "I am the life of the party.",
+      "I feel comfortable around people.",
+      "I start conversations.",
+      "I talk to a lot of different people at parties.",
+      "I don't mind being the center of attention."
+    ],
+    "license": "Public Domain"
+  },
+  {
+    "name": "PHQ-9",
+    "author": "Kroenke, Spitzer, & Williams",
+    "year": 2001,
+    "domain": "clinical",
+    "citation": "Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
+    "items": [
+      "Little interest or pleasure in doing things",
+      "Feeling down, depressed, or hopeless",
+      "Trouble falling or staying asleep, or sleeping too much",
+      "Feeling tired or having little energy",
+      "Poor appetite or overeating"
+    ],
+    "license": "Public Domain (Pfizer 2005)"
+  },
+  {
+    "name": "Social Connectedness Scale-Revised",
+    "author": "Lee & Robbins",
+    "year": 1995,
+    "domain": "social",
+    "citation": "Lee, R. M., & Robbins, S. B. (1995). Measuring belongingness: The Social Connectedness and the Social Assurance scales. Journal of Counseling Psychology, 42(2), 232-241.",
+    "items": [
+      "I feel disconnected from the world around me.",
+      "Even around people I know, I don't feel that I really belong.",
+      "I feel so distant from people.",
+      "I have no sense of togetherness with my peers.",
+      "I don't feel related to anyone."
+    ],
+    "license": "Research use with citation"
+  },
+  {
+    "name": "Job Satisfaction Survey (JSS)",
+    "author": "Spector",
+    "year": 1985,
+    "domain": "organizational",
+    "citation": "Spector, P. E. (1985). Measurement of human service staff satisfaction: Development of the Job Satisfaction Survey. American Journal of Community Psychology, 13(6), 693-713.",
+    "items": [
+      "I feel I am being paid a fair amount for the work I do.",
+      "There is really too little chance for promotion on my job.",
+      "My supervisor is quite competent in doing his/her job.",
+      "I am not satisfied with the benefits I receive.",
+      "When I do a good job, I receive the recognition for it that I should receive."
+    ],
+    "license": "Free for research (author website)"
+  },
+  {
+    "name": "Attitude Toward the Environment Scale",
+    "author": "Milfont & Duckitt",
+    "year": 2010,
+    "domain": "attitudes",
+    "citation": "Milfont, T. L., & Duckitt, J. (2010). The environmental attitudes inventory: A valid and reliable measure to assess the structure of environmental attitudes. Journal of Environmental Psychology, 30(1), 80-94.",
+    "items": [
+      "Humans are severely abusing the environment.",
+      "Humans have the right to modify the natural environment to suit their needs.",
+      "Plants and animals have as much right as humans to exist.",
+      "The balance of nature is strong enough to cope with the impacts of modern industrial nations.",
+      "Despite our special abilities, humans are still subject to the laws of nature."
+    ],
+    "license": "Research use with citation"
+  }
+]

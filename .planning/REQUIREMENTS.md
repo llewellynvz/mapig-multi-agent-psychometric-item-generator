@@ -38,8 +38,8 @@ Requirements for production deployment milestone. Research-backed optimization f
 - [x] **API-01**: Add Anthropic SDK dependency to backend
 - [x] **API-02**: Update LLM factory to support Claude models (Opus, Sonnet, Haiku)
 - [x] **API-03**: Smart model allocation (Opus for validation, Sonnet for other agents)
-- [ ] **API-04**: OpenAI fallback option (user-selectable)
-- [ ] **API-05**: CLAUDE_API_KEY environment variable in Vercel
+- [x] **API-04**: OpenAI fallback option (user-selectable)
+- [x] **API-05**: CLAUDE_API_KEY environment variable in Vercel
 - [x] **API-06**: UI model selector (Claude vs OpenAI, default Claude)
 - [x] **API-07**: Cost tracking per model (Opus vs Sonnet vs OpenAI)
 
@@ -148,8 +148,8 @@ Mapping requirements to phases. Updated during roadmap creation.
 | API-01 | Phase 3 | Complete |
 | API-02 | Phase 3 | Complete |
 | API-03 | Phase 3 | Complete |
-| API-04 | Phase 3 | Pending |
-| API-05 | Phase 3 | Pending |
+| API-04 | Phase 3 | Complete |
+| API-05 | Phase 3 | Complete |
 | API-06 | Phase 3 | Complete |
 | API-07 | Phase 3 | Complete |
 | SCHEMA-01 | Phase 3.1 | Complete |

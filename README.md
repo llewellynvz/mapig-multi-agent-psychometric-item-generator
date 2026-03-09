@@ -122,14 +122,14 @@ Example:
 ```env
 APP_MODE=openai
 OPENAI_API_KEY=YOUR_KEY
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-5.2
 
 SEARCH_PROVIDER=hybrid
 PERPLEXITY_API_KEY=YOUR_KEY
 PERPLEXITY_BASE_URL=https://api.perplexity.ai/v2
 PERPLEXITY_MODEL=sonar-pro
 PERPLEXITY_SEARCH_MODE=academic
-PERPLEXITY_MAX_RESULTS=8
+PERPLEXITY_MAX_RESULTS=20
 PERPLEXITY_DOMAIN_FILTER=doi.org,psycnet.apa.org,link.springer.com,sciencedirect.com,onlinelibrary.wiley.com,tandfonline.com,journals.sagepub.com,academic.oup.com,cambridge.org
 ```
 
@@ -357,3 +357,7 @@ GitHub: https://github.com/llewellynvz
 Proprietary software.  
 Personal, academic, and internal research use is permitted.  
 Redistribution and commercial use are not permitted.
+
+## Reference
+
+Lee, P., Son, M., & Jia, Z. (2025). AI-powered automatic item generation for psychological tests: A conceptual framework for an LLM-based multi-agent AIG system. Journal of Business and Psychology, 1-29.

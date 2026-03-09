@@ -236,6 +236,37 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
           <RunTimeline iterationCount={audit.iteration_count} />
         </InsetPanel>
 
+        {/* Cost Breakdown (if available) */}
+        {audit.opus_cost !== undefined && audit.total_cost !== undefined && (
+          <InsetPanel className="space-y-2 rounded-2xl p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">API Cost Breakdown</p>
+            <div className="space-y-1 text-sm">
+              {audit.opus_cost > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Claude Opus (Validation):</span>
+                  <span className="font-mono">${audit.opus_cost.toFixed(2)}</span>
+                </div>
+              )}
+              {audit.sonnet_cost !== undefined && audit.sonnet_cost > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Claude Sonnet (Other Agents):</span>
+                  <span className="font-mono">${audit.sonnet_cost.toFixed(2)}</span>
+                </div>
+              )}
+              {audit.openai_cost !== undefined && audit.openai_cost > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">OpenAI:</span>
+                  <span className="font-mono">${audit.openai_cost.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold pt-2 border-t border-border/40">
+                <span>Total:</span>
+                <span className="font-mono">${audit.total_cost.toFixed(2)}</span>
+              </div>
+            </div>
+          </InsetPanel>
+        )}
+
         <section className="rounded-2xl border border-accent/35 bg-accent/15 p-3">
           <p className="text-sm font-semibold">About this panel</p>
           <p className="mt-1 text-xs text-slate-100/90">

@@ -68,12 +68,16 @@ def get_claude_chat_model(model: str = "claude-opus-4-6") -> ChatAnthropic:
     if not settings.CLAUDE_API_KEY:
         raise ValueError("CLAUDE_API_KEY required for Claude models")
 
+    # Enable prompt caching for cost savings
+    # Ref: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
     return ChatAnthropic(
         model=model,
         api_key=settings.CLAUDE_API_KEY,
         temperature=0.2,
         max_retries=3,
         timeout=60,
+        # Enable prompt caching to reduce input token costs by ~50% for repeated prompts
+        default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
     )
 
 

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import uuid
-from typing import List
+from typing import List, Tuple
 
-from backend.agents.llm_utils import invoke_structured
+from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import DraftItem, EvidenceChunk, ItemWriterResponse, UserRequest
 from backend.settings import settings
 
 
-def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> ItemWriterResponse:
-    """Generate initial draft items."""
+def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> Tuple[ItemWriterResponse, TokenUsage]:
+    """Generate initial draft items.
+
+    Returns:
+        Tuple of (ItemWriterResponse, TokenUsage)
+    """
     item_count = request.item_count
 
     if settings.APP_MODE == "mock":
@@ -39,7 +43,7 @@ def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> ItemWrit
                     evidence_citations=citations,
                 )
             )
-        return ItemWriterResponse(items=items)
+        return ItemWriterResponse(items=items), TokenUsage()
 
     system_prompt = load_prompt("item_writer.md")
 
@@ -54,7 +58,7 @@ def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> ItemWrit
         ("human", f"Draft {item_count} items using ONLY the evidence provided.\n\nINPUT:\n{user_payload}"),
     ]
 
-    return invoke_structured(
+    return invoke_structured_with_usage(
         ItemWriterResponse,
         messages,
         agent_name="item_writer",

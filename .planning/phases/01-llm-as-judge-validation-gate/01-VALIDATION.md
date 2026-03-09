@@ -107,6 +107,35 @@ created: 2026-03-08
 
 ---
 
+## Validation Audit 2026-03-09
+
+**Audit Type:** Retroactive Nyquist validation via `/gsd:validate-phase`
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 1 |
+| Resolved | 1 |
+| Escalated | 0 |
+
+**Gaps Resolved:**
+
+1. **Task 01-04-01** (VAL-01, VAL-06): Fixed LangGraph Command pattern incompatibility in validation routing
+   - **Issue:** `route_after_validation` returned `Command` objects but was called via `add_conditional_edges`, which expects string returns. This caused validation routing to fail with warning: `"Task validation_node wrote to unknown channel branch:to:Command(...), ignoring it"`. Smoke test failed because graph execution stopped after validation_node without creating `final_output`.
+   - **Root Cause:** Mixed incompatible LangGraph patterns - Command return type (LangGraph 1.0) with add_conditional_edges (expects strings)
+   - **Fix:** Merged routing logic into `validation_node` to return Command directly (LangGraph 1.0 best practice). Removed separate `route_after_validation` function and `add_conditional_edges` call. Updated tests to test validation_node directly.
+   - **Files Modified:**
+     - `app/graph.py`: Merged routing into validation_node, removed route_after_validation function, removed add_conditional_edges call
+     - `tests/test_graph.py`: Updated test_retry_limit to test validation_node instead of route_after_validation
+   - **Status:** ✅ GREEN
+
+**Test Suite Status After Audit:**
+- **52/52 tests passing** (100% pass rate, 4 skipped unrelated tests)
+- **Smoke test now passing** (test_graph_smoke validates end-to-end workflow)
+- **No LangGraph routing warnings**
+- **All VALIDATION.md commands verified working**
+
+---
+
 ## Validation Sign-Off
 
 - [x] All tasks have `<automated>` verify or Wave 0 dependencies

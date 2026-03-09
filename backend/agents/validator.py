@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List, Tuple
 
-from backend.agents.llm_factory import get_validator_model
+from backend.agents.llm_factory import get_validator_model, get_claude_chat_model
 from backend.agents.llm_utils import TokenUsage, _extract_token_usage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import (
@@ -16,6 +16,15 @@ from backend.schemas import (
 from backend.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _use_smart_validation() -> bool:
+    """Check if smart validation (tiered Sonnet→Opus) is enabled.
+
+    Smart validation: Use cheaper Sonnet for first attempt, only use Opus if items fail.
+    Cost savings: ~80% cheaper for items that pass Sonnet validation.
+    """
+    return getattr(settings, "SMART_VALIDATION_ENABLED", True)
 
 
 def validate_items(
@@ -80,7 +89,7 @@ def validate_items(
             )
         return ValidationResponse(validations=validations), TokenUsage()
 
-    # Real mode: Use Claude Opus for validation
+    # Real mode: Smart validation with tiered approach
     try:
         system_prompt = load_prompt("validator.md")
 
@@ -103,9 +112,16 @@ def validate_items(
             ),
         ]
 
-        # Get validator model (Claude Opus)
-        model = get_validator_model()
-        model_name = getattr(model, "model_name", getattr(model, "model", "opus"))
+        # Smart validation: Use Sonnet first (80% cheaper), only use Opus if items fail
+        if _use_smart_validation() and attempt == 1:
+            logger.info(f"Smart validation: Attempting with Sonnet first (attempt {attempt})")
+            model = get_claude_chat_model(model="claude-sonnet-4-5")
+            model_name = "claude-sonnet-4-5"
+        else:
+            # Use Opus for: (1) retries (attempt > 1), or (2) smart validation disabled
+            logger.info(f"Using Opus validation (attempt {attempt})")
+            model = get_validator_model()
+            model_name = getattr(model, "model_name", getattr(model, "model", "opus"))
 
         # Invoke with structured output, capturing raw response for token tracking
         runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
@@ -121,9 +137,10 @@ def validate_items(
             result = response
             usage = TokenUsage(model_name=model_name)
 
+        accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(
-            f"Validated {len(items)} items on attempt {attempt}. "
-            f"Accepted: {sum(1 for v in result.validations if v.accept)}/{len(items)}. "
+            f"Validated {len(items)} items with {model_name} on attempt {attempt}. "
+            f"Accepted: {accepted_count}/{len(items)}. "
             f"Tokens: {usage.total_tokens}"
         )
 

@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     AGENT_MODEL_OVERRIDES_ENABLED: bool = True  # Enable per-agent model selection
     OPENAI_CHEAP_MODEL: str = "gpt-4o-mini"  # Cheaper model for peripheral agents (~60% cheaper than Sonnet)
 
+    # Smart validation (cost optimization)
+    # Use Sonnet for first validation attempt, only Opus if items fail
+    SMART_VALIDATION_ENABLED: bool = True  # Tiered Sonnet→Opus validation (~80% cost savings on passing items)
+
     # Azure OpenAI (used only in APP_MODE=azure)
     AZURE_OPENAI_ENDPOINT: Optional[str] = Field(default=None)
     AZURE_OPENAI_API_KEY: Optional[str] = Field(default=None)

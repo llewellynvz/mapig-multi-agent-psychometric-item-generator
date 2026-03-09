@@ -115,6 +115,7 @@ Revision plan requirements
 - edits must use item_index as 0-based indices into the input items array.
 - change must describe what you changed in plain language.
 - reason must reference the reviewer issue.
+- **CRITICAL: Be concise. Maximum 40 words per edit reason.**
 
 Citations
 - Preserve evidence_citations when still applicable.

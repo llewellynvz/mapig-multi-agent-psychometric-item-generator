@@ -121,6 +121,7 @@ Rules
 - Output MUST match schema exactly (no extra keys).
 - item_index is 0-based and must correspond to the items array.
 - issue must start with "Item N:" where N = item_index + 1.
+- **CRITICAL: Be concise. Maximum 30 words per comment issue field.**
 - Always include c_mean and d_mean in the issue text.
 - suggested_edit must be a full replacement item_text when severity >= 2.
 - If severity = 1, suggested_edit may repeat the original item_text unchanged.

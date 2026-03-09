@@ -50,7 +50,8 @@ For each item, you must evaluate on FOUR dimensions. For each dimension:
 1. Write your reasoning first (chain-of-thought explanation)
 2. Then assign a score from 1-10 using the rubric below
 
-CRITICAL: Chain-of-thought reasoning MUST come before the numeric score. Explain your thinking, then score.
+**CRITICAL: Be concise. Maximum 40 words per dimension reasoning.**
+Chain-of-thought reasoning MUST come before the numeric score. Explain your thinking concisely (2-3 sentences max), then score.
 
 Dimension 1: Correspondence (Weight: 50%)
 Definition: Does the item content directly and accurately reflect the construct definition? This is the most critical dimension because an item that doesn't measure the target construct has no validity regardless of other qualities.

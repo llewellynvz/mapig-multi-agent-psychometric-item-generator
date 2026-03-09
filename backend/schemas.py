@@ -100,7 +100,12 @@ class DraftItem(BaseModel):
         min_length=2,
         description="Construct name for this item (should match UserRequest.construct_name).",
     )
-    rationale: str = Field(..., min_length=5, description="Why this item reflects the construct.")
+    rationale: str = Field(
+        ...,
+        min_length=5,
+        max_length=350,  # ~50 words at 7 chars/word average
+        description="Why this item reflects the construct. Maximum 50 words.",
+    )
     evidence_citations: List[str] = Field(
         default_factory=list,
         description="List of EvidenceChunk.source_id values that support this item.",
@@ -124,11 +129,21 @@ class ReviewComment(BaseModel):
         default=None,
         description="0-based index of the item this comment refers to (when applicable).",
     )
-    issue: str = Field(..., min_length=3, description="What is wrong and why it matters.")
+    issue: str = Field(
+        ...,
+        min_length=3,
+        max_length=210,  # ~30 words at 7 chars/word average
+        description="What is wrong and why it matters. Maximum 30 words.",
+    )
     severity: conint(ge=1, le=5) = Field(
         ..., description="1=nitpick, 3=needs revision, 5=blocking"
     )
-    suggested_edit: str = Field(..., min_length=0, description="Proposed fix in plain text.")
+    suggested_edit: str = Field(
+        ...,
+        min_length=0,
+        max_length=175,  # ~25 words for concise suggestions
+        description="Proposed fix in plain text. Maximum 25 words.",
+    )
 
 
 class RevisionEdit(BaseModel):
@@ -137,7 +152,12 @@ class RevisionEdit(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     item_index: int = Field(..., ge=0, description="Which item in the list to edit.")
-    reason: str = Field(..., min_length=3, description="Why this edit is required.")
+    reason: str = Field(
+        ...,
+        min_length=3,
+        max_length=280,  # ~40 words at 7 chars/word average
+        description="Why this edit is required. Maximum 40 words.",
+    )
     before: str = Field(..., description="Previous item text (or excerpt).")
     after: str = Field(..., description="Revised item text.")
 
@@ -161,7 +181,12 @@ class DimensionScore(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dimension: str = Field(..., description="One of: correspondence, distinctiveness, clarity, specificity")
-    reasoning: str = Field(..., min_length=3, description="Chain-of-thought explanation before scoring")
+    reasoning: str = Field(
+        ...,
+        min_length=3,
+        max_length=280,  # ~40 words at 7 chars/word average
+        description="Chain-of-thought explanation before scoring. Maximum 40 words.",
+    )
     score: int = Field(..., ge=1, le=10, description="Score from 1-10 for this dimension")
 
 

@@ -1,5 +1,14 @@
 # Milestones
 
+## v1.1 Deployment (Shipped: 2026-03-09)
+
+**Phases completed:** 2 phases, 8 plans, 5 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
 ## v1.0 MAPIG Production Optimization (Shipped: 2026-03-09)
 
 **Phases completed:** 5 phases (1-4, 3.1), 17 plans

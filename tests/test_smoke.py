@@ -2,6 +2,7 @@ import os
 import datetime as _dt
 
 os.environ["APP_MODE"] = "mock"
+os.environ["SEARCH_PROVIDER"] = "local"  # Avoid Perplexity API calls in smoke test
 
 from langgraph.checkpoint.memory import MemorySaver
 

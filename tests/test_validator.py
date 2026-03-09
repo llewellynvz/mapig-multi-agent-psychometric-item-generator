@@ -16,7 +16,7 @@ from backend.schemas import UserRequest, DraftItem
 # Task 1: Validation prompt tests
 def test_prompt_instructs_cot_reasoning():
     """Test 1 for Task 1: Prompt instructs chain-of-thought reasoning before scores."""
-    prompt_path = Path("app/prompts/validator.md")
+    prompt_path = Path("backend/prompts/validator.md")
     assert prompt_path.exists(), "validator.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -25,10 +25,14 @@ def test_prompt_instructs_cot_reasoning():
     assert "chain" in content or "reasoning" in content, "Prompt must mention chain-of-thought or reasoning"
     assert "before" in content, "Prompt must instruct reasoning BEFORE scoring"
 
+    # Task #2: Check for output reduction instructions
+    assert "passing dimension" in content or "score ≥ 7" in content or "score >= 7" in content, "Prompt must mention passing dimensions"
+    assert "empty string" in content or '""' in content, "Prompt must instruct empty reasoning for passing dimensions"
+
 
 def test_prompt_defines_four_dimensions_with_weights():
     """Test 2 for Task 1: Prompt defines all 4 dimensions with weights."""
-    prompt_path = Path("app/prompts/validator.md")
+    prompt_path = Path("backend/prompts/validator.md")
     assert prompt_path.exists(), "validator.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -48,7 +52,7 @@ def test_prompt_defines_four_dimensions_with_weights():
 
 def test_prompt_provides_scale_anchors():
     """Test 3 for Task 1: Prompt provides 1-10 scale anchors per dimension."""
-    prompt_path = Path("app/prompts/validator.md")
+    prompt_path = Path("backend/prompts/validator.md")
     assert prompt_path.exists(), "validator.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8")
@@ -66,7 +70,7 @@ def test_prompt_provides_scale_anchors():
 
 def test_prompt_specifies_weighted_formula_and_threshold():
     """Test 4 for Task 1: Prompt specifies weighted score formula and 7.0 threshold."""
-    prompt_path = Path("app/prompts/validator.md")
+    prompt_path = Path("backend/prompts/validator.md")
     assert prompt_path.exists(), "validator.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -94,7 +98,7 @@ def test_four_dimensions():
     request = _sample_user_request()
     items = _sample_draft_items()
 
-    result = validate_items(request, items, attempt=1)
+    result, usage = validate_items(request, items, attempt=1)
 
     assert len(result.validations) == 2, "Should validate all items"
     for validation in result.validations:
@@ -108,28 +112,34 @@ def test_four_dimensions():
 
 
 def test_cot_reasoning():
-    """Verify each DimensionScore includes chain-of-thought reasoning before score.
+    """Verify each DimensionScore includes chain-of-thought reasoning for failing dimensions.
 
     Tests VAL-03: Chain-of-thought prompting with explicit reasoning before scores.
+    Task #2 Enhancement: Only failing dimensions (score < 7) require reasoning.
 
     Expected behavior:
-    - Each DimensionScore has a non-empty 'reasoning' field
-    - Reasoning appears before the score in the structured output
-    - Reasoning explains WHY the score was assigned (not just what the score is)
-    - Reasoning is substantive (minimum 20 characters)
+    - Each DimensionScore has a 'reasoning' field
+    - For passing dimensions (score >= 7): reasoning can be empty string
+    - For failing dimensions (score < 7): reasoning must be substantive (min 3 chars)
+    - Reasoning explains WHY the score was assigned for failing dimensions
     """
     from backend.agents.validator import validate_items
 
     request = _sample_user_request()
     items = _sample_draft_items()
 
-    result = validate_items(request, items, attempt=1)
+    result, usage = validate_items(request, items, attempt=1)
 
     for validation in result.validations:
         for dim_score in validation.dimension_scores:
             assert hasattr(dim_score, 'reasoning'), "DimensionScore must have reasoning field"
-            assert dim_score.reasoning, "Reasoning must not be empty"
-            assert len(dim_score.reasoning) >= 3, "Reasoning must be substantive (min 3 chars per schema)"
+
+            # Task #2: Only failing dimensions require reasoning
+            if dim_score.score < 7:
+                assert dim_score.reasoning, f"Failing dimension {dim_score.dimension} must have reasoning"
+                assert len(dim_score.reasoning) >= 3, f"Reasoning for failing dimension must be substantive (min 3 chars)"
+            # Passing dimensions can have empty reasoning (token optimization)
+            # No assertion needed - empty reasoning is valid for passing scores
 
 
 def test_score_range():
@@ -148,7 +158,7 @@ def test_score_range():
     request = _sample_user_request()
     items = _sample_draft_items()
 
-    result = validate_items(request, items, attempt=1)
+    result, usage = validate_items(request, items, attempt=1)
 
     for validation in result.validations:
         for dim_score in validation.dimension_scores:
@@ -173,7 +183,7 @@ def test_rejection_threshold():
     request = _sample_user_request()
     items = _sample_draft_items()
 
-    result = validate_items(request, items, attempt=1)
+    result, usage = validate_items(request, items, attempt=1)
 
     for validation in result.validations:
         # In mock mode, items alternate: idx 0 = 8.0 (accept), idx 1 = 6.5 (reject)
@@ -190,7 +200,7 @@ def test_mock_mode_returns_deterministic_results():
     request = _sample_user_request()
     items = _sample_draft_items()
 
-    result = validate_items(request, items, attempt=1)
+    result, usage = validate_items(request, items, attempt=1)
 
     # Mock mode should return deterministic results
     assert len(result.validations) == 2, "Should validate both items"

@@ -352,3 +352,179 @@ def test_user_request_accepts_openai_provider():
     # Assert: Serialization preserves model_provider
     data = request.model_dump()
     assert data["model_provider"] == "openai"
+
+
+# Task #4: Web Surfer Enhancement - Theoretical Model Discovery Tests
+
+
+def test_evidence_chunk_basic_fields():
+    """Task #4: EvidenceChunk maintains backward compatibility with existing fields."""
+    from backend.schemas import EvidenceChunk
+
+    # Act: Create basic evidence chunk without theoretical metadata
+    evidence = EvidenceChunk(
+        source_id="web:abc123",
+        title="Test Source",
+        snippet="A short snippet about the construct",
+        url_or_docref="https://example.com/paper",
+        quote="This is a quote from the source"
+    )
+
+    # Assert: Basic fields work correctly
+    assert evidence.source_id == "web:abc123"
+    assert evidence.title == "Test Source"
+    assert evidence.snippet == "A short snippet about the construct"
+    assert evidence.url_or_docref == "https://example.com/paper"
+    assert evidence.quote == "This is a quote from the source"
+
+    # Assert: Theoretical fields default to None
+    assert evidence.evidence_type is None
+    assert evidence.authors is None
+    assert evidence.theoretical_model is None
+    assert evidence.dimensions is None
+
+
+def test_evidence_chunk_theoretical_metadata():
+    """Task #4: EvidenceChunk accepts theoretical model discovery fields."""
+    from backend.schemas import EvidenceChunk
+
+    # Act: Create evidence chunk with full theoretical metadata
+    evidence = EvidenceChunk(
+        source_id="web:keyes2002",
+        title="Keyes (2002) - The Mental Health Continuum",
+        snippet="Flourishing is defined as high levels of emotional, psychological, and social well-being",
+        url_or_docref="https://doi.org/10.1037/0022-006X.70.3.674",
+        quote="Flourishing is the presence of mental health, characterized by emotional vitality, positive functioning, and social integration.",
+        evidence_type="theoretical_definition",
+        authors="Keyes, C. L. M.",
+        theoretical_model="Two-Continua Model of Mental Health",
+        dimensions=["emotional well-being", "psychological well-being", "social well-being"]
+    )
+
+    # Assert: All theoretical fields populated correctly
+    assert evidence.evidence_type == "theoretical_definition"
+    assert evidence.authors == "Keyes, C. L. M."
+    assert evidence.theoretical_model == "Two-Continua Model of Mental Health"
+    assert evidence.dimensions == ["emotional well-being", "psychological well-being", "social well-being"]
+
+
+def test_evidence_chunk_validates_evidence_type():
+    """Task #4: EvidenceChunk validates evidence_type enum values."""
+    from pydantic import ValidationError
+    from backend.schemas import EvidenceChunk
+
+    # Test valid evidence types
+    valid_types = ["theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions"]
+
+    for evidence_type in valid_types:
+        evidence = EvidenceChunk(
+            source_id="web:test",
+            title="Test",
+            snippet="Test snippet",
+            url_or_docref="https://example.com",
+            quote="Test quote",
+            evidence_type=evidence_type
+        )
+        assert evidence.evidence_type == evidence_type
+
+    # Test invalid evidence type
+    with pytest.raises(ValidationError) as exc_info:
+        EvidenceChunk(
+            source_id="web:test",
+            title="Test",
+            snippet="Test snippet",
+            url_or_docref="https://example.com",
+            quote="Test quote",
+            evidence_type="invalid_type"
+        )
+    assert "evidence_type" in str(exc_info.value).lower()
+
+
+def test_evidence_chunk_dimensions_type():
+    """Task #4: EvidenceChunk dimensions field accepts list of strings."""
+    from backend.schemas import EvidenceChunk
+
+    # Act: Create evidence with dimensions
+    evidence = EvidenceChunk(
+        source_id="web:sdt",
+        title="Self-Determination Theory",
+        snippet="SDT identifies three basic psychological needs",
+        url_or_docref="https://example.com/sdt",
+        quote="Autonomy, competence, and relatedness are the three fundamental needs",
+        evidence_type="dimensions",
+        authors="Deci & Ryan",
+        theoretical_model="Self-Determination Theory",
+        dimensions=["autonomy", "competence", "relatedness"]
+    )
+
+    # Assert: Dimensions stored as list
+    assert isinstance(evidence.dimensions, list)
+    assert len(evidence.dimensions) == 3
+    assert "autonomy" in evidence.dimensions
+    assert "competence" in evidence.dimensions
+    assert "relatedness" in evidence.dimensions
+
+
+def test_evidence_chunk_serialization():
+    """Task #4: EvidenceChunk serializes to JSON with theoretical metadata."""
+    from backend.schemas import EvidenceChunk
+
+    # Arrange: Create evidence with theoretical metadata
+    evidence = EvidenceChunk(
+        source_id="web:flourishing",
+        title="Flourishing Framework",
+        snippet="Test snippet",
+        url_or_docref="https://example.com",
+        quote="Test quote",
+        evidence_type="dimensions",
+        authors="Keyes",
+        theoretical_model="Flourishing Model",
+        dimensions=["emotional", "psychological", "social"]
+    )
+
+    # Act: Serialize to dict
+    data = evidence.model_dump()
+
+    # Assert: All fields present in serialization
+    assert data["source_id"] == "web:flourishing"
+    assert data["evidence_type"] == "dimensions"
+    assert data["authors"] == "Keyes"
+    assert data["theoretical_model"] == "Flourishing Model"
+    assert data["dimensions"] == ["emotional", "psychological", "social"]
+
+
+def test_retrieval_response_with_theoretical_evidence():
+    """Task #4: RetrievalResponse accepts evidence chunks with theoretical metadata."""
+    from backend.schemas import RetrievalResponse, EvidenceChunk
+
+    # Arrange: Create evidence chunks with theoretical metadata
+    evidence_list = [
+        EvidenceChunk(
+            source_id="web:def",
+            title="Definition",
+            snippet="Snippet 1",
+            url_or_docref="https://example.com/1",
+            quote="Quote 1",
+            evidence_type="theoretical_definition",
+            authors="Author A"
+        ),
+        EvidenceChunk(
+            source_id="web:dim",
+            title="Dimensions",
+            snippet="Snippet 2",
+            url_or_docref="https://example.com/2",
+            quote="Quote 2",
+            evidence_type="dimensions",
+            dimensions=["dim1", "dim2"]
+        )
+    ]
+
+    # Act: Create RetrievalResponse
+    response = RetrievalResponse(evidence=evidence_list)
+
+    # Assert: Response contains all evidence with metadata
+    assert len(response.evidence) == 2
+    assert response.evidence[0].evidence_type == "theoretical_definition"
+    assert response.evidence[0].authors == "Author A"
+    assert response.evidence[1].evidence_type == "dimensions"
+    assert response.evidence[1].dimensions == ["dim1", "dim2"]

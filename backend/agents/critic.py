@@ -124,6 +124,7 @@ def decide(
     content_comments: List[ReviewComment],
     iteration: int,
     model_provider: str = "claude",
+    use_chatgpt_critics: bool = False,
 ) -> Tuple[Decision, str]:
     """
     LLM-based critic with adaptive thresholds and rule-based optimization.
@@ -193,6 +194,7 @@ def decide(
             messages,
             agent_name="critic",
             model_provider=model_provider,
+            use_chatgpt_critics=use_chatgpt_critics,
         )
         # Ensure threshold mode is in the reason
         reason_with_mode = f"{resp.reason} {threshold_ctx} [LLM-based]"

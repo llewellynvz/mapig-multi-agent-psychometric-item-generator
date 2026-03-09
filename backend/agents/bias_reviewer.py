@@ -30,6 +30,7 @@ def review_bias(request: AbbreviatedRequest, items: List[DraftItem], iteration: 
         messages,
         agent_name="bias_reviewer",
         model_provider=request.model_provider,
+        use_chatgpt_critics=request.use_chatgpt_critics,
     )
 
     # Safety: enforce comment type at runtime.

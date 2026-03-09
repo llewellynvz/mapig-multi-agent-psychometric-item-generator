@@ -12,7 +12,7 @@ export const RUN_STATUS_URL = (threadId: string) =>
   `${API_BASE_URL}/v1/runs/${encodeURIComponent(threadId)}/status`;
 
 export interface ProgressEvent {
-  type: "start" | "node_start" | "iteration" | "complete" | "error";
+  type: "start" | "node_start" | "iteration" | "complete" | "error" | "log";
   node?: string;
   display_name?: string;
   iteration?: number;
@@ -21,6 +21,12 @@ export interface ProgressEvent {
   data?: unknown;
   message?: string;
   trace?: string;
+
+  // Log event fields
+  timestamp?: string;
+  level?: "info" | "warning" | "error";
+  source?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface RunStatusResponse {

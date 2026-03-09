@@ -56,3 +56,4 @@ __pycache__/
 
 # archived files
 _archived/
+.vercel

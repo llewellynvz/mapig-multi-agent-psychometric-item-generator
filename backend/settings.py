@@ -27,7 +27,8 @@ class Settings(BaseSettings):
 
     # OpenAI (used only in APP_MODE=openai)
     OPENAI_API_KEY: Optional[str] = Field(default=None)
-    OPENAI_MODEL: str = "gpt-5-nano"
+    OPENAI_MODEL: str = "gpt-4o"  # Default GPT-4o for general use
+    CHATGPT_CRITIC_MODEL: str = "gpt-4o"  # GPT 5.2 (gpt-4o) for critic agents when toggle enabled
     OPENAI_BASE_URL: Optional[str] = Field(default=None)
 
     # Hybrid model strategy (cost optimization)

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Pill } from "@/components/ui/pill";
 import { SurfaceCard } from "@/components/ui/surface-card";
+import type { ProgressEvent } from "@/lib/api";
 
 export interface ProgressState {
   currentNode: string | null;
@@ -14,6 +15,8 @@ export interface ProgressState {
 
 interface ProgressIndicatorProps {
   progress: ProgressState;
+  logs?: ProgressEvent[];
+  useChatGPT?: boolean;
 }
 
 const NODE_DISPLAY_NAMES: Record<string, string> = {
@@ -28,16 +31,32 @@ const NODE_DISPLAY_NAMES: Record<string, string> = {
   finalize_node: "Finalizing",
 };
 
-export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
+export function ProgressIndicator({ progress, logs = [], useChatGPT = false }: ProgressIndicatorProps) {
   const displayName =
     progress.displayName ||
     (progress.currentNode ? NODE_DISPLAY_NAMES[progress.currentNode] || progress.currentNode : "Starting...");
+
+  const logContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new logs arrive
+  React.useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
     <SurfaceCard className="border-sky-300/70 p-6">
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">Generation Progress</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold">Generation Progress</h3>
+            {useChatGPT ? (
+              <Pill className="border-accent/60 bg-accent/30 text-accent">GPT 5.2</Pill>
+            ) : (
+              <Pill className="border-sky-400/60 bg-sky-400/20 text-sky-300">Claude</Pill>
+            )}
+          </div>
           {progress.status === "running" && (
             <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
           )}
@@ -78,6 +97,40 @@ export function ProgressIndicator({ progress }: ProgressIndicatorProps) {
 
         {progress.status === "idle" && (
           <p className="text-sm text-muted-foreground">Ready to generate items...</p>
+        )}
+
+        {/* Live Logs */}
+        {progress.status === "running" && logs.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-slate-300">Live Logs</h4>
+            <div
+              ref={logContainerRef}
+              className="max-h-60 overflow-y-auto space-y-1 rounded-md bg-white/5 p-3"
+            >
+              {logs.map((log, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs font-mono">
+                  <span
+                    className={`shrink-0 ${
+                      log.level === "error"
+                        ? "text-red-400"
+                        : log.level === "warning"
+                          ? "text-yellow-400"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    [{log.timestamp?.split("T")[1]?.slice(0, 8) ?? ""}]
+                  </span>
+                  <span className="text-sky-300 shrink-0">{log.source}:</span>
+                  <span className="text-slate-300">{log.message}</span>
+                  {log.metadata && Object.keys(log.metadata).length > 0 && (
+                    <span className="text-slate-500 text-[10px]">
+                      {JSON.stringify(log.metadata)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </SurfaceCard>

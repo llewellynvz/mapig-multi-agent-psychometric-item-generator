@@ -19,10 +19,12 @@ def _load_shared_prompt() -> str:
     return ""
 
 
+@lru_cache(maxsize=20)
 def load_prompt(prompt_filename: str) -> str:
     """Load an agent prompt, optionally prepending a shared system prompt.
 
-    The shared prompt (_shared.md) is cached in memory to reduce file I/O.
+    Both the shared prompt (_shared.md) and individual agent prompts are cached
+    in memory to reduce file I/O and improve performance.
 
     Args:
         prompt_filename: Name of agent-specific prompt file (e.g., "item_writer.md")

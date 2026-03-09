@@ -57,6 +57,11 @@ class GraphState(TypedDict, total=False):
     iteration: int
     stop_reason: str
 
+    # Cost tracking (accumulated during run)
+    opus_tokens_used: int
+    sonnet_tokens_used: int
+    openai_tokens_used: int
+
     # Output
     final_output: FinalOutput
 
@@ -80,6 +85,9 @@ def init_run(state: GraphState) -> GraphState:
             "failed_item_indices": [],
             "timestamp_utc": state.get("timestamp_utc") or _utc_now(),
             "run_id": state.get("run_id") or str(uuid.uuid4()),
+            "opus_tokens_used": 0,
+            "sonnet_tokens_used": 0,
+            "openai_tokens_used": 0,
         }
 
 

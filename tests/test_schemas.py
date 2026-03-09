@@ -274,3 +274,81 @@ def test_finaloutput_mutable_defaults():
     assert len(output1.bias_feedback) == 1
     assert len(output2.bias_feedback) == 0
     assert output1.bias_feedback is not output2.bias_feedback
+
+
+# Phase 03: Claude API Migration - Provider Selection Tests
+
+
+def test_user_request_model_provider_defaults_to_claude():
+    """Phase 03-01: UserRequest.model_provider defaults to 'claude'."""
+    from app.schemas import UserRequest
+
+    # Act: Create UserRequest without model_provider
+    request = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Definition here",
+        target_population="General adult",
+        response_scale="1-5 Likert",
+        item_count=5
+    )
+
+    # Assert: Default is 'claude'
+    assert request.model_provider == "claude"
+
+
+def test_user_request_validates_model_provider_enum():
+    """Phase 03-01: UserRequest validates model_provider is 'claude' or 'openai'."""
+    from pydantic import ValidationError
+    from app.schemas import UserRequest
+
+    # Test valid values
+    valid_claude = UserRequest(
+        construct_name="Test",
+        construct_definition="Definition",
+        target_population="Adults",
+        response_scale="1-5",
+        model_provider="claude"
+    )
+    assert valid_claude.model_provider == "claude"
+
+    valid_openai = UserRequest(
+        construct_name="Test",
+        construct_definition="Definition",
+        target_population="Adults",
+        response_scale="1-5",
+        model_provider="openai"
+    )
+    assert valid_openai.model_provider == "openai"
+
+    # Test invalid value
+    with pytest.raises(ValidationError) as exc_info:
+        UserRequest(
+            construct_name="Test",
+            construct_definition="Definition",
+            target_population="Adults",
+            response_scale="1-5",
+            model_provider="azure"  # Invalid
+        )
+    assert "model_provider" in str(exc_info.value).lower()
+
+
+def test_user_request_accepts_openai_provider():
+    """Phase 03-01: UserRequest accepts 'openai' as model_provider."""
+    from app.schemas import UserRequest
+
+    # Act: Create UserRequest with openai provider
+    request = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Definition here",
+        target_population="General adult",
+        response_scale="1-5 Likert",
+        item_count=10,
+        model_provider="openai"
+    )
+
+    # Assert: model_provider set correctly
+    assert request.model_provider == "openai"
+
+    # Assert: Serialization preserves model_provider
+    data = request.model_dump()
+    assert data["model_provider"] == "openai"

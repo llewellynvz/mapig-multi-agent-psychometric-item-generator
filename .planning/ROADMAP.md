@@ -23,7 +23,7 @@
 ### 📋 v1.1 Deployment (In Progress)
 
 - [x] Phase 5: Vercel Deployment (4/4 plans) — completed 2026-03-09
-- [ ] Phase 6: Comprehensive Evaluation Framework (TBD plans)
+- [ ] Phase 6: Comprehensive Evaluation Framework (4 plans)
 
 ## Phase Details
 
@@ -68,10 +68,13 @@ Plans:
   4. Validation scores demonstrate ≥15% improvement over baseline (pre-optimization system)
   5. Success criteria are documented: validation score improvement ≥15% AND generated items rated as comparable to published scales by experts
 
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 06-01-PLAN.md — Backend evaluation infrastructure with LLM-as-judge comparison (Wave 1)
+- [ ] 06-02-PLAN.md — Benchmark scale sourcing and storage (Wave 1)
+- [ ] 06-03-PLAN.md — Evaluation suite orchestrator and baseline comparison (Wave 2)
+- [ ] 06-04-PLAN.md — Dashboard UI and API endpoint (Wave 3)
 
 ## Progress
 
@@ -86,8 +89,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 | 3.1. Enhanced FinalOutput Schema | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Production Features | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 5. Vercel Deployment | v1.1 | 4/4 | Complete | 2026-03-09 |
-| 6. Comprehensive Evaluation Framework | v1.1 | 0/TBD | Not started | - |
+| 6. Comprehensive Evaluation Framework | v1.1 | 0/4 | Planned | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-09 (Phase 5 planning revised)*
+*Last updated: 2026-03-09 (Phase 6 planning complete)*

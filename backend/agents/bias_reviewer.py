@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
-from backend.agents.llm_utils import invoke_structured
+from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import BiasReviewResponse, DraftItem, ReviewComment, UserRequest
 from backend.settings import settings
 
 
-def review_bias(request: UserRequest, items: List[DraftItem], iteration: int) -> BiasReviewResponse:
+def review_bias(request: UserRequest, items: List[DraftItem], iteration: int) -> Tuple[BiasReviewResponse, TokenUsage]:
     """Bias/fairness review of items."""
     if settings.APP_MODE == "mock":
         # Mock: no bias issues for the stub items.
-        return BiasReviewResponse(comments=[])
+        return BiasReviewResponse(comments=[]), TokenUsage()
 
     system_prompt = load_prompt("bias_reviewer.md")
 
@@ -25,7 +25,7 @@ def review_bias(request: UserRequest, items: List[DraftItem], iteration: int) ->
         ("human", f"Review these items for bias and fairness risks.\n\nINPUT:\n{payload}"),
     ]
 
-    resp = invoke_structured(
+    resp, usage = invoke_structured_with_usage(
         BiasReviewResponse,
         messages,
         agent_name="bias_reviewer",
@@ -35,4 +35,4 @@ def review_bias(request: UserRequest, items: List[DraftItem], iteration: int) ->
     # Safety: enforce comment type at runtime.
     for c in resp.comments:
         c.type = "bias"
-    return resp
+    return resp, usage

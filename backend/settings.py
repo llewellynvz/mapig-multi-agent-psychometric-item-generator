@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 STANDARD_ITEM_CONSTRAINTS = [
@@ -82,6 +82,40 @@ class Settings(BaseSettings):
 
     # Retrieval allowlist
     APPROVED_SOURCES_DIR: str = "data/approved_sources"
+
+    @field_validator(
+        'APP_MODE',
+        'OPENAI_API_KEY',
+        'OPENAI_MODEL',
+        'CHATGPT_CRITIC_MODEL',
+        'OPENAI_BASE_URL',
+        'OPENAI_CHEAP_MODEL',
+        'AZURE_OPENAI_ENDPOINT',
+        'AZURE_OPENAI_API_KEY',
+        'AZURE_OPENAI_DEPLOYMENT',
+        'AZURE_OPENAI_API_VERSION',
+        'CLAUDE_API_KEY',
+        'VALIDATOR_MODEL',
+        'SEARCH_PROVIDER',
+        'PERPLEXITY_API_KEY',
+        'PERPLEXITY_BASE_URL',
+        'PERPLEXITY_MODEL',
+        'PERPLEXITY_SEARCH_MODE',
+        'PERPLEXITY_DOMAIN_FILTER',
+        'CHECKPOINT_DB_PATH',
+        'APPROVED_SOURCES_DIR',
+        mode='before'
+    )
+    @classmethod
+    def strip_whitespace(cls, v):
+        """Strip leading/trailing whitespace from string values.
+
+        This prevents validation errors when environment variables contain
+        trailing newlines or spaces (common when copying from UI forms).
+        """
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 settings = Settings()

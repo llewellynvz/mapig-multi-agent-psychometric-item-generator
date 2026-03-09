@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MAPIG Setup</title>
+    <link rel="stylesheet" href="./setup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="card">
+        <h1>Welcome to MAPIG Desktop</h1>
+        <p class="lead">
+          One-time setup. Enter your API keys, click launch, and MAPIG will open.
+          Closing the app closes all MAPIG services automatically.
+        </p>
+
+        <form id="setup-form" novalidate>
+          <label for="openaiApiKey">OpenAI API key <span>*</span></label>
+          <input
+            id="openaiApiKey"
+            name="openaiApiKey"
+            type="password"
+            autocomplete="off"
+            placeholder="sk-..."
+          />
+          <p class="hint">
+            <button class="link-btn" id="openaiLink" type="button">
+              Get an OpenAI API key
+            </button>
+          </p>
+
+          <label class="checkbox" for="enablePerplexity">
+            <input id="enablePerplexity" name="enablePerplexity" type="checkbox" checked />
+            Enable Perplexity web retrieval (recommended)
+          </label>
+
+          <div id="perplexityFields">
+            <label for="perplexityApiKey">Perplexity API key</label>
+            <input
+              id="perplexityApiKey"
+              name="perplexityApiKey"
+              type="password"
+              autocomplete="off"
+              placeholder="pplx-..."
+            />
+            <p class="hint">
+              <button class="link-btn" id="perplexityLink" type="button">
+                Get a Perplexity API key
+              </button>
+            </p>
+
+            <label for="perplexityModel">Perplexity model</label>
+            <input id="perplexityModel" name="perplexityModel" type="text" />
+
+            <label for="perplexitySearchMode">Perplexity search mode</label>
+            <select id="perplexitySearchMode" name="perplexitySearchMode">
+              <option value="academic">Academic</option>
+              <option value="web">Web</option>
+            </select>
+
+            <label for="perplexityMaxResults">Perplexity max results</label>
+            <input
+              id="perplexityMaxResults"
+              name="perplexityMaxResults"
+              type="number"
+              min="1"
+              max="50"
+            />
+
+            <label for="perplexityDomainFilter">Allowed domains (comma separated)</label>
+            <textarea
+              id="perplexityDomainFilter"
+              name="perplexityDomainFilter"
+              rows="4"
+            ></textarea>
+          </div>
+
+          <label for="openaiModel">OpenAI model</label>
+          <input id="openaiModel" name="openaiModel" type="text" />
+
+          <button id="submitBtn" class="submit" type="submit">Save and Launch MAPIG</button>
+          <p id="status" class="status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="./setup.js"></script>
+  </body>
+</html>
+

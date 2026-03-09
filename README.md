@@ -109,10 +109,8 @@ Recommended mode:
 # Backend (Python, via Poetry)
 poetry install
 
-# Frontend (Next.js)
-cd frontend
+# Frontend (Next.js, at repo root)
 npm install
-cd ..
 ```
 
 ### 2) Configure environment
@@ -190,13 +188,62 @@ Feedback history is tracked per round in the Results view.
 ## Testing
 Frontend production build:
 ```bash
-npm --prefix frontend run build
+npm run build
 ```
 
 Backend tests (if installed):
 ```bash
 pytest -q
 ```
+
+## Deployment (Vercel)
+
+MAPIG deploys as a **single Vercel project** with unified frontend and backend.
+
+### Architecture
+- **Frontend**: Next.js at repository root (pages in `/src`, public assets in `/public`)
+- **Backend**: Python serverless functions in `/api` directory
+- **Single domain**: Both frontend and backend served from same URL (e.g., `https://mapig.vercel.app`)
+- **No CORS needed**: Same-origin requests from frontend to `/api/*` endpoints
+
+### Prerequisites
+- Vercel account (Pro plan recommended for 300s timeout)
+- API keys: `CLAUDE_API_KEY` and/or `OPENAI_API_KEY`
+- Optional: `PERPLEXITY_API_KEY` for web search
+
+### Deployment Steps
+
+1. **Connect Repository to Vercel**
+   - Import project from GitHub/GitLab
+   - Framework Preset: Next.js (auto-detected)
+   - Root Directory: `.` (leave as root)
+   - Build Command: `npm run build` (auto-detected)
+
+2. **Configure Environment Variables** (Vercel Dashboard → Settings → Environment Variables)
+   ```
+   CLAUDE_API_KEY=<your-anthropic-key>
+   OPENAI_API_KEY=<your-openai-key>
+   APP_MODE=claude
+   SEARCH_PROVIDER=perplexity
+   PERPLEXITY_API_KEY=<your-perplexity-key>
+   PERPLEXITY_DOMAIN_FILTER=doi.org,psycnet.apa.org,...
+   NEXT_PUBLIC_API_URL=https://your-project.vercel.app
+   ```
+
+3. **Deploy**
+   - Push to `main` branch → Vercel auto-deploys
+   - Preview deployments created for PRs automatically
+
+### URLs
+- **Frontend**: `https://your-project.vercel.app`
+- **Backend API**: `https://your-project.vercel.app/api/*`
+- **Health check**: `https://your-project.vercel.app/api/healthz`
+
+### Notes
+- **Checkpointing**: In-memory only (MemorySaver) - session resumption not available after cold start
+- **SSE Streaming**: Fully supported within 300s timeout (typical runs: 20-40s)
+- **Cold Starts**: First request may take 3-8s; subsequent requests are fast
+- **Function Timeout**: 300s default (Pro plan), configurable up to 800s with Fluid Compute
 
 ## Deployment (Vercel)
 

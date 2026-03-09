@@ -77,8 +77,41 @@ class UserRequest(BaseModel):
     )
 
 
+class AbbreviatedRequest(BaseModel):
+    """Minimal request for agents that don't need full context.
+
+    Used by reviewers to reduce payload size (~60% smaller than UserRequest).
+    Reviewers only need: construct definition, constraints, target population, and response scale.
+    Evidence, examples, and retrieval settings are not needed for review.
+
+    Cost optimization: Reduces input tokens by ~500-800 per reviewer call.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    construct_name: str = Field(..., min_length=2, description="Name of construct to measure.")
+    construct_definition: str = Field(
+        ...,
+        min_length=10,
+        description="Operational definition of the construct (in-scope and out-of-scope boundaries).",
+    )
+    target_population: str = Field(..., min_length=2, description="Who will answer these items.")
+    response_scale: str = Field(..., min_length=2, description="Response scale, e.g., 5-point Likert.")
+    constraints: List[str] = Field(
+        default_factory=list,
+        description="Hard constraints for item writing (reading level, no idioms, etc.).",
+    )
+    model_provider: Literal["claude", "openai"] = Field(
+        default="claude",
+        description="LLM provider selection (claude or openai)."
+    )
+
+
 class EvidenceChunk(BaseModel):
-    """A small evidence unit from an approved source."""
+    """A small evidence unit from an approved source.
+
+    Enhanced in Task #4 to support theoretical model discovery with structured metadata.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -87,6 +120,24 @@ class EvidenceChunk(BaseModel):
     snippet: str = Field(..., description="Short snippet relevant to the construct.")
     url_or_docref: str = Field(..., description="URL or internal doc reference/path.")
     quote: str = Field(..., description="Exact quote or near-quote used as evidence.")
+
+    # Task #4: Theoretical model discovery fields
+    evidence_type: Optional[Literal["theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions"]] = Field(
+        default=None,
+        description="Type of evidence: theoretical_definition, dimensions, measurement_precedent, or boundary_conditions"
+    )
+    authors: Optional[str] = Field(
+        default=None,
+        description="Author names for theoretical sources (e.g., 'Keyes, 2002' or 'Deci & Ryan')"
+    )
+    theoretical_model: Optional[str] = Field(
+        default=None,
+        description="Name of theoretical model or framework (e.g., 'Two-Continua Model of Mental Health')"
+    )
+    dimensions: Optional[List[str]] = Field(
+        default=None,
+        description="Subcomponents or dimensions from theoretical framework (e.g., ['emotional', 'psychological', 'social'])"
+    )
 
 
 class DraftItem(BaseModel):
@@ -174,18 +225,18 @@ class DimensionScore(BaseModel):
     """A single dimension score with chain-of-thought reasoning.
 
     Represents one of four validation dimensions: correspondence, distinctiveness,
-    clarity, or specificity. Reasoning must come before score to encourage
-    deliberate evaluation.
+    clarity, or specificity. Reasoning is only required for failing dimensions
+    (score < 7) to reduce token usage while maintaining quality feedback.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     dimension: str = Field(..., description="One of: correspondence, distinctiveness, clarity, specificity")
     reasoning: str = Field(
-        ...,
-        min_length=3,
+        default="",
+        min_length=0,
         max_length=280,  # ~40 words at 7 chars/word average
-        description="Chain-of-thought explanation before scoring. Maximum 40 words.",
+        description="Chain-of-thought explanation. Empty string for passing dimensions (score ≥ 7), detailed reasoning for failing dimensions (score < 7). Maximum 40 words when provided.",
     )
     score: int = Field(..., ge=1, le=10, description="Score from 1-10 for this dimension")
 

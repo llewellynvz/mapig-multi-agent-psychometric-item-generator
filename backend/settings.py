@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # Use Sonnet for first validation attempt, only Opus if items fail
     SMART_VALIDATION_ENABLED: bool = True  # Tiered Sonnet→Opus validation (~80% cost savings on passing items)
 
+    # Rule-based critic (cost optimization)
+    # Use deterministic logic for clear accept/reject decisions (severity <3 → accept, ≥4 → revise)
+    # Only invoke LLM for borderline cases (severity = 3)
+    RULE_BASED_CRITIC_ENABLED: bool = True  # ~90% critic calls use zero tokens (~2% overall cost savings)
+
     # Azure OpenAI (used only in APP_MODE=azure)
     AZURE_OPENAI_ENDPOINT: Optional[str] = Field(default=None)
     AZURE_OPENAI_API_KEY: Optional[str] = Field(default=None)

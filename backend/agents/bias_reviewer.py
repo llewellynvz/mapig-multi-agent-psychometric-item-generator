@@ -4,11 +4,11 @@ from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
-from backend.schemas import BiasReviewResponse, DraftItem, ReviewComment, UserRequest
+from backend.schemas import AbbreviatedRequest, BiasReviewResponse, DraftItem, ReviewComment
 from backend.settings import settings
 
 
-def review_bias(request: UserRequest, items: List[DraftItem], iteration: int) -> Tuple[BiasReviewResponse, TokenUsage]:
+def review_bias(request: AbbreviatedRequest, items: List[DraftItem], iteration: int) -> Tuple[BiasReviewResponse, TokenUsage]:
     """Bias/fairness review of items."""
     if settings.APP_MODE == "mock":
         # Mock: no bias issues for the stub items.

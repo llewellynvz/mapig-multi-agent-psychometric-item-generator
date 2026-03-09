@@ -104,7 +104,7 @@ Plans:
   4. Frontend TypeScript types mirror backend schema changes exactly
   5. Existing API consumers continue working without modification (null/empty arrays for new fields)
 
-**Plans:** 2/2 plans complete
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 03.1-00-PLAN.md — Create test scaffolds for schema validation and graph integration (Wave 0)
@@ -176,7 +176,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. LLM-as-Judge Validation Gate | 5/5 | Complete    | 2026-03-08 |
 | 2. Agent Architecture Optimization | 5/6 | In Progress|  |
-| 3. Claude API Migration | 0/3 | Not started | - |
+| 3. Claude API Migration | 2/3 | In Progress|  |
 | 3.1. Enhance FinalOutput schema | 0/2 | Complete    | 2026-03-08 |
 | 4. Production Features | 0/1 | Complete    | 2026-03-08 |
 | 5. Vercel Deployment | 0/TBD | Not started | - |

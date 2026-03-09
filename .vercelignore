@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+.planning/
+.git/
+frontend/node_modules/
+desktop/
+.cursor/
+nul
+*.pdf

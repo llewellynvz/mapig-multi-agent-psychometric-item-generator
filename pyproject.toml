@@ -1,3 +1,28 @@
+[project]
+name = "mapig"
+version = "0.1.0"
+description = "A multi-agent orchestrator for Psychometric Self-Report Item Generation(LangGraph + Azure OpenAI)"
+authors = [{name = "Prof. Llewellyn E. Van Zyl", email = "llewellyn101@gmail.com"}]
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "langgraph==1.0.6",
+    "langgraph-checkpoint==3.0.3",
+    "langchain-core==1.2.8",
+    "langchain-openai==1.1.7",
+    "langchain-anthropic>=1.3.4",
+    "anthropic>=0.84.0",
+    "fastapi==0.128.0",
+    "uvicorn[standard]==0.40.0",
+    "pydantic==2.12.5",
+    "pydantic-settings==2.12.0",
+    "httpx==0.28.1",
+    "python-dotenv==1.2.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.0.2"]
+
 [tool.poetry]
 name = "MAPIG: Multi-Agent Psychometric Item Generator"
 version = "0.1.0"

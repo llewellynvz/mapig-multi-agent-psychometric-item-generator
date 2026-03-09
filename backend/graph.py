@@ -68,6 +68,41 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
     }
 
 
+def _should_validate_items(
+    linguistic_comments: List[ReviewComment],
+    bias_comments: List[ReviewComment],
+    content_comments: List[ReviewComment],
+) -> bool:
+    """Decide if full Opus validation is needed based on review feedback.
+
+    Cost optimization: Skip expensive Opus validation when items clearly pass reviews.
+
+    Args:
+        linguistic_comments: Linguistic reviewer feedback
+        bias_comments: Bias reviewer feedback
+        content_comments: Content reviewer feedback
+
+    Returns:
+        True if validation needed, False to skip
+    """
+    all_comments = linguistic_comments + bias_comments + content_comments
+
+    # No comments at all → skip validation (items are clean!)
+    if len(all_comments) == 0:
+        logger.info("Smart validation: No review comments → skipping Opus validation (cost savings!)")
+        return False
+
+    # Only minor comments (severity ≤ 2) → skip validation
+    max_severity = max((c.severity for c in all_comments), default=0)
+    if max_severity <= 2:
+        logger.info(f"Smart validation: Only minor issues (max severity {max_severity}) → skipping Opus validation")
+        return False
+
+    # High-severity issues (≥ 3) → full validation required
+    logger.info(f"Smart validation: {len(all_comments)} comments with max severity {max_severity} → running Opus validation")
+    return True
+
+
 class GraphState(TypedDict, total=False):
     # Inputs / identifiers
     user_request: UserRequest
@@ -445,6 +480,22 @@ def finalize_node(state: GraphState) -> GraphState:
 
         total_cost = opus_cost + sonnet_cost + openai_cost
 
+        # Determine if smart validation was used
+        from backend.agents.validator import _use_smart_validation
+        smart_val_enabled = _use_smart_validation()
+        validation_model = None
+        if smart_val_enabled and state.get("validation_attempt", 1) == 1:
+            # First attempt with smart validation: used Sonnet (unless all items passed)
+            # Check if Opus was actually used by looking at token usage
+            if opus_tokens > 0:
+                validation_model = "opus"  # Fallback to Opus occurred
+            else:
+                validation_model = "sonnet"  # Sonnet was sufficient
+        elif state.get("validation_attempt", 1) > 1:
+            validation_model = "opus"  # Retries always use Opus
+        else:
+            validation_model = "opus"  # Smart validation disabled, always Opus
+
         # Update audit with validation metadata and cost tracking
         audit = AuditMetadata(
             thread_id=state.get("thread_id", "unknown"),
@@ -460,6 +511,8 @@ def finalize_node(state: GraphState) -> GraphState:
             sonnet_cost=round(sonnet_cost, 2) if sonnet_cost > 0 else None,
             openai_cost=round(openai_cost, 2) if openai_cost > 0 else None,
             total_cost=round(total_cost, 2) if total_cost > 0 else None,
+            smart_validation_used=smart_val_enabled,
+            validation_model_used=validation_model,
         )
 
         # Phase 03.1: Extract review feedback from GraphState for complete metadata export

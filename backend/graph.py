@@ -17,6 +17,7 @@ from backend.agents.item_writer import write_items
 from backend.agents.linguistic_reviewer import review_linguistic
 from backend.agents.meta_editor import revise_items
 from backend.agents.retrieval_agent import retrieve_evidence
+from backend.agents.llm_utils import TokenUsage
 from backend.schemas import (
     AuditMetadata,
     DraftItem,
@@ -33,6 +34,38 @@ from backend.agents.web_surfer import surf as web_surf
 from backend.agents.content_reviewer import review_content
 
 logger = logging.getLogger("lmaig")
+
+
+def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
+    """Accumulate token usage into appropriate GraphState counters.
+
+    Args:
+        state: Current graph state
+        usage: Token usage from LLM call
+
+    Returns:
+        Dict with updated token counters
+    """
+    model_name = usage.model_name.lower()
+    opus_tokens = state.get("opus_tokens_used", 0)
+    sonnet_tokens = state.get("sonnet_tokens_used", 0)
+    openai_tokens = state.get("openai_tokens_used", 0)
+
+    if "opus" in model_name:
+        opus_tokens += usage.total_tokens
+    elif "sonnet" in model_name or "claude" in model_name:
+        sonnet_tokens += usage.total_tokens
+    elif "gpt" in model_name or "openai" in model_name:
+        openai_tokens += usage.total_tokens
+    else:
+        # Unknown model - add to sonnet as fallback
+        sonnet_tokens += usage.total_tokens
+
+    return {
+        "opus_tokens_used": opus_tokens,
+        "sonnet_tokens_used": sonnet_tokens,
+        "openai_tokens_used": openai_tokens,
+    }
 
 
 class GraphState(TypedDict, total=False):
@@ -111,8 +144,12 @@ def retrieve_node(state: GraphState) -> GraphState:
 
 def item_writer_node(state: GraphState) -> GraphState:
     with step("item_writer_node", state):
-        resp = write_items(state["user_request"], state.get("evidence", []))
-        return {"draft_items": resp.items}
+        resp, usage = write_items(state["user_request"], state.get("evidence", []))
+        token_update = _accumulate_tokens(state, usage)
+        return {
+            "draft_items": resp.items,
+            **token_update,
+        }
 
 
 def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
@@ -123,11 +160,14 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
         draft_items = state.get("draft_items", [])
         attempt = state.get("validation_attempt", 1)
 
-        resp = validate_items(
+        resp, usage = validate_items(
             request=state["user_request"],
             items=draft_items,
             attempt=attempt
         )
+
+        # Accumulate token usage
+        token_update = _accumulate_tokens(state, usage)
 
         # Store validation results and determine routing
         validation_results = resp.validations
@@ -138,7 +178,10 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
             # All items passed
             logger.info("Validation passed: all items scored >= 7.0")
             return Command(
-                update={"validation_results": validation_results},
+                update={
+                    "validation_results": validation_results,
+                    **token_update,
+                },
                 goto="reviewers_fanout_node"
             )
 
@@ -146,7 +189,10 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
             # Max retries exhausted; accept best available
             logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
             return Command(
-                update={"validation_results": validation_results},
+                update={
+                    "validation_results": validation_results,
+                    **token_update,
+                },
                 goto="reviewers_fanout_node"
             )
 
@@ -156,7 +202,8 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
             update={
                 "validation_results": validation_results,
                 "validation_attempt": attempt + 1,
-                "failed_item_indices": [v.item_index for v in failed]
+                "failed_item_indices": [v.item_index for v in failed],
+                **token_update,
             },
             goto="regenerate_items_node"
         )
@@ -188,44 +235,60 @@ def regenerate_items_node(state: GraphState) -> GraphState:
         modified_request.item_count = len(failed_indices)
 
         # Regenerate failed items
-        resp = write_items(modified_request, state.get("evidence", []))
+        resp, usage = write_items(modified_request, state.get("evidence", []))
+        token_update = _accumulate_tokens(state, usage)
 
         # Merge: keep accepted items, replace failed items
         merged_items = draft_items.copy()
         for idx, new_item in zip(failed_indices, resp.items):
             merged_items[idx] = new_item
 
-        return {"draft_items": merged_items}
+        return {
+            "draft_items": merged_items,
+            **token_update,
+        }
 
 
 def linguistic_review_node(state: GraphState) -> GraphState:
     with step("linguistic_review_node", state):
-        resp = review_linguistic(
+        resp, usage = review_linguistic(
             state["user_request"],
             state.get("draft_items", []),
             iteration=state.get("iteration", 0),
         )
-        return {"linguistic_comments": resp.comments}
+        token_update = _accumulate_tokens(state, usage)
+        return {
+            "linguistic_comments": resp.comments,
+            **token_update,
+        }
 
 
 def bias_review_node(state: GraphState) -> GraphState:
     with step("bias_review_node", state):
-        resp = review_bias(
+        resp, usage = review_bias(
             state["user_request"],
             state.get("draft_items", []),
             iteration=state.get("iteration", 0),
         )
-        return {"bias_comments": resp.comments}
+        token_update = _accumulate_tokens(state, usage)
+        return {
+            "bias_comments": resp.comments,
+            **token_update,
+        }
 
 def content_review_node(state: GraphState) -> GraphState:
     with step("content_review_node", state):
-        resp = review_content(
+        resp, usage = review_content(
             state["user_request"],
             state.get("draft_items", []),
             iteration=state.get("iteration", 0),
         )
+        token_update = _accumulate_tokens(state, usage)
         logger.info("content_review comments=%d", len(resp.comments))
-        return {"content_comments": resp.comments}
+        return {
+            "content_comments": resp.comments,
+            **token_update,
+        }
 
 
 def reviewers_fanout_node(state: GraphState) -> GraphState:
@@ -248,9 +311,9 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
             )
 
             # Wait for all to complete and get results
-            content_resp = content_future.result()
-            linguistic_resp = linguistic_future.result()
-            bias_resp = bias_future.result()
+            content_resp, content_usage = content_future.result()
+            linguistic_resp, linguistic_usage = linguistic_future.result()
+            bias_resp, bias_usage = bias_future.result()
 
         logger.info(
             "reviewers_fanout: content=%d linguistic=%d bias=%d",
@@ -259,10 +322,20 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
             len(bias_resp.comments),
         )
 
+        # Accumulate all token usage
+        combined_usage = TokenUsage(
+            input_tokens=content_usage.input_tokens + linguistic_usage.input_tokens + bias_usage.input_tokens,
+            output_tokens=content_usage.output_tokens + linguistic_usage.output_tokens + bias_usage.output_tokens,
+            total_tokens=content_usage.total_tokens + linguistic_usage.total_tokens + bias_usage.total_tokens,
+            model_name=content_usage.model_name,  # All use same model
+        )
+        token_update = _accumulate_tokens(state, combined_usage)
+
         return {
             "content_comments": content_resp.comments,
             "linguistic_comments": linguistic_resp.comments,
             "bias_comments": bias_resp.comments,
+            **token_update,
         }
 
 
@@ -296,7 +369,7 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "final
 
 def meta_editor_node(state: GraphState) -> GraphState:
     with step("meta_editor_node", state):
-        resp = revise_items(
+        resp, usage = revise_items(
             request=state["user_request"],
             items=state.get("draft_items", []),
             linguistic_comments=state.get("linguistic_comments", []),
@@ -305,6 +378,8 @@ def meta_editor_node(state: GraphState) -> GraphState:
             iteration=state.get("iteration", 0),
         )
 
+        token_update = _accumulate_tokens(state, usage)
+
         return {
             "draft_items": resp.revised_items,
             "revision_plan": resp.revision_plan,
@@ -312,6 +387,7 @@ def meta_editor_node(state: GraphState) -> GraphState:
             "linguistic_comments": [],
             "bias_comments": [],
             "content_comments": [],
+            **token_update,
         }
 
 

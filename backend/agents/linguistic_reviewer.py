@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
-from backend.agents.llm_utils import invoke_structured
+from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import DraftItem, LinguisticReviewResponse, ReviewComment, UserRequest
 from backend.settings import settings
@@ -10,7 +10,7 @@ from backend.settings import settings
 
 def review_linguistic(
     request: UserRequest, items: List[DraftItem], iteration: int
-) -> LinguisticReviewResponse:
+) -> Tuple[LinguisticReviewResponse, TokenUsage]:
     """Linguistic review of items."""
     if settings.APP_MODE == "mock":
         # Deterministic: force one revision loop by emitting a single medium-severity issue on iteration 0.
@@ -24,8 +24,8 @@ def review_linguistic(
                         suggested_edit="Vary the wording and target different facets of the construct across items.",
                     )
                 ]
-            )
-        return LinguisticReviewResponse(comments=[])
+            ), TokenUsage()
+        return LinguisticReviewResponse(comments=[]), TokenUsage()
 
     system_prompt = load_prompt("linguistic_reviewer.md")
 
@@ -38,7 +38,7 @@ def review_linguistic(
         ("human", f"Review these items for linguistic quality.\n\nINPUT:\n{payload}"),
     ]
 
-    resp = invoke_structured(
+    resp, usage = invoke_structured_with_usage(
         LinguisticReviewResponse,
         messages,
         agent_name="linguistic_reviewer",
@@ -48,4 +48,4 @@ def review_linguistic(
     # Safety: enforce comment type at runtime.
     for c in resp.comments:
         c.type = "linguistic"
-    return resp
+    return resp, usage

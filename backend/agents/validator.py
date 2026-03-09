@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Tuple
 
 from backend.agents.llm_factory import get_validator_model
+from backend.agents.llm_utils import TokenUsage, _extract_token_usage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import (
     DimensionScore,
@@ -21,7 +22,7 @@ def validate_items(
     request: UserRequest,
     items: List[DraftItem],
     attempt: int = 1,
-) -> ValidationResponse:
+) -> Tuple[ValidationResponse, TokenUsage]:
     """Validate all items using LLM-as-judge with chain-of-thought scoring.
 
     Args:
@@ -30,7 +31,7 @@ def validate_items(
         attempt: Which regeneration attempt (1-3)
 
     Returns:
-        ValidationResponse containing validation results for all items
+        Tuple of (ValidationResponse, TokenUsage)
 
     Raises:
         ValueError: If attempt is not between 1-3
@@ -77,7 +78,7 @@ def validate_items(
                     attempt=attempt,
                 )
             )
-        return ValidationResponse(validations=validations)
+        return ValidationResponse(validations=validations), TokenUsage()
 
     # Real mode: Use Claude Opus for validation
     try:
@@ -104,20 +105,29 @@ def validate_items(
 
         # Get validator model (Claude Opus)
         model = get_validator_model()
+        model_name = getattr(model, "model_name", getattr(model, "model", "opus"))
 
-        # Invoke with structured output
-        # Note: We inline the structured output logic here because invoke_structured
-        # doesn't currently accept a model parameter. This is technical debt
-        # to be addressed in a future refactoring phase.
-        runnable = model.with_structured_output(ValidationResponse, strict=True)
-        result = runnable.invoke(messages)
+        # Invoke with structured output, capturing raw response for token tracking
+        runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
+        response = runnable.invoke(messages)
+
+        # Extract result and token usage
+        if isinstance(response, dict) and "parsed" in response and "raw" in response:
+            result = response["parsed"]
+            raw_message = response["raw"]
+            usage = _extract_token_usage(raw_message, model_name)
+        else:
+            # Fallback: no raw message available
+            result = response
+            usage = TokenUsage(model_name=model_name)
 
         logger.info(
             f"Validated {len(items)} items on attempt {attempt}. "
-            f"Accepted: {sum(1 for v in result.validations if v.accept)}/{len(items)}"
+            f"Accepted: {sum(1 for v in result.validations if v.accept)}/{len(items)}. "
+            f"Tokens: {usage.total_tokens}"
         )
 
-        return result
+        return result, usage
 
     except Exception as e:
         logger.error(f"Validation failed: {e}", exc_info=True)

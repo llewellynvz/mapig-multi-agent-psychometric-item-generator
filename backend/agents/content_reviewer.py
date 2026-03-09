@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
-from backend.agents.llm_utils import invoke_structured
+from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import ContentReviewResponse, DraftItem, ReviewComment, UserRequest
 from backend.settings import settings
 
 
-def review_content(request: UserRequest, items: List[DraftItem], iteration: int) -> ContentReviewResponse:
+def review_content(request: UserRequest, items: List[DraftItem], iteration: int) -> Tuple[ContentReviewResponse, TokenUsage]:
     if settings.APP_MODE == "mock":
-        return ContentReviewResponse(comments=[])
+        return ContentReviewResponse(comments=[]), TokenUsage()
 
     system_prompt = load_prompt("content_reviewer.md")
     payload = {"user_request": request.model_dump(), "items": [i.model_dump() for i in items], "iteration": iteration}
@@ -20,7 +20,7 @@ def review_content(request: UserRequest, items: List[DraftItem], iteration: int)
         ("human", f"Review for content validity.\n\nINPUT:\n{payload}"),
     ]
 
-    resp = invoke_structured(
+    resp, usage = invoke_structured_with_usage(
         ContentReviewResponse,
         messages,
         agent_name="content_reviewer",
@@ -30,4 +30,4 @@ def review_content(request: UserRequest, items: List[DraftItem], iteration: int)
     fixed = []
     for c in resp.comments:
         fixed.append(ReviewComment(**{**c.model_dump(), "type": "content"}))
-    return ContentReviewResponse(comments=fixed)
+    return ContentReviewResponse(comments=fixed), usage

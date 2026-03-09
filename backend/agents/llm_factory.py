@@ -112,7 +112,8 @@ def get_validator_model() -> ChatAnthropic:
 
 def get_chat_model_for_agent(
     agent_name: str,
-    model_provider: str = "claude"
+    model_provider: str = "claude",
+    use_chatgpt_critics: bool = False,
 ) -> Union[ChatOpenAI, AzureChatOpenAI, ChatAnthropic]:
     """Get LLM for specific agent with smart model allocation.
 
@@ -124,9 +125,15 @@ def get_chat_model_for_agent(
     - bias_reviewer: gpt-4o-mini (20x cheaper than Sonnet, fairness detection OK)
     - critic: gpt-4o-mini (20x cheaper, has rule fallback)
 
+    ChatGPT critics toggle (when use_chatgpt_critics=True):
+    - All critic agents (validator, linguistic_reviewer, bias_reviewer, content_reviewer, critic)
+      use ChatGPT o1-5.2-flex for cost comparison
+    - Item writer ALWAYS uses Claude Sonnet (unaffected by toggle)
+
     Args:
         agent_name: Agent identifier (e.g., "validator", "item_writer", "bias_reviewer")
         model_provider: "claude" or "openai"
+        use_chatgpt_critics: Use ChatGPT for critic agents (cost comparison mode)
 
     Returns:
         Configured chat model instance
@@ -134,7 +141,19 @@ def get_chat_model_for_agent(
     Raises:
         ValueError: If required API key missing for selected provider
     """
-    # Check for agent-specific overrides first
+    # Define critic agents that can be switched to ChatGPT
+    CRITIC_AGENTS = ["validator", "linguistic_reviewer", "bias_reviewer", "content_reviewer", "critic"]
+
+    # Special case: ChatGPT critics toggle
+    # When enabled, all critic agents use ChatGPT o1-5.2-flex
+    if use_chatgpt_critics and agent_name in CRITIC_AGENTS:
+        return get_openai_chat_model(model=settings.CHATGPT_CRITIC_MODEL)
+
+    # Ensure item writer ALWAYS uses Claude Sonnet (ignore toggle)
+    if agent_name == "item_writer":
+        return get_claude_chat_model(model="claude-sonnet-4-5")
+
+    # Check for agent-specific overrides
     if settings.AGENT_MODEL_OVERRIDES_ENABLED and agent_name in AGENT_MODEL_OVERRIDES:
         override_provider, override_model = AGENT_MODEL_OVERRIDES[agent_name]
         if override_provider == "openai":

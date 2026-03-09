@@ -43,6 +43,7 @@ def review_linguistic(
         messages,
         agent_name="linguistic_reviewer",
         model_provider=request.model_provider,
+        use_chatgpt_critics=request.use_chatgpt_critics,
     )
 
     # Safety: enforce comment type at runtime.

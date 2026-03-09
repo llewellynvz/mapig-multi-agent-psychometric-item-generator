@@ -20,7 +20,7 @@ export interface UserRequest {
 
 export interface DimensionScore {
   dimension: string;
-  reasoning: string;
+  reasoning: string; // Empty string for passing dimensions (score >= 7), detailed for failing (score < 7)
   score: number;
 }
 

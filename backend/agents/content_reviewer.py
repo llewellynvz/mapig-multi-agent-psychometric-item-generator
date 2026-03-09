@@ -25,6 +25,7 @@ def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteratio
         messages,
         agent_name="content_reviewer",
         model_provider=request.model_provider,
+        use_chatgpt_critics=request.use_chatgpt_critics,
     )
     # Ensure comment.type is correct even if the model forgets.
     fixed = []

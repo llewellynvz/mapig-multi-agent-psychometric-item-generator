@@ -77,6 +77,8 @@ export default function HomePage() {
     iteration: 0,
     status: "idle",
   });
+  const [logs, setLogs] = React.useState<ProgressEvent[]>([]);
+  const [useChatGPT, setUseChatGPT] = React.useState(false);
 
   const appendHistoryEntry = React.useCallback(
     (data: FinalOutput, kind: RunKind, feedback: string) => {
@@ -109,6 +111,12 @@ export default function HomePage() {
         body: request,
         threadId,
         onProgress: (event: ProgressEvent) => {
+          if (event.type === "log") {
+            // Handle log events
+            setLogs((prev) => [...prev, event]);
+            return;
+          }
+
           if (event.type === "start") {
             if (event.thread_id) {
               setThreadIdInput(event.thread_id);
@@ -127,6 +135,7 @@ export default function HomePage() {
               iteration: 0,
               status: "running",
             });
+            setLogs([]); // Clear logs on new run
           } else if (event.type === "node_start") {
             setProgress((prev) => ({
               ...prev,
@@ -250,6 +259,7 @@ export default function HomePage() {
       setSubmittedSetup(values);
       setHumanFeedback("");
       setFeedbackHistory([]);
+      setUseChatGPT(values.use_chatgpt_critics);
       runGeneration(formToRequest(values), threadId);
     },
     [runGeneration]
@@ -522,7 +532,7 @@ export default function HomePage() {
         {step === "run" && (
           <section className="animate-fade-up grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-4">
-              <ProgressIndicator progress={progress} />
+              <ProgressIndicator progress={progress} logs={logs} useChatGPT={useChatGPT} />
               <SurfaceCard className="border-sky-300/70">
                 <CardHeader className="border-b border-border/60">
                   <CardTitle className="text-base md:text-lg">Running Agent Workflow</CardTitle>

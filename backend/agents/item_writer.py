@@ -63,4 +63,5 @@ def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> Tuple[It
         messages,
         agent_name="item_writer",
         model_provider=request.model_provider,
+        use_chatgpt_critics=request.use_chatgpt_critics,
     )

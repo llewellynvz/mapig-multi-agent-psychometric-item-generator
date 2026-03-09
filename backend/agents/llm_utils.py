@@ -62,6 +62,7 @@ def invoke_structured(
     agent_name: Optional[str] = None,
     model_provider: Optional[str] = None,
     use_cache_control: bool = True,
+    use_chatgpt_critics: bool = False,
 ) -> SchemaT:
     """
     Invoke the configured LLM and return validated structured output.
@@ -77,11 +78,12 @@ def invoke_structured(
         agent_name: Optional agent identifier for smart allocation
         model_provider: Optional provider override ("claude" or "openai")
         use_cache_control: Enable prompt caching for system messages (default: True)
+        use_chatgpt_critics: Use ChatGPT for critic agents (cost comparison mode)
 
     Returns:
         Validated response instance of schema type
     """
-    result, _ = invoke_structured_with_usage(schema, messages, agent_name, model_provider, use_cache_control)
+    result, _ = invoke_structured_with_usage(schema, messages, agent_name, model_provider, use_cache_control, use_chatgpt_critics)
     return result
 
 
@@ -91,6 +93,7 @@ def invoke_structured_with_usage(
     agent_name: Optional[str] = None,
     model_provider: Optional[str] = None,
     use_cache_control: bool = True,
+    use_chatgpt_critics: bool = False,
 ) -> Tuple[SchemaT, TokenUsage]:
     """
     Invoke the configured LLM and return validated structured output WITH token usage.
@@ -106,6 +109,7 @@ def invoke_structured_with_usage(
         agent_name: Optional agent identifier for smart allocation
         model_provider: Optional provider override ("claude" or "openai")
         use_cache_control: Enable prompt caching for system messages (default: True)
+        use_chatgpt_critics: Use ChatGPT for critic agents (cost comparison mode)
 
     Returns:
         Tuple of (validated response instance, token usage)
@@ -116,7 +120,7 @@ def invoke_structured_with_usage(
     # Use smart allocation if both parameters provided
     if agent_name and model_provider:
         from backend.agents.llm_factory import get_chat_model_for_agent
-        llm = get_chat_model_for_agent(agent_name, model_provider)
+        llm = get_chat_model_for_agent(agent_name, model_provider, use_chatgpt_critics)
     else:
         # Fall back to default get_chat_model()
         from backend.agents.llm_factory import get_chat_model

@@ -82,9 +82,16 @@ function ValidationScoreDisplay({
                 <div className="text-sm font-medium text-slate-100">
                   {dim.dimension.charAt(0).toUpperCase() + dim.dimension.slice(1)}: {dim.score}/10
                 </div>
-                <div className="mt-1 text-xs text-slate-300 italic">
-                  {dim.reasoning}
-                </div>
+                {dim.reasoning && (
+                  <div className="mt-1 text-xs text-slate-300 italic">
+                    {dim.reasoning}
+                  </div>
+                )}
+                {!dim.reasoning && dim.score >= 7 && (
+                  <div className="mt-1 text-xs text-slate-400 italic">
+                    (passed - no issues)
+                  </div>
+                )}
               </div>
             ))}
           </div>

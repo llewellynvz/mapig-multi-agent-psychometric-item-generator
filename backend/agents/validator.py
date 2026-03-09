@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List, Tuple
 
-from backend.agents.llm_factory import get_validator_model, get_claude_chat_model
+from backend.agents.llm_factory import get_chat_model_for_agent
 from backend.agents.llm_utils import TokenUsage, _extract_token_usage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import (
@@ -111,16 +111,32 @@ def validate_items(
         # Only apply cache control for Claude models (Anthropic API supports prompt caching)
         from langchain_core.messages import HumanMessage, SystemMessage
 
+        # Determine model based on smart validation and ChatGPT critics toggle
         # Smart validation: Use Sonnet first (80% cheaper), only use Opus if items fail
-        if _use_smart_validation() and attempt == 1:
+        # ChatGPT critics: Override to use ChatGPT if enabled
+        use_chatgpt = getattr(request, "use_chatgpt_critics", False)
+
+        if _use_smart_validation() and attempt == 1 and not use_chatgpt:
+            # Smart validation: Sonnet first attempt (Claude only)
             logger.info(f"Smart validation: Attempting with Sonnet first (attempt {attempt})")
+            model = get_chat_model_for_agent(
+                agent_name="validator",
+                model_provider="claude",
+                use_chatgpt_critics=False,
+            )
+            # Override to force Sonnet for first attempt (not Opus)
+            from backend.agents.llm_factory import get_claude_chat_model
             model = get_claude_chat_model(model="claude-sonnet-4-5")
             model_name = "claude-sonnet-4-5"
         else:
-            # Use Opus for: (1) retries (attempt > 1), or (2) smart validation disabled
-            logger.info(f"Using Opus validation (attempt {attempt})")
-            model = get_validator_model()
-            model_name = getattr(model, "model_name", getattr(model, "model", "opus"))
+            # Use standard allocation (respects ChatGPT toggle)
+            logger.info(f"Using validator model (attempt {attempt}, use_chatgpt={use_chatgpt})")
+            model = get_chat_model_for_agent(
+                agent_name="validator",
+                model_provider=request.model_provider,
+                use_chatgpt_critics=use_chatgpt,
+            )
+            model_name = getattr(model, "model_name", getattr(model, "model", "unknown"))
 
         # Build messages with cache_control for system prompt
         # Cache control reduces cost by ~90% on cached portions (5-minute TTL)

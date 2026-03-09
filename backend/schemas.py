@@ -5,6 +5,19 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, conint
 
 
+class LogEvent(BaseModel):
+    """Real-time log event for SSE streaming."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["log"]
+    timestamp: str = Field(..., description="ISO timestamp")
+    level: Literal["info", "warning", "error"] = Field(..., description="Log level")
+    source: str = Field(..., description="Agent or step name")
+    message: str = Field(..., description="Log message")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional context (tokens, duration, etc.)")
+
+
 class UserRequest(BaseModel):
     """The user's measurement intent.
 
@@ -76,6 +89,12 @@ class UserRequest(BaseModel):
         description="LLM provider selection (claude or openai)."
     )
 
+    # ChatGPT critics toggle for cost comparison
+    use_chatgpt_critics: bool = Field(
+        default=False,
+        description="Use ChatGPT (o1-5.2-flex) for critic agents (validator, reviewers, critic). Item writer always uses Sonnet."
+    )
+
 
 class AbbreviatedRequest(BaseModel):
     """Minimal request for agents that don't need full context.
@@ -104,6 +123,12 @@ class AbbreviatedRequest(BaseModel):
     model_provider: Literal["claude", "openai"] = Field(
         default="claude",
         description="LLM provider selection (claude or openai)."
+    )
+
+    # ChatGPT critics toggle for cost comparison
+    use_chatgpt_critics: bool = Field(
+        default=False,
+        description="Use ChatGPT for critic agents."
     )
 
 
@@ -284,7 +309,8 @@ class AuditMetadata(BaseModel):
     # Cost tracking (optional, calculated at finalization)
     opus_cost: Optional[float] = Field(default=None, description="Claude Opus API cost in USD")
     sonnet_cost: Optional[float] = Field(default=None, description="Claude Sonnet API cost in USD")
-    openai_cost: Optional[float] = Field(default=None, description="OpenAI API cost in USD")
+    openai_cost: Optional[float] = Field(default=None, description="OpenAI API cost in USD (GPT-4o-mini)")
+    chatgpt_cost: Optional[float] = Field(default=None, description="ChatGPT API cost in USD (GPT-4o for critics toggle)")
     total_cost: Optional[float] = Field(default=None, description="Total API cost in USD")
 
     # Smart validation tracking (Strategy C)

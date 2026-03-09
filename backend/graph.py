@@ -51,12 +51,17 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
     opus_tokens = state.get("opus_tokens_used", 0)
     sonnet_tokens = state.get("sonnet_tokens_used", 0)
     openai_tokens = state.get("openai_tokens_used", 0)
+    chatgpt_tokens = state.get("chatgpt_tokens_used", 0)
 
     if "opus" in model_name:
         opus_tokens += usage.total_tokens
     elif "sonnet" in model_name or "claude" in model_name:
         sonnet_tokens += usage.total_tokens
+    elif "gpt-4o" in model_name and "mini" not in model_name:
+        # GPT-4o (not mini) - used for ChatGPT critics toggle
+        chatgpt_tokens += usage.total_tokens
     elif "gpt" in model_name or "openai" in model_name:
+        # Other OpenAI models (e.g., GPT-4o-mini from overrides)
         openai_tokens += usage.total_tokens
     else:
         # Unknown model - add to sonnet as fallback
@@ -66,6 +71,7 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
         "opus_tokens_used": opus_tokens,
         "sonnet_tokens_used": sonnet_tokens,
         "openai_tokens_used": openai_tokens,
+        "chatgpt_tokens_used": chatgpt_tokens,
     }
 
 
@@ -406,6 +412,7 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
 def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "finalize_node"]]:
     user_request = state.get("user_request")
     model_provider = user_request.model_provider if user_request else "claude"
+    use_chatgpt_critics = user_request.use_chatgpt_critics if user_request else False
 
     decision, reason = critic_decide(
         linguistic_comments=state.get("linguistic_comments", []),
@@ -413,6 +420,7 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "final
         content_comments=state.get("content_comments", []),
         iteration=state.get("iteration", 0),
         model_provider=model_provider,
+        use_chatgpt_critics=use_chatgpt_critics,
     )
 
     if decision == "revise":
@@ -519,21 +527,24 @@ def finalize_node(state: GraphState) -> GraphState:
         opus_tokens = state.get("opus_tokens_used", 0)
         sonnet_tokens = state.get("sonnet_tokens_used", 0)
         openai_tokens = state.get("openai_tokens_used", 0)
+        chatgpt_tokens = state.get("chatgpt_tokens_used", 0)
 
         # Claude pricing (per 1M tokens):
         # - Opus: $15 input + $75 output → blended ~$45
         # - Sonnet: $3 input + $15 output → blended ~$9
         # OpenAI pricing (per 1M tokens):
+        # - GPT-4o: $2.50 input + $10 output → blended ~$6.25 (used for ChatGPT critics toggle)
         # - GPT-4o-mini: $0.15 input + $0.60 output → blended ~$0.375 (20x cheaper than Sonnet!)
-        # - GPT-4: $5 input + $15 output → blended ~$10
         # Note: Assuming ~1:1 input/output ratio for blended rate
 
         opus_cost = (opus_tokens / 1_000_000) * 45.0  # Blended rate for Opus
         sonnet_cost = (sonnet_tokens / 1_000_000) * 9.0  # Blended rate for Sonnet
-        # Use GPT-4o-mini pricing (most agents use this via overrides)
+        # GPT-4o pricing (used when ChatGPT critics toggle is enabled)
+        chatgpt_cost = (chatgpt_tokens / 1_000_000) * 6.25  # Blended rate for GPT-4o
+        # GPT-4o-mini pricing (used for agent overrides like bias_reviewer, critic)
         openai_cost = (openai_tokens / 1_000_000) * 0.375  # Blended rate for GPT-4o-mini
 
-        total_cost = opus_cost + sonnet_cost + openai_cost
+        total_cost = opus_cost + sonnet_cost + chatgpt_cost + openai_cost
 
         # Determine if smart validation was used
         from backend.agents.validator import _use_smart_validation
@@ -565,6 +576,7 @@ def finalize_node(state: GraphState) -> GraphState:
             opus_cost=round(opus_cost, 2) if opus_cost > 0 else None,
             sonnet_cost=round(sonnet_cost, 2) if sonnet_cost > 0 else None,
             openai_cost=round(openai_cost, 2) if openai_cost > 0 else None,
+            chatgpt_cost=round(chatgpt_cost, 2) if chatgpt_cost > 0 else None,
             total_cost=round(total_cost, 2) if total_cost > 0 else None,
             smart_validation_used=smart_val_enabled,
             validation_model_used=validation_model,

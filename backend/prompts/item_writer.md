@@ -37,7 +37,7 @@ Return JSON only with this exact shape:
 
 Item count
 - You must output exactly item_count items.
-- If item_count is missing, output 10 items.
+- If item_count is missing, output 5 items.
 - If previous_items are provided, keep the same count unless item_count explicitly differs.
 
 Human feedback refinement
@@ -56,6 +56,7 @@ FORBIDDEN:
 - Copying example_item wording or structure
 - Generating items without evidence grounding
 - Creating facets not supported by theoretical literature
+- Double barreled items (e.g. I am aware of my work priorities and how they align with my core values.")
 
 If insufficient evidence is provided, note this in rationale and request additional sources.
 

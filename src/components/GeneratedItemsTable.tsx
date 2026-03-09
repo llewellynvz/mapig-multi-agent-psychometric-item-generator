@@ -33,7 +33,7 @@ function ValidationScoreDisplay({
         </span>
 
         {/* Two buttons side-by-side */}
-        <SecondaryButton
+        <PrimaryButton
           size="sm"
           onClick={() => setExpandedRationale(!expandedRationale)}
           className="h-8 text-xs"
@@ -44,9 +44,9 @@ function ValidationScoreDisplay({
             <ChevronRight className="mr-1 h-3 w-3" />
           )}
           Rationale
-        </SecondaryButton>
+        </PrimaryButton>
 
-        <SecondaryButton
+        <PrimaryButton
           size="sm"
           onClick={() => setExpandedReasoning(!expandedReasoning)}
           className="h-8 text-xs"
@@ -57,7 +57,7 @@ function ValidationScoreDisplay({
             <ChevronRight className="mr-1 h-3 w-3" />
           )}
           Show Reasoning
-        </SecondaryButton>
+        </PrimaryButton>
       </div>
 
       {/* Rationale panel */}
@@ -172,8 +172,8 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
     const content = selectedFormat === 'csv'
       ? exportToCsv(fullOutput)
       : selectedFormat === 'json'
-      ? exportToJson(fullOutput)
-      : exportToMarkdown(fullOutput);
+        ? exportToJson(fullOutput)
+        : exportToMarkdown(fullOutput);
 
     const mimeTypes = {
       csv: 'text/csv;charset=utf-8',
@@ -285,9 +285,8 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
         <p className="text-sm text-muted-foreground">
           {displayItems.length} items generated
           {fullOutput?.audit?.validation_failures
-            ? ` (${fullOutput.audit.validation_failures} rejected, ${
-                (fullOutput.audit.validation_attempts ?? 0) - (fullOutput.audit.validation_failures ?? 0)
-              } from regeneration)`
+            ? ` (${fullOutput.audit.validation_failures} rejected, ${(fullOutput.audit.validation_attempts ?? 0) - (fullOutput.audit.validation_failures ?? 0)
+            } from regeneration)`
             : ''
           }
         </p>

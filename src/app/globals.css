@@ -147,24 +147,24 @@
   .btn-primary-ui {
     @apply text-white;
     border-radius: var(--radius-2);
-    background: var(--color-accent);
+    background: #008da1;
     box-shadow: var(--shadow-1);
   }
 
   .btn-primary-ui:hover {
-    background: #11b9cf;
+    background: #006d7c;
   }
 
   .btn-secondary-ui {
     @apply text-white;
     border-radius: var(--radius-2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(177, 221, 12, 0.3);
+    background: #b1dd0c;
   }
 
   .btn-secondary-ui:hover {
-    border-color: rgba(167, 209, 43, 0.65);
-    background: rgba(167, 209, 43, 0.24);
+    border-color: rgba(177, 221, 12, 0.65);
+    background: #9cbd0a;
     color: #fff;
   }
 

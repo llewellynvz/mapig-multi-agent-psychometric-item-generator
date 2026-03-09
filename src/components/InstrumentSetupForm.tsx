@@ -56,14 +56,98 @@ export interface InstrumentSetupFormProps {
 }
 
 function setErrorsFromDetail(setError: UseFormSetError<InstrumentSetupFormValues>, detail: unknown) {
-  if (!Array.isArray(detail)) return;
-  for (const item of detail) {
-    const loc = item?.loc;
-    const msg = item?.msg ?? "Validation error";
+  console.log("[MAPIG] Validation error detail received:", detail);
+  console.log("[MAPIG] Detail type:", typeof detail, "isArray:", Array.isArray(detail));
+
+  // Handle single error object (not in array)
+  if (!Array.isArray(detail) && typeof detail === "object" && detail !== null) {
+    const errorObj = detail as { type?: string; msg?: string; loc?: unknown };
+    console.log("[MAPIG] Single error object (not array):", errorObj);
+
+    const loc = errorObj.loc;
+    const msg = errorObj.msg ?? "Validation error";
+
+    // Try to extract field name from loc
     if (Array.isArray(loc) && loc.length >= 2 && loc[0] === "body") {
       const field = loc[1] as keyof InstrumentSetupFormValues;
+      console.log(`[MAPIG] Setting error on field "${field}":`, msg);
       setError(field, { type: "server", message: String(msg) });
+      return;
+    } else if (Array.isArray(loc) && loc.length >= 1) {
+      const field = loc[0] as keyof InstrumentSetupFormValues;
+      if (field in defaultInstrumentSetup) {
+        console.log(`[MAPIG] Setting error on field "${field}" (fallback):`, msg);
+        setError(field, { type: "server", message: String(msg) });
+        return;
+      }
     }
+
+    // No field location found, set generic error
+    console.warn("[MAPIG] No field location in single error object, setting generic error");
+    setError("construct_name", {
+      type: "server",
+      message: String(msg)
+    });
+    return;
+  }
+
+  // Handle string errors
+  if (typeof detail === "string") {
+    console.log("[MAPIG] String error:", detail);
+    setError("construct_name", {
+      type: "server",
+      message: detail
+    });
+    return;
+  }
+
+  // Handle array format (multiple errors)
+  if (!Array.isArray(detail)) {
+    console.error("[MAPIG] Unexpected validation error format:", detail);
+    setError("construct_name", {
+      type: "server",
+      message: "Validation error occurred. Please check your inputs."
+    });
+    return;
+  }
+
+  // Parse array of validation errors
+  let errorCount = 0;
+  for (const item of detail) {
+    console.log("[MAPIG] Processing error item:", item);
+    const loc = item?.loc;
+    const msg = item?.msg ?? "Validation error";
+
+    // Handle errors with proper location
+    if (Array.isArray(loc) && loc.length >= 2 && loc[0] === "body") {
+      const field = loc[1] as keyof InstrumentSetupFormValues;
+      console.log(`[MAPIG] Setting error on field "${field}":`, msg);
+      setError(field, { type: "server", message: String(msg) });
+      errorCount++;
+    } else if (Array.isArray(loc) && loc.length >= 1) {
+      // Fallback: try first element as field name
+      const field = loc[0] as keyof InstrumentSetupFormValues;
+      if (field in defaultInstrumentSetup) {
+        console.log(`[MAPIG] Setting error on field "${field}" (fallback):`, msg);
+        setError(field, { type: "server", message: String(msg) });
+        errorCount++;
+      } else {
+        console.warn(`[MAPIG] Field "${field}" not found in schema, skipping`);
+      }
+    } else {
+      console.warn("[MAPIG] Invalid loc format:", loc);
+    }
+  }
+
+  console.log(`[MAPIG] Total errors set: ${errorCount}/${detail.length}`);
+
+  // If no errors were set, log warning and set a fallback error
+  if (errorCount === 0) {
+    console.warn("[MAPIG] No field errors could be mapped from validation response:", detail);
+    setError("construct_name", {
+      type: "server",
+      message: "Validation error occurred. Please check your inputs."
+    });
   }
 }
 
@@ -139,198 +223,199 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
         <InsetPanel className="space-y-6 rounded-2xl p-4">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-            <Label htmlFor="construct_name">Construct name (required)</Label>
-            <Input
-              id="construct_name"
-              placeholder="e.g. Workplace belonging"
-              {...form.register("construct_name")}
-            />
-            {form.formState.errors.construct_name && (
-              <p className="text-sm font-medium text-accent">
-                {form.formState.errors.construct_name.message}
-              </p>
-            )}
-          </div>
-
-            <div className="space-y-2">
-            <Label htmlFor="construct_definition">
-              Construct definition (required, min 10 chars)
-            </Label>
-            <Textarea
-              id="construct_definition"
-              placeholder="Operational definition of the construct..."
-              rows={4}
-              {...form.register("construct_definition")}
-            />
-            {form.formState.errors.construct_definition && (
-              <p className="text-sm font-medium text-accent">
-                {form.formState.errors.construct_definition.message}
-              </p>
-            )}
-          </div>
-
-            <div className="space-y-2">
-            <Label htmlFor="target_population">Target population (required)</Label>
-            <Input
-              id="target_population"
-              placeholder="e.g. Full-time employees in hybrid work"
-              {...form.register("target_population")}
-            />
-            {form.formState.errors.target_population && (
-              <p className="text-sm font-medium text-accent">
-                {form.formState.errors.target_population.message}
-              </p>
-            )}
-          </div>
-
-            <div className="space-y-2">
-            <Label htmlFor="response_scale">Response scale</Label>
-            <select
-              id="response_scale"
-              className="flex h-10 w-full items-center justify-between rounded-2xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              value={isPresetResponseScale ? responseScale : "__custom__"}
-              onChange={(e) => form.setValue("response_scale", e.target.value === "__custom__" ? "" : e.target.value)}
-            >
-              <option value="" disabled>
-                Select scale
-              </option>
-              {RESPONSE_SCALE_PRESETS.map((preset) => (
-                <option key={preset} value={preset}>
-                  {preset}
-                </option>
-              ))}
-              <option value="__custom__">Custom (enter below)</option>
-            </select>
-            {!isPresetResponseScale && (
+              <Label htmlFor="construct_name">Construct name (required)</Label>
               <Input
-                placeholder="Enter custom response scale"
-                value={responseScale}
-                onChange={(e) => form.setValue("response_scale", e.target.value)}
+                id="construct_name"
+                placeholder="e.g. Workplace belonging"
+                {...form.register("construct_name")}
               />
-            )}
-            {form.formState.errors.response_scale && (
-              <p className="text-sm font-medium text-accent">
-                {form.formState.errors.response_scale.message}
-              </p>
-            )}
-          </div>
-
-            <div className="space-y-2">
-            <Label htmlFor="item_count">Item count (2–50)</Label>
-            <Input
-              id="item_count"
-              type="number"
-              min={2}
-              max={50}
-              {...form.register("item_count", { valueAsNumber: true })}
-            />
-            {form.formState.errors.item_count && (
-              <p className="text-sm font-medium text-accent">
-                {form.formState.errors.item_count.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="use_chatgpt_critics" className="cursor-pointer">
-                Critic model
-              </Label>
-              <Switch
-                id="use_chatgpt_critics"
-                checked={form.watch("use_chatgpt_critics")}
-                onCheckedChange={(checked) => form.setValue("use_chatgpt_critics", checked)}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {form.watch("use_chatgpt_critics") ? (
-                <>
-                  <span className="font-medium text-accent">GPT 5.2 (ChatGPT)</span> — Critics use OpenAI for cost savings. Item writer uses Claude Sonnet.
-                </>
-              ) : (
-                <>
-                  <span className="font-medium">Claude</span> — Critics use Claude Opus/Sonnet (default). Item writer uses Claude Sonnet.
-                </>
+              {form.formState.errors.construct_name && (
+                <p className="text-sm font-medium text-accent">
+                  {form.formState.errors.construct_name.message}
+                </p>
               )}
-            </p>
-          </div>
+            </div>
 
             <div className="space-y-2">
-            <Label>Constraints</Label>
-            <TagInput
-              value={form.watch("constraints")}
-              onChange={(v) => form.setValue("constraints", v)}
-              placeholder="Add constraint..."
-              aria-label="Constraints"
-            />
-          </div>
+              <Label htmlFor="construct_definition">
+                Construct definition (required, min 10 chars)
+              </Label>
+              <Textarea
+                id="construct_definition"
+                placeholder="Operational definition of the construct..."
+                rows={4}
+                {...form.register("construct_definition")}
+              />
+              {form.formState.errors.construct_definition && (
+                <p className="text-sm font-medium text-accent">
+                  {form.formState.errors.construct_definition.message}
+                </p>
+              )}
+            </div>
 
             <div className="space-y-2">
-            <Label htmlFor="construct_exclusions">Construct boundary / overlap exclusions (optional)</Label>
-            <Textarea
-              id="construct_exclusions"
-              placeholder="Describe what this construct is NOT, and nearby constructs/items that should be avoided."
-              rows={3}
-              {...form.register("construct_exclusions")}
-            />
-          </div>
-
-            <div className="space-y-2">
-            <Label htmlFor="native_construct">Native construct (optional)</Label>
-            <Input
-              id="native_construct"
-              placeholder="Optional native-language label"
-              {...form.register("native_construct")}
-            />
-          </div>
-
-            <div className="space-y-2">
-            <Label htmlFor="example_item">Example item (optional)</Label>
-            <Input
-              id="example_item"
-              placeholder="e.g. I feel like I belong in my team."
-              {...form.register("example_item")}
-            />
-          </div>
-
-            <div className="space-y-2">
-            <Label>Approved domains (optional)</Label>
-            <p className="text-xs text-muted-foreground">
-              Restrict Perplexity search to these domains. Add or remove as needed.
-            </p>
-            <TagInput
-              value={form.watch("approved_domains")}
-              onChange={(v) => form.setValue("approved_domains", v)}
-              placeholder="e.g. doi.org"
-              aria-label="Approved domains"
-            />
-          </div>
-
-          {onThreadIdChange && (
-              <div className="space-y-2">
-              <Label htmlFor="thread_id">Resume thread (X-Thread-ID)</Label>
+              <Label htmlFor="target_population">Target population (required)</Label>
               <Input
-                id="thread_id"
-                placeholder="Paste thread ID to resume"
-                value={threadIdInput}
-                onChange={(e) => onThreadIdChange(e.target.value)}
-                aria-label="Thread ID for resume"
+                id="target_population"
+                placeholder="e.g. Full-time employees in hybrid work"
+                {...form.register("target_population")}
+              />
+              {form.formState.errors.target_population && (
+                <p className="text-sm font-medium text-accent">
+                  {form.formState.errors.target_population.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="response_scale">Response scale</Label>
+              <select
+                id="response_scale"
+                className="flex h-10 w-full items-center justify-between rounded-2xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={isPresetResponseScale ? responseScale : "__custom__"}
+                onChange={(e) => form.setValue("response_scale", e.target.value === "__custom__" ? "" : e.target.value)}
+              >
+                <option value="" disabled>
+                  Select scale
+                </option>
+                {RESPONSE_SCALE_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset}
+                  </option>
+                ))}
+                <option value="__custom__">Custom (enter below)</option>
+              </select>
+              {!isPresetResponseScale && (
+                <Input
+                  placeholder="Enter custom response scale"
+                  value={responseScale}
+                  onChange={(e) => form.setValue("response_scale", e.target.value)}
+                />
+              )}
+              {form.formState.errors.response_scale && (
+                <p className="text-sm font-medium text-accent">
+                  {form.formState.errors.response_scale.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="item_count">Item count (2–50)</Label>
+              <Input
+                id="item_count"
+                type="number"
+                min={2}
+                max={50}
+                {...form.register("item_count", { valueAsNumber: true })}
+              />
+              {form.formState.errors.item_count && (
+                <p className="text-sm font-medium text-accent">
+                  {form.formState.errors.item_count.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="use_chatgpt_critics" className="cursor-pointer">Critic Model</Label>
+                  <p className="text-xs text-muted-foreground mr-6">
+                    {form.watch("use_chatgpt_critics") ? (
+                      <>
+                        <span className="font-medium text-white">ChatGPT 5.2</span> — Critics, validators, and reviewers use OpenAI for cost savings. Item writer always uses Claude Sonnet.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-white">Claude</span> — All agents use Claude models (Opus/Sonnet). Item writer uses Claude Sonnet.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Switch
+                  id="use_chatgpt_critics"
+                  checked={form.watch("use_chatgpt_critics")}
+                  onCheckedChange={(checked) => form.setValue("use_chatgpt_critics", checked)}
+                  className="data-[state=checked]:bg-[#008da1] data-[state=unchecked]:bg-[#b1dd0c]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Constraints</Label>
+              <TagInput
+                value={form.watch("constraints")}
+                onChange={(v) => form.setValue("constraints", v)}
+                placeholder="Add constraint..."
+                aria-label="Constraints"
               />
             </div>
-          )}
+
+            <div className="space-y-2">
+              <Label htmlFor="construct_exclusions">Construct boundary / overlap exclusions (optional)</Label>
+              <Textarea
+                id="construct_exclusions"
+                placeholder="Describe what this construct is NOT, and nearby constructs/items that should be avoided."
+                rows={3}
+                {...form.register("construct_exclusions")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="native_construct">Native construct (optional)</Label>
+              <Input
+                id="native_construct"
+                placeholder="Optional native-language label"
+                {...form.register("native_construct")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="example_item">Example item (optional)</Label>
+              <Input
+                id="example_item"
+                placeholder="e.g. I feel like I belong in my team."
+                {...form.register("example_item")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Approved domains (optional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Restrict Perplexity search to these domains. Add or remove as needed.
+              </p>
+              <TagInput
+                value={form.watch("approved_domains")}
+                onChange={(v) => form.setValue("approved_domains", v)}
+                placeholder="e.g. doi.org"
+                aria-label="Approved domains"
+              />
+            </div>
+
+            {onThreadIdChange && (
+              <div className="space-y-2">
+                <Label htmlFor="thread_id">Resume thread (X-Thread-ID)</Label>
+                <Input
+                  id="thread_id"
+                  placeholder="Paste thread ID to resume"
+                  value={threadIdInput}
+                  onChange={(e) => onThreadIdChange(e.target.value)}
+                  aria-label="Thread ID for resume"
+                />
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-3 pt-4">
-            <PrimaryButton type="button" disabled={isPending} onClick={() => handleSubmit()}>
-              {isPending ? "Generating…" : "Generate items"}
-            </PrimaryButton>
-            <SecondaryButton
-              type="button"
-              onClick={handleReset}
-              disabled={isPending}
-            >
-              Reset
-            </SecondaryButton>
-          </div>
+              <PrimaryButton type="button" disabled={isPending} onClick={() => handleSubmit()}>
+                {isPending ? "Generating…" : "Generate items"}
+              </PrimaryButton>
+              <PrimaryButton
+                type="button"
+                onClick={handleReset}
+                disabled={isPending}
+              >
+                Reset
+              </PrimaryButton>
+            </div>
           </form>
         </InsetPanel>
       </CardContent>

@@ -349,7 +349,20 @@ def finalize_node(state: GraphState) -> GraphState:
                 }
             )
 
-        # Update audit with validation metadata
+        # Calculate API costs (approximate pricing as of 2025)
+        opus_tokens = state.get("opus_tokens_used", 0)
+        sonnet_tokens = state.get("sonnet_tokens_used", 0)
+        openai_tokens = state.get("openai_tokens_used", 0)
+
+        # Claude pricing (per 1M tokens): Opus $15 input + $75 output, Sonnet $3 input + $15 output
+        # Simplified: average input/output ratio ~1:1, use blended rate
+        opus_cost = (opus_tokens / 1_000_000) * 45.0  # Blended rate
+        sonnet_cost = (sonnet_tokens / 1_000_000) * 9.0  # Blended rate
+        openai_cost = (openai_tokens / 1_000_000) * 10.0  # GPT-4 tier blended rate
+
+        total_cost = opus_cost + sonnet_cost + openai_cost
+
+        # Update audit with validation metadata and cost tracking
         audit = AuditMetadata(
             thread_id=state.get("thread_id", "unknown"),
             run_id=state.get("run_id", "unknown"),
@@ -360,6 +373,10 @@ def finalize_node(state: GraphState) -> GraphState:
             approved_sources=approved_sources,
             validation_attempts=state.get("validation_attempt", 1),
             validation_failures=len([v for v in validation_results if not v.accept]),
+            opus_cost=round(opus_cost, 2) if opus_cost > 0 else None,
+            sonnet_cost=round(sonnet_cost, 2) if sonnet_cost > 0 else None,
+            openai_cost=round(openai_cost, 2) if openai_cost > 0 else None,
+            total_cost=round(total_cost, 2) if total_cost > 0 else None,
         )
 
         # Phase 03.1: Extract review feedback from GraphState for complete metadata export

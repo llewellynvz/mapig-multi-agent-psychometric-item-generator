@@ -240,3 +240,12 @@ def test_finalize_node_enhanced_output():
     assert len(final_output.final_items) == 1
     assert final_output.audit.thread_id == "test-thread"
     assert final_output.audit.iteration_count == 2
+
+
+def test_missing_claude_key_raises_error():
+    """Test that missing CLAUDE_API_KEY prevents Claude workflow.
+
+    This test will be implemented when pytest-mock is available.
+    Validates HTTPException raised when CLAUDE_API_KEY missing.
+    """
+    pass

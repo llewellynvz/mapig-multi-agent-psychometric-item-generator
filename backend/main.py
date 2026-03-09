@@ -14,12 +14,19 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 
 # #region agent log
 import os as _os
-DEBUG_LOG_PATH = _os.path.join(
-    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
-    ".cursor",
-    "debug.log",
-)
-_os.makedirs(_os.path.dirname(DEBUG_LOG_PATH), exist_ok=True)
+# Use /tmp for Vercel serverless environment (read-only filesystem)
+if _os.environ.get("VERCEL"):
+    DEBUG_LOG_PATH = "/tmp/debug.log"
+else:
+    DEBUG_LOG_PATH = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+        ".cursor",
+        "debug.log",
+    )
+try:
+    _os.makedirs(_os.path.dirname(DEBUG_LOG_PATH), exist_ok=True)
+except (OSError, PermissionError):
+    pass  # Ignore if directory creation fails in serverless environment
 
 def _debug_log(message: str, data: dict, hypothesis_id: str = "H1") -> None:
     try:

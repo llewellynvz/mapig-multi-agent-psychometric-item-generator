@@ -236,6 +236,10 @@ class AuditMetadata(BaseModel):
     openai_cost: Optional[float] = Field(default=None, description="OpenAI API cost in USD")
     total_cost: Optional[float] = Field(default=None, description="Total API cost in USD")
 
+    # Smart validation tracking (Strategy C)
+    smart_validation_used: Optional[bool] = Field(default=None, description="Whether smart validation (Sonnet→Opus) was used")
+    validation_model_used: Optional[str] = Field(default=None, description="Model used for validation (sonnet/opus)")
+
 
 class FinalOutput(BaseModel):
     """Final items plus audit metadata.

@@ -40,8 +40,8 @@ Requirements for production deployment milestone. Research-backed optimization f
 - [x] **API-03**: Smart model allocation (Opus for validation, Sonnet for other agents)
 - [ ] **API-04**: OpenAI fallback option (user-selectable)
 - [ ] **API-05**: CLAUDE_API_KEY environment variable in Vercel
-- [ ] **API-06**: UI model selector (Claude vs OpenAI, default Claude)
-- [ ] **API-07**: Cost tracking per model (Opus vs Sonnet vs OpenAI)
+- [x] **API-06**: UI model selector (Claude vs OpenAI, default Claude)
+- [x] **API-07**: Cost tracking per model (Opus vs Sonnet vs OpenAI)
 
 ### Phase 3.1: Enhance FinalOutput Schema
 
@@ -150,8 +150,8 @@ Mapping requirements to phases. Updated during roadmap creation.
 | API-03 | Phase 3 | Complete |
 | API-04 | Phase 3 | Pending |
 | API-05 | Phase 3 | Pending |
-| API-06 | Phase 3 | Pending |
-| API-07 | Phase 3 | Pending |
+| API-06 | Phase 3 | Complete |
+| API-07 | Phase 3 | Complete |
 | SCHEMA-01 | Phase 3.1 | Complete |
 | SCHEMA-02 | Phase 3.1 | Complete |
 | SCHEMA-03 | Phase 3.1 | Complete |

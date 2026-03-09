@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-5-nano"
     OPENAI_BASE_URL: Optional[str] = Field(default=None)
 
+    # Hybrid model strategy (cost optimization)
+    # Some agents can use cheaper OpenAI models instead of Claude
+    AGENT_MODEL_OVERRIDES_ENABLED: bool = True  # Enable per-agent model selection
+    OPENAI_CHEAP_MODEL: str = "gpt-4o-mini"  # Cheaper model for peripheral agents (~60% cheaper than Sonnet)
+
     # Azure OpenAI (used only in APP_MODE=azure)
     AZURE_OPENAI_ENDPOINT: Optional[str] = Field(default=None)
     AZURE_OPENAI_API_KEY: Optional[str] = Field(default=None)

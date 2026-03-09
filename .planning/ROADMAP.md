@@ -22,7 +22,7 @@
 
 ### 📋 v1.1 Deployment (Planned)
 
-- [ ] Phase 5: Vercel Deployment (3 plans)
+- [ ] Phase 5: Vercel Deployment (4 plans)
 - [ ] Phase 6: Comprehensive Evaluation Framework (TBD plans)
 
 ## Phase Details
@@ -32,21 +32,24 @@
 
 **Depends on**: Phase 4
 
-**Requirements**: DEP-01, DEP-02, DEP-03, DEP-04, DEP-05, DEP-06, DEP-07, DEP-08
+**Requirements**: DEP-01, DEP-02, DEP-03, DEP-04, DEP-05, DEP-06, DEP-07
+
+**Note**: DEP-08 (cold start optimization <5s) deferred to v2 per user decision. Baseline measurements documented in 05-03.
 
 **Success Criteria** (what must be TRUE):
   1. Production URL is accessible publicly and handles end-to-end item generation workflow
   2. SSE streaming displays real-time agent progress events in frontend exactly as in local development
   3. In-memory checkpoints maintain state during single run (session resumption not required after cold start for v1)
   4. CLAUDE_API_KEY and OPENAI_API_KEY are configured as Vercel environment variables and accessible to serverless functions
-  5. Cold start performance documented (DEP-08 optimization deferred to v2)
+  5. Cold start performance documented with baseline measurements (DEP-08 optimization deferred to v2)
 
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Backend serverless conversion with MemorySaver and CORS configuration (Wave 1)
-- [ ] 05-02-PLAN.md — Frontend Vercel configuration and deployment documentation (Wave 2)
-- [ ] 05-03-PLAN.md — Vercel deployment and end-to-end verification (Wave 3)
+- [ ] 05-00-PLAN.md — Create test scaffolds for Vercel deployment (Wave 0)
+- [ ] 05-01-PLAN.md — Backend serverless conversion with MemorySaver and CORS configuration (Wave 2)
+- [ ] 05-02-PLAN.md — Frontend Vercel configuration and deployment documentation (Wave 3)
+- [ ] 05-03-PLAN.md — Vercel deployment, verification, and cold start baseline (Wave 4)
 
 ### Phase 6: Comprehensive Evaluation Framework
 **Goal**: System quality is validated through automated evaluation suite measuring item quality, agent performance, workflow efficiency, and construct validity against published scales with documented success criteria
@@ -79,9 +82,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 | 3. Claude API Migration | v1.0 | 3/3 | Complete | 2026-03-09 |
 | 3.1. Enhanced FinalOutput Schema | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Production Features | v1.0 | 1/1 | Complete | 2026-03-08 |
-| 5. Vercel Deployment | v1.1 | 0/3 | Not started | - |
+| 5. Vercel Deployment | v1.1 | 0/4 | Not started | - |
 | 6. Comprehensive Evaluation Framework | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-09 (v1.0 milestone complete)*
+*Last updated: 2026-03-09 (Phase 5 planning revised)*

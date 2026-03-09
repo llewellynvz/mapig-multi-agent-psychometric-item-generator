@@ -259,11 +259,15 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
 
 
 def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "finalize_node"]]:
+    user_request = state.get("user_request")
+    model_provider = user_request.model_provider if user_request else "claude"
+
     decision, reason = critic_decide(
         linguistic_comments=state.get("linguistic_comments", []),
         bias_comments=state.get("bias_comments", []),
         content_comments=state.get("content_comments", []),
         iteration=state.get("iteration", 0),
+        model_provider=model_provider,
     )
 
     if decision == "revise":

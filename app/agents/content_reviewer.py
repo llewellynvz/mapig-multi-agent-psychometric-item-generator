@@ -20,7 +20,12 @@ def review_content(request: UserRequest, items: List[DraftItem], iteration: int)
         ("human", f"Review for content validity.\n\nINPUT:\n{payload}"),
     ]
 
-    resp = invoke_structured(ContentReviewResponse, messages)
+    resp = invoke_structured(
+        ContentReviewResponse,
+        messages,
+        agent_name="content_reviewer",
+        model_provider=request.model_provider,
+    )
     # Ensure comment.type is correct even if the model forgets.
     fixed = []
     for c in resp.comments:

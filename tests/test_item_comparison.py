@@ -63,3 +63,39 @@ def test_comparison_result_structure():
     )
     assert result.overall_score == 7.125
     assert result.quality_parity.score == 8.0
+
+
+def test_mock_mode_comparison_deterministic():
+    """Mock mode returns deterministic comparison results."""
+    from backend.evaluation.item_comparison import compare_to_published_item
+
+    result = compare_to_published_item(
+        generated_item="I feel energized by social interactions.",
+        published_item="I enjoy being around people.",
+        construct_name="Extraversion"
+    )
+
+    assert isinstance(result, ComparisonResult)
+    assert 1.0 <= result.overall_score <= 10.0
+    assert result.quality_parity.score >= 1.0
+    assert result.construct_fidelity.score >= 1.0
+    assert result.stylistic_similarity.score >= 1.0
+    assert result.psychometric_properties.score >= 1.0
+    # Check that reasoning is provided
+    assert len(result.quality_parity.reasoning) >= 10
+
+
+def test_comparison_function_signature():
+    """Verify compare_to_published_item has expected signature."""
+    from backend.evaluation.item_comparison import compare_to_published_item
+    import inspect
+
+    sig = inspect.signature(compare_to_published_item)
+    params = list(sig.parameters.keys())
+
+    # Must accept generated_item, published_item, construct_name
+    assert "generated_item" in params
+    assert "published_item" in params
+    assert "construct_name" in params
+    # model_provider should be optional with default
+    assert "model_provider" in params

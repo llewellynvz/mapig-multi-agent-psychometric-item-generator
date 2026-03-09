@@ -23,8 +23,8 @@ def test_validator_uses_opus():
     - Function is cached (lru_cache) for performance
     """
     from unittest.mock import patch
-    from app.agents.llm_factory import get_validator_model, get_claude_chat_model
-    from app.settings import settings
+    from backend.agents.llm_factory import get_validator_model, get_claude_chat_model
+    from backend.settings import settings
     from langchain_anthropic import ChatAnthropic
 
     # Mock the settings object's CLAUDE_API_KEY
@@ -60,8 +60,8 @@ def test_claude_api_key_required():
     - No API calls are made if key is missing
     """
     from unittest.mock import patch
-    from app.agents.llm_factory import get_validator_model, get_claude_chat_model
-    from app.settings import settings
+    from backend.agents.llm_factory import get_validator_model, get_claude_chat_model
+    from backend.settings import settings
 
     # Mock settings to have no API key
     with patch.object(settings, 'CLAUDE_API_KEY', None):
@@ -83,8 +83,8 @@ def test_claude_api_key_required():
 def test_smart_allocation_validator_uses_opus():
     """Phase 03-01: get_chat_model_for_agent('validator', 'claude') returns Opus."""
     from unittest.mock import patch
-    from app.agents.llm_factory import get_chat_model_for_agent, get_claude_chat_model
-    from app.settings import settings
+    from backend.agents.llm_factory import get_chat_model_for_agent, get_claude_chat_model
+    from backend.settings import settings
     from langchain_anthropic import ChatAnthropic
 
     # Mock CLAUDE_API_KEY
@@ -105,8 +105,8 @@ def test_smart_allocation_validator_uses_opus():
 def test_smart_allocation_other_agents_use_sonnet():
     """Phase 03-01: Non-validator agents use Sonnet for cost optimization."""
     from unittest.mock import patch
-    from app.agents.llm_factory import get_chat_model_for_agent, get_claude_chat_model
-    from app.settings import settings
+    from backend.agents.llm_factory import get_chat_model_for_agent, get_claude_chat_model
+    from backend.settings import settings
     from langchain_anthropic import ChatAnthropic
 
     # Mock CLAUDE_API_KEY
@@ -127,8 +127,8 @@ def test_smart_allocation_other_agents_use_sonnet():
 def test_openai_provider_returns_openai_model():
     """Phase 03-01: get_chat_model_for_agent with 'openai' provider returns ChatOpenAI."""
     from unittest.mock import patch
-    from app.agents.llm_factory import get_chat_model_for_agent, get_openai_chat_model
-    from app.settings import settings
+    from backend.agents.llm_factory import get_chat_model_for_agent, get_openai_chat_model
+    from backend.settings import settings
     from langchain_openai import ChatOpenAI
 
     # Mock OPENAI_API_KEY
@@ -147,8 +147,8 @@ def test_openai_provider_returns_openai_model():
 def test_missing_claude_key_raises_error():
     """Phase 03-01: Missing CLAUDE_API_KEY raises ValueError for claude provider."""
     from unittest.mock import patch
-    from app.agents.llm_factory import get_chat_model_for_agent, get_claude_chat_model
-    from app.settings import settings
+    from backend.agents.llm_factory import get_chat_model_for_agent, get_claude_chat_model
+    from backend.settings import settings
 
     # Mock settings to have no Claude API key
     with patch.object(settings, 'CLAUDE_API_KEY', None):

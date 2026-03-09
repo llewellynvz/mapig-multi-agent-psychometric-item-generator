@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 def test_cors_allows_localhost():
     """CORS allows localhost for local development."""
-    from app.main import app
+    from backend.main import app
     client = TestClient(app)
 
     response = client.options(
@@ -27,7 +27,7 @@ def test_cors_allows_localhost():
 
 def test_cors_allows_vercel_preview_domains():
     """CORS allows Vercel preview deployment domains."""
-    from app.main import app
+    from backend.main import app
     client = TestClient(app)
 
     # Test pattern: https://project-abc123.vercel.app
@@ -49,7 +49,7 @@ def test_cors_allows_vercel_preview_domains():
 
 def test_cors_allows_vercel_production_domains():
     """CORS allows Vercel production domains."""
-    from app.main import app
+    from backend.main import app
     client = TestClient(app)
 
     # Test pattern: https://project.vercel.app
@@ -69,7 +69,7 @@ def test_cors_allows_vercel_production_domains():
 
 def test_cors_regex_pattern_matches_vercel():
     """CORS configuration includes regex pattern for *.vercel.app domains."""
-    from app.main import app
+    from backend.main import app
 
     # Find CORSMiddleware in app.middleware
     cors_middleware = None
@@ -85,7 +85,7 @@ def test_cors_regex_pattern_matches_vercel():
 
 def test_cors_credentials_allowed():
     """CORS allows credentials for authenticated requests."""
-    from app.main import app
+    from backend.main import app
     client = TestClient(app)
 
     response = client.options(

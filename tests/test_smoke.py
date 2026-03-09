@@ -6,8 +6,8 @@ os.environ["SEARCH_PROVIDER"] = "local"  # Avoid Perplexity API calls in smoke t
 
 from langgraph.checkpoint.memory import MemorySaver
 
-from app.graph import build_graph
-from app.schemas import UserRequest
+from backend.graph import build_graph
+from backend.schemas import UserRequest
 
 
 def test_graph_smoke():

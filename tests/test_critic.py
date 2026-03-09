@@ -24,7 +24,7 @@ def test_adaptive_thresholds_early_iteration():
     - get_adaptive_thresholds(2) returns strict thresholds
     - Thresholds stricter than mid/late iterations
     """
-    from app.agents.critic import get_adaptive_thresholds
+    from backend.agents.critic import get_adaptive_thresholds
 
     # Early iteration thresholds
     thresholds_iter1 = get_adaptive_thresholds(iteration=1, max_iterations=5)
@@ -55,7 +55,7 @@ def test_adaptive_thresholds_mid_iteration():
     - get_adaptive_thresholds(4) returns standard thresholds
     - Thresholds between early and late iterations
     """
-    from app.agents.critic import get_adaptive_thresholds
+    from backend.agents.critic import get_adaptive_thresholds
 
     # Mid iteration thresholds
     thresholds_iter3 = get_adaptive_thresholds(iteration=3, max_iterations=5)
@@ -86,7 +86,7 @@ def test_adaptive_thresholds_late_iteration():
     - get_adaptive_thresholds(6) returns relaxed thresholds
     - Thresholds more permissive than early/mid iterations
     """
-    from app.agents.critic import get_adaptive_thresholds
+    from backend.agents.critic import get_adaptive_thresholds
 
     # Late iteration thresholds
     thresholds_iter5 = get_adaptive_thresholds(iteration=5, max_iterations=5)
@@ -116,8 +116,8 @@ def test_threshold_mode_in_reason():
     - Reason clearly states threshold mode used
     - Users can understand why certain items were accepted/rejected
     """
-    from app.agents.critic import decide
-    from app.schemas import ReviewComment
+    from backend.agents.critic import decide
+    from backend.schemas import ReviewComment
 
     # Sample comments with minor issue (severity 3)
     linguistic_comments = [

@@ -1,13 +1,13 @@
 from __future__ import annotations
-from app.logging_utils import step
+from backend.logging_utils import step
 
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
-from app.schemas import EvidenceChunk, RetrievalResponse, UserRequest
-from app.settings import settings
+from backend.schemas import EvidenceChunk, RetrievalResponse, UserRequest
+from backend.settings import settings
 
 
 def _tokenize(text: str) -> List[str]:

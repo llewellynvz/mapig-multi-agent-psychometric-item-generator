@@ -17,7 +17,7 @@ def test_memory_checkpointer_initialization():
 
 def test_app_uses_memory_checkpointer():
     """FastAPI app lifespan initializes graph with MemorySaver."""
-    from app.main import app
+    from backend.main import app
 
     # Access app.state after lifespan context (requires async context manager)
     # This test validates the checkpointer type once app.state.graph exists

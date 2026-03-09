@@ -59,7 +59,7 @@ This file provides persistent context for Claude Code across sessions. It docume
 - ❌ Session resumption (browser refresh) won't work after function cold start
 - ❌ Deferred to v2: persistent checkpoints with Vercel Postgres
 
-**Implementation**: See `app/main.py` lifespan context.
+**Implementation**: See `backend/main.py` lifespan context.
 
 ### 3. Native ASGI Pattern (Not Mangum)
 
@@ -70,7 +70,7 @@ This file provides persistent context for Claude Code across sessions. It docume
 - Mangum is AWS Lambda-specific and doesn't work with Vercel
 - Native approach is simpler and officially supported
 
-**Implementation**: `api/index.py` directly exports the FastAPI `app` instance.
+**Implementation**: `api/index.py` directly exports the FastAPI `app` instance from `backend/main.py`.
 
 ## Repository Structure
 
@@ -78,7 +78,7 @@ This file provides persistent context for Claude Code across sessions. It docume
 lmaig-langgraph/
 ├── api/                    # Vercel serverless entry point
 │   └── index.py           # Exports FastAPI app for Vercel
-├── app/                   # FastAPI application code
+├── backend/               # FastAPI application code (renamed from 'app' to avoid Next.js conflict)
 │   ├── main.py           # FastAPI app, lifespan, routes
 │   ├── graph.py          # LangGraph workflow definition
 │   ├── agents/           # Agent implementations

@@ -27,7 +27,7 @@ def test_validation_export():
     - ValidationResult can be serialized to JSON
     - All dimension scores and reasoning are preserved in export
     """
-    from app.schemas import DimensionScore, ItemValidation, DraftItem, FinalOutput, AuditMetadata
+    from backend.schemas import DimensionScore, ItemValidation, DraftItem, FinalOutput, AuditMetadata
 
     # Create dimension scores
     dim_scores = [
@@ -90,7 +90,7 @@ def test_dimension_score_schema():
     - Pydantic raises ValidationError for float scores (must be int)
     """
     from pydantic import ValidationError
-    from app.schemas import DimensionScore, ItemValidation
+    from backend.schemas import DimensionScore, ItemValidation
 
     # Test valid score
     valid_score = DimensionScore(
@@ -139,7 +139,7 @@ def test_dimension_score_schema():
 
 def test_finaloutput_enhanced_schema():
     """Phase 03.1: FinalOutput accepts optional metadata fields."""
-    from app.schemas import UserRequest, ReviewComment, DraftItem, FinalOutput, AuditMetadata
+    from backend.schemas import UserRequest, ReviewComment, DraftItem, FinalOutput, AuditMetadata
 
     # Arrange: Create mock data
     user_req = UserRequest(
@@ -198,7 +198,7 @@ def test_finaloutput_enhanced_schema():
 
 def test_finaloutput_backward_compatibility():
     """Phase 03.1: FinalOutput maintains backward compatibility without optional fields."""
-    from app.schemas import DraftItem, FinalOutput, AuditMetadata
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata
 
     # Arrange: Create minimal valid FinalOutput (existing pattern)
     draft_item = DraftItem(
@@ -235,7 +235,7 @@ def test_finaloutput_backward_compatibility():
 
 def test_finaloutput_mutable_defaults():
     """Phase 03.1: FinalOutput feedback arrays are not shared across instances."""
-    from app.schemas import ReviewComment, DraftItem, FinalOutput, AuditMetadata
+    from backend.schemas import ReviewComment, DraftItem, FinalOutput, AuditMetadata
 
     # Arrange: Create two FinalOutput instances without feedback
     draft_item = DraftItem(
@@ -281,7 +281,7 @@ def test_finaloutput_mutable_defaults():
 
 def test_user_request_model_provider_defaults_to_claude():
     """Phase 03-01: UserRequest.model_provider defaults to 'claude'."""
-    from app.schemas import UserRequest
+    from backend.schemas import UserRequest
 
     # Act: Create UserRequest without model_provider
     request = UserRequest(
@@ -299,7 +299,7 @@ def test_user_request_model_provider_defaults_to_claude():
 def test_user_request_validates_model_provider_enum():
     """Phase 03-01: UserRequest validates model_provider is 'claude' or 'openai'."""
     from pydantic import ValidationError
-    from app.schemas import UserRequest
+    from backend.schemas import UserRequest
 
     # Test valid values
     valid_claude = UserRequest(
@@ -334,7 +334,7 @@ def test_user_request_validates_model_provider_enum():
 
 def test_user_request_accepts_openai_provider():
     """Phase 03-01: UserRequest accepts 'openai' as model_provider."""
-    from app.schemas import UserRequest
+    from backend.schemas import UserRequest
 
     # Act: Create UserRequest with openai provider
     request = UserRequest(

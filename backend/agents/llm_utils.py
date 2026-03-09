@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
-from app.settings import settings
+from backend.settings import settings
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 Message = Tuple[str, str]
@@ -38,11 +38,11 @@ def invoke_structured(
 
     # Use smart allocation if both parameters provided
     if agent_name and model_provider:
-        from app.agents.llm_factory import get_chat_model_for_agent
+        from backend.agents.llm_factory import get_chat_model_for_agent
         llm = get_chat_model_for_agent(agent_name, model_provider)
     else:
         # Fall back to default get_chat_model()
-        from app.agents.llm_factory import get_chat_model
+        from backend.agents.llm_factory import get_chat_model
         llm = get_chat_model()
 
     # Primary path: provider/tool-based structured output

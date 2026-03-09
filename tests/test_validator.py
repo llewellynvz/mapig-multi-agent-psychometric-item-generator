@@ -10,7 +10,7 @@ from pathlib import Path
 
 os.environ["APP_MODE"] = "mock"
 
-from app.schemas import UserRequest, DraftItem
+from backend.schemas import UserRequest, DraftItem
 
 
 # Task 1: Validation prompt tests
@@ -89,7 +89,7 @@ def test_four_dimensions():
     - Each DimensionScore has a dimension field matching one of the 4 dimensions
     - All 4 dimensions are present (no duplicates, no missing)
     """
-    from app.agents.validator import validate_items
+    from backend.agents.validator import validate_items
 
     request = _sample_user_request()
     items = _sample_draft_items()
@@ -118,7 +118,7 @@ def test_cot_reasoning():
     - Reasoning explains WHY the score was assigned (not just what the score is)
     - Reasoning is substantive (minimum 20 characters)
     """
-    from app.agents.validator import validate_items
+    from backend.agents.validator import validate_items
 
     request = _sample_user_request()
     items = _sample_draft_items()
@@ -143,7 +143,7 @@ def test_score_range():
     - Pydantic validation enforces range constraints
     - No scores outside valid range (boundary test)
     """
-    from app.agents.validator import validate_items
+    from backend.agents.validator import validate_items
 
     request = _sample_user_request()
     items = _sample_draft_items()
@@ -168,7 +168,7 @@ def test_rejection_threshold():
     - ValidationResult.accept is True when weighted_score >= 7.0
     - Boundary case: weighted_score == 7.0 should be accepted
     """
-    from app.agents.validator import validate_items
+    from backend.agents.validator import validate_items
 
     request = _sample_user_request()
     items = _sample_draft_items()
@@ -185,7 +185,7 @@ def test_rejection_threshold():
 
 def test_mock_mode_returns_deterministic_results():
     """Test 5 for Task 2: Mock mode returns deterministic validation results."""
-    from app.agents.validator import validate_items
+    from backend.agents.validator import validate_items
 
     request = _sample_user_request()
     items = _sample_draft_items()
@@ -212,10 +212,10 @@ def test_uses_validator_model():
     Note: This test verifies the function exists and can be called.
     Actual model usage tested via integration tests (not in mock mode).
     """
-    from app.agents.llm_factory import get_validator_model
+    from backend.agents.llm_factory import get_validator_model
 
     # In mock mode, we just verify the function exists and configuration is correct
-    from app.settings import settings
+    from backend.settings import settings
 
     assert settings.VALIDATOR_MODEL == "claude-opus-4-6", "Validator should use Claude Opus 4-6"
 

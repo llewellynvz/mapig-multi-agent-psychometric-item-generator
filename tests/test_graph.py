@@ -26,7 +26,7 @@ def test_validation_placement():
     which implements VAL-01. The test will remain skipped until Plan 04 implements
     the validation_node in the graph.
     """
-    from app.graph import build_graph
+    from backend.graph import build_graph
 
     # Build the graph
     graph = build_graph()
@@ -39,7 +39,7 @@ def test_validation_placement():
 
     # Test 3: GraphState should have validation fields
     # We test this by checking the actual function exists
-    from app.graph import validation_node, regenerate_items_node
+    from backend.graph import validation_node, regenerate_items_node
     assert callable(validation_node), "validation_node function must be callable"
     assert callable(regenerate_items_node), "regenerate_items_node function must be callable"
 
@@ -60,8 +60,8 @@ def test_retry_limit():
     import os
     os.environ["APP_MODE"] = "mock"  # Use mock mode to avoid API calls
 
-    from app.graph import validation_node
-    from app.schemas import UserRequest, DraftItem
+    from backend.graph import validation_node
+    from backend.schemas import UserRequest, DraftItem
 
     # Helper to create mock state
     def create_mock_state(item_count=10, attempt=1):
@@ -99,8 +99,8 @@ def test_retry_limit():
 
 def test_finalize_node_enhanced_output():
     """Phase 03.1: finalize_node populates enhanced FinalOutput fields from GraphState."""
-    from app.graph import finalize_node
-    from app.schemas import (
+    from backend.graph import finalize_node
+    from backend.schemas import (
         UserRequest, ReviewComment, DraftItem, EvidenceChunk,
         ItemValidation, DimensionScore
     )
@@ -224,9 +224,9 @@ def test_claude_end_to_end_workflow():
     - GraphState tracks model_provider through execution
     """
     from unittest.mock import patch, MagicMock
-    from app.schemas import UserRequest
-    from app.agents.llm_factory import get_chat_model_for_agent
-    from app.settings import settings
+    from backend.schemas import UserRequest
+    from backend.agents.llm_factory import get_chat_model_for_agent
+    from backend.settings import settings
     from langchain_anthropic import ChatAnthropic
 
     # Create request with claude provider
@@ -242,7 +242,7 @@ def test_claude_end_to_end_workflow():
     # Mock CLAUDE_API_KEY
     with patch.object(settings, 'CLAUDE_API_KEY', "test-key-12345"):
         # Clear LRU cache to force new instances
-        from app.agents.llm_factory import get_claude_chat_model
+        from backend.agents.llm_factory import get_claude_chat_model
         if hasattr(get_claude_chat_model, 'cache_clear'):
             get_claude_chat_model.cache_clear()
 
@@ -274,8 +274,8 @@ def test_missing_claude_key_raises_error():
     """
     from unittest.mock import patch, AsyncMock
     from fastapi import HTTPException
-    from app.schemas import UserRequest
-    from app.settings import settings
+    from backend.schemas import UserRequest
+    from backend.settings import settings
 
     # Test the validation logic directly (endpoint validates before graph initialization)
     request = UserRequest(

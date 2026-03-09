@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import List
 
-from app.agents.llm_utils import invoke_structured
-from app.agents.prompt_loader import load_prompt
-from app.schemas import ContentReviewResponse, DraftItem, ReviewComment, UserRequest
-from app.settings import settings
+from backend.agents.llm_utils import invoke_structured
+from backend.agents.prompt_loader import load_prompt
+from backend.schemas import ContentReviewResponse, DraftItem, ReviewComment, UserRequest
+from backend.settings import settings
 
 
 def review_content(request: UserRequest, items: List[DraftItem], iteration: int) -> ContentReviewResponse:

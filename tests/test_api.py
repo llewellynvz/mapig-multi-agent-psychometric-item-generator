@@ -26,7 +26,7 @@ def test_validation_in_response():
     - API response is valid JSON with all validation metadata
     - Frontend can render dimension scores and reasoning from response
     """
-    from app.schemas import (
+    from backend.schemas import (
         DraftItem,
         DimensionScore,
         ItemValidation,

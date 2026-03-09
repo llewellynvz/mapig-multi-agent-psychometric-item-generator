@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Deployment
-status: completed
-stopped_at: Completed 05-00-PLAN.md
-last_updated: "2026-03-09T03:05:32.273Z"
-last_activity: 2026-03-09 — Completed plan 03-03 (End-to-End Claude Integration)
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-09T03:10:40.508Z"
+last_activity: 2026-03-09 — Completed plan 05-01 (Vercel Serverless Conversion)
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 88
+  completed_plans: 2
+  percent: 90
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 05 of 7 (Vercel Deployment)
-Plan: 0 of 4
+Plan: 1 of 4
 Status: In Progress
-Last activity: 2026-03-09 — Completed plan 05-00 (Test Scaffolds for Vercel Deployment)
+Last activity: 2026-03-09 — Completed plan 05-01 (Vercel Serverless Conversion)
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [█████████░] 86%
 | Phase 03 P02 | 3.05 | 3 tasks | 4 files |
 | Phase 03 P03 | 3.83 | 4 tasks | 11 files |
 | Phase 05 P00 | 1.92 | 3 tasks | 3 files |
+| Phase 05 P01 | 1.83 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Key v1.0 decisions:
 - [Phase 03]: Use blended pricing rates for cost estimation: Opus $45/M, Sonnet $9/M, OpenAI $10/M (Plan 03-03)
 - [Phase 03]: Block generation with clear error messages when API keys missing (Plan 03-03)
 - [Phase 03]: Document Vercel deployment as primary production target (Plan 03-03)
+- [Phase 05]: Native Vercel ASGI pattern instead of Mangum adapter (research proves Vercel has native ASGI support since 2023; Mangum is AWS Lambda-specific)
+- [Phase 05]: MemorySaver for ephemeral checkpointing in serverless (acceptable v1 trade-off; session resumption won't work across cold starts)
+- [Phase 05]: CORS allow_origin_regex for *.vercel.app domains (supports preview and production URLs without hardcoding)
 
 ### Roadmap Evolution
 
@@ -121,8 +125,8 @@ No active blockers for v1.1 planning.
 
 ## Session Continuity
 
-Last session: 2026-03-09T03:05:32.271Z
-Stopped at: Completed 05-00-PLAN.md
+Last session: 2026-03-09T03:10:40.506Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
 
 ---

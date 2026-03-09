@@ -205,6 +205,12 @@ class AuditMetadata(BaseModel):
     validation_attempts: int = Field(default=0, description="Total validation attempts across all items")
     validation_failures: int = Field(default=0, description="Number of items that failed validation")
 
+    # Cost tracking (optional, calculated at finalization)
+    opus_cost: Optional[float] = Field(default=None, description="Claude Opus API cost in USD")
+    sonnet_cost: Optional[float] = Field(default=None, description="Claude Sonnet API cost in USD")
+    openai_cost: Optional[float] = Field(default=None, description="OpenAI API cost in USD")
+    total_cost: Optional[float] = Field(default=None, description="Total API cost in USD")
+
 
 class FinalOutput(BaseModel):
     """Final items plus audit metadata.

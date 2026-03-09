@@ -130,7 +130,7 @@ Plans:
 - [x] 04-01-PLAN.md — Multi-format export implementation with RFC 4180-compliant CSV, JSON, and Markdown formats — ✓ 2026-03-08
 
 ### Phase 5: Vercel Deployment
-**Goal**: MAPIG runs on Vercel serverless infrastructure with production URL, maintaining all functionality including SSE streaming and SQLite checkpoints
+**Goal**: MAPIG runs on Vercel serverless infrastructure with production URL, maintaining all functionality including SSE streaming with in-memory checkpointing
 
 **Depends on**: Phase 4
 
@@ -139,14 +139,16 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Production URL is accessible publicly and handles end-to-end item generation workflow
   2. SSE streaming displays real-time agent progress events in frontend exactly as in local development
-  3. SQLite checkpoints enable session resumption after interruptions (users can return to in-progress runs)
+  3. In-memory checkpoints maintain state during single run (session resumption not required after cold start for v1)
   4. CLAUDE_API_KEY and OPENAI_API_KEY are configured as Vercel environment variables and accessible to serverless functions
-  5. First request after cold start completes within 5 seconds (cold start optimization)
+  5. Cold start performance documented (DEP-08 optimization deferred to v2)
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 05-01-PLAN.md — Backend serverless conversion with MemorySaver and CORS configuration (Wave 1)
+- [ ] 05-02-PLAN.md — Frontend Vercel configuration and deployment documentation (Wave 2)
+- [ ] 05-03-PLAN.md — Vercel deployment and end-to-end verification (Wave 3)
 
 ### Phase 6: Comprehensive Evaluation Framework
 **Goal**: System quality is validated through automated evaluation suite measuring item quality, agent performance, workflow efficiency, and construct validity against published scales with documented success criteria
@@ -179,9 +181,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6
 | 3. Claude API Migration | 3/3 | Complete    | 2026-03-09 |
 | 3.1. Enhance FinalOutput schema | 2/2 | Complete    | 2026-03-08 |
 | 4. Production Features | 1/1 | Complete    | 2026-03-08 |
-| 5. Vercel Deployment | 0/TBD | Not started | - |
+| 5. Vercel Deployment | 0/3 | Not started | - |
 | 6. Comprehensive Evaluation Framework | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-09 (Phase 3 Claude API Migration completed)*
+*Last updated: 2026-03-09 (Phase 5 planning complete)*

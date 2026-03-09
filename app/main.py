@@ -43,6 +43,14 @@ from app.logging_utils import get_performance_summary
 from app.schemas import FinalOutput, UserRequest
 from app.settings import STANDARD_ITEM_CONSTRAINTS, settings
 
+# TODO: Token tracking implementation
+# Currently cost fields remain None until token usage tracking is added.
+# Options for implementation:
+# 1. LangSmith callbacks (tracks usage automatically)
+# 2. Custom callback handler on LLM instances
+# 3. Parse response metadata from invoke_structured returns
+# This task prepares schemas; actual tracking deferred to future optimization phase.
+
 RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 
@@ -250,6 +258,20 @@ async def generate_items_stream(
     """
     if not hasattr(app.state, "graph"):
         raise HTTPException(status_code=503, detail="Graph not initialized")
+
+    # Validate API key for selected provider
+    if request.model_provider == "claude":
+        if not settings.CLAUDE_API_KEY:
+            raise HTTPException(
+                status_code=400,
+                detail="CLAUDE_API_KEY not configured. Add to .env or Vercel environment variables, or switch to OpenAI provider."
+            )
+    elif request.model_provider == "openai":
+        if not settings.OPENAI_API_KEY:
+            raise HTTPException(
+                status_code=400,
+                detail="OPENAI_API_KEY not configured. Add to .env or Vercel environment variables."
+            )
 
     thread_id = x_thread_id or str(uuid.uuid4())
     run_id = str(uuid.uuid4())

@@ -56,6 +56,59 @@
 
 ---
 
+## Milestone: v1.1 — Deployment
+
+**Shipped:** 2026-03-09
+**Phases:** 2 (5-6) | **Plans:** 8 | **Timeline:** 1 day
+
+### What Was Built
+
+- **Production Deployment:** Single-project Vercel deployment at https://lmaig-langgraph.vercel.app/ with Next.js and Python serverless unified under one domain (monorepo pattern, no CORS needed)
+- **Serverless Backend:** Native ASGI conversion with MemorySaver for ephemeral checkpointing, production CORS for *.vercel.app domains
+- **Frontend Production Config:** Next.js standalone mode, environment templates, comprehensive deployment documentation
+- **LLM-as-Judge Evaluation:** 4-dimensional item comparison (quality, construct, style, psychometric) with dual-direction evaluation to mitigate position bias
+- **Benchmark Infrastructure:** 5 published scales (IPIP-NEO, PHQ-9, Social Connectedness, JSS, Environmental Attitudes) providing 25 gold-standard test cases
+- **Evaluation Dashboard:** /evaluation route with automated quality metrics, baseline comparison, documented success criteria (≥15% improvement + dimensions ≥7.0)
+
+### What Worked
+
+- **Single-project deployment pattern:** Simplified from originally planned two-project setup; same-origin architecture eliminated CORS complexity
+- **Native ASGI research:** Early research (05-RESEARCH.md) corrected Mangum assumption, preventing deployment failure
+- **TDD with fast execution:** Test scaffolds (05-00) created first, enabling rapid verification throughout phases 5-6
+- **Structured evaluation response:** 4-section JSON API format (current/baseline/improvement/success_criteria) eliminated frontend calculation complexity
+- **Position bias mitigation:** Dual-direction comparison (forward + reverse) provided unbiased evaluation scores
+- **Rapid execution:** 8 plans completed in single day with production deployment verified
+
+### What Was Inefficient
+
+- **Incomplete original completion:** Milestone was initially marked complete but lacked key accomplishments in MILESTONES.md and missing requirements archive
+- **Plan 05-03 outdated architecture:** Plan referenced two-project setup (frontend + backend as separate Vercel projects) but actual implementation used single-project monorepo — plan adaptation required during execution
+- **DEP-08 deferral:** Cold start optimization marked as requirement but deferred without explicit decision documentation until execution
+
+### Patterns Established
+
+- **Monorepo serverless pattern:** Next.js at root + Python in /api for unified Vercel deployment (single domain, no CORS, single environment config)
+- **Ephemeral checkpointing trade-off:** MemorySaver acceptable for v1 (works during single run); persistent storage deferred to v2
+- **Dual-direction comparison:** Evaluate both item orderings (generated→published, published→generated) and average to eliminate position bias
+- **Structured evaluation JSON:** Return current/baseline/improvement/success_criteria sections to eliminate frontend recalculation
+
+### Key Lessons
+
+1. **Research corrects assumptions:** 05-RESEARCH.md definitively proved Vercel has native ASGI support (not Mangum); prevented deployment failure from wrong adapter
+2. **Simplify architecture when possible:** Single Vercel project simpler than two-project setup; same-origin eliminates CORS, environment variables, preview URL complexity
+3. **Document deferred requirements explicitly:** DEP-08 (cold start) should have been marked deferred in requirements, not left as incomplete — creates confusion during audit
+4. **Complete all completion steps:** Milestone marked "complete" but lacked accomplishments in MILESTONES.md and requirements archive — better to complete all workflow steps at once
+5. **Position bias matters:** LLM-as-judge research shows position bias is real; dual-direction evaluation worth 2x API cost for unbiased scores
+
+### Cost Observations
+
+- Model mix: Primarily Sonnet for development, Opus for evaluation comparison (estimated 30% Opus, 70% Sonnet)
+- Sessions: 2 sessions (initial completion, retroactive completion of missing steps)
+- Notable: Evaluation suite runs ~60s in mock mode (25 comparisons), production timing TBD
+- TDD approach: Test scaffolds frontloaded time but caught issues early (e.g., DraftItem.item_text attribute)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -63,13 +116,18 @@
 | Milestone | Timeline | Phases | Key Change |
 |-----------|----------|--------|------------|
 | v1.0 | 28 days | 5 | First milestone - established GSD workflow patterns |
+| v1.1 | 1 day | 2 | Rapid execution - deployment + evaluation framework in single day |
 
 ### Cumulative Quality
 
 | Milestone | Plans | Nyquist Compliant | Tech Debt Items |
 |-----------|-------|-------------------|-----------------|
 | v1.0 | 17 | 4/5 phases (80%) | 2 (Nyquist gap, token tracking) |
+| v1.1 | 8 | 2/2 phases (100%) | 2 (cold start optimization, eval dashboard nav link) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. *To be populated after v1.1+ when cross-milestone patterns emerge*
+1. **Research-driven decisions prevent failures:** v1.0 (psychometric principles) and v1.1 (native ASGI) both benefited from upfront research correcting initial assumptions
+2. **Simplicity wins when possible:** v1.1 single-project deployment simpler than two-project plan; v1.0 smart model allocation simpler than complex cost optimization
+3. **Complete workflow steps together:** v1.1 initial completion missed accomplishments/requirements — better to finish all steps in one session
+4. **TDD frontloads effort but reduces rework:** Both milestones used test scaffolds first; caught issues early (v1.0 validation logic, v1.1 DraftItem.item_text attribute)

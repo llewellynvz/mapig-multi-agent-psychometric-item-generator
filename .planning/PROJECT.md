@@ -44,33 +44,28 @@ Generate psychometrically valid, production-ready assessment items with automate
 - ✓ Multi-format export (CSV, JSON, Markdown) with RFC 4180 compliance — v1.0
 - ✓ Full metadata export (validation scores, review feedback, audit trail) — v1.0
 
+<!-- v1.1 Deployment -->
+
+- ✓ Production deployment on Vercel serverless infrastructure — v1.1
+- ✓ Single-project monorepo pattern (Next.js + Python in one Vercel project) — v1.1
+- ✓ Native ASGI serverless conversion (no adapter needed) — v1.1
+- ✓ MemorySaver for ephemeral in-memory checkpointing — v1.1
+- ✓ Production CORS configured for *.vercel.app domains — v1.1
+- ✓ Next.js standalone mode with environment templates — v1.1
+- ✓ SSE streaming working in production environment — v1.1
+- ✓ Comprehensive evaluation framework with 4-dimensional metrics — v1.1
+- ✓ LLM-as-judge comparison with position bias mitigation — v1.1
+- ✓ 5 benchmark scales (IPIP-NEO, PHQ-9, Social Connectedness, JSS, Environmental Attitudes) — v1.1
+- ✓ 25 gold-standard test cases across psychological domains — v1.1
+- ✓ Evaluation dashboard at /evaluation with automated metrics — v1.1
+- ✓ Success criteria: ≥15% improvement + all dimensions ≥7.0/10 — v1.1
+- ✓ Baseline comparison framework (current vs pre-optimization) — v1.1
+
 ### Active
 
-<!-- Next milestone: Deployment and Evaluation -->
+<!-- Next milestone requirements will be defined during /gsd:new-milestone -->
 
-**1. Vercel Deployment**
-- [ ] Convert FastAPI endpoints to Vercel serverless functions
-- [ ] Adapt LangGraph state machine for serverless execution
-- [ ] Maintain SQLite checkpoint compatibility (local storage)
-- [ ] Deploy Next.js frontend to Vercel
-- [ ] Configure CLAUDE_API_KEY and OPENAI_API_KEY in Vercel environment
-- [ ] Production URL accessible and functional
-- [ ] SSE streaming works in Vercel serverless environment
-- [ ] Cold start optimization (<5s first request)
-
-**2. Comprehensive Evaluation Framework**
-- [ ] Item quality metrics (clarity score, bias score, construct validity score)
-- [ ] Agent performance metrics (accuracy, reliability per agent)
-- [ ] End-to-end workflow metrics (total time, iteration count, acceptance rate)
-- [ ] Benchmark constructs (5 test cases: personality, clinical, social, organizational, attitudes)
-- [ ] Compare generated items to published scales (expert comparison)
-- [ ] Automated eval suite runnable on demand
-- [ ] Success criteria: validation scores improve ≥15% vs baseline
-- [ ] Success criteria: generated items comparable to published scales
-
-**3. Optional Phase 2 Enhancements**
-- [ ] A/B test Content + Bias reviewer consolidation (7→6 agents)
-- [ ] Token tracking implementation (infrastructure ready from Phase 3)
+*No active requirements. Use `/gsd:new-milestone` to plan next version.*
 
 ### Out of Scope
 
@@ -84,15 +79,18 @@ Generate psychometrically valid, production-ready assessment items with automate
 
 ## Context
 
-**Current State (v1.0):**
-- Tech stack: FastAPI + LangGraph + Next.js, Claude Opus/Sonnet, 18,460 LOC (Python + TypeScript)
-- 7 specialized agents with research-backed optimization: Web Surfer (evidence) → Item Writer (10 psychometric principles) → Validation Agent (4-dimensional scoring) → Parallel Reviews (Content, Linguistic, Bias) → Critic (adaptive thresholds) → Meta Editor (facet balancing) → loop or finalize
-- LLM-as-judge validation gate: 7.0 threshold, max 3 retries, Claude Opus 4.6
-- Smart model allocation: Opus for validation (accuracy), Sonnet for other agents (80% cost reduction)
-- Full metadata export: CSV/JSON/Markdown with validation scores, review feedback, audit trail
-- Evidence sources: local markdown files + Perplexity academic search with domain allowlist
-- Frontend: Next.js with model selector, export controls, SSE event streaming
-- Backend: FastAPI with AsyncSqliteSaver checkpoints, streaming endpoints
+**Current State (v1.1):**
+- **Deployment**: Production at https://lmaig-langgraph.vercel.app/ (Vercel serverless, single-project monorepo)
+- **Tech stack**: FastAPI + LangGraph + Next.js, Claude Opus/Sonnet, ~19,000 LOC (Python + TypeScript)
+- **Architecture**: Native ASGI serverless, MemorySaver checkpointing, same-origin (no CORS)
+- **7 specialized agents**: Web Surfer (evidence) → Item Writer (10 psychometric principles) → Validation Agent (4-dimensional scoring) → Parallel Reviews (Content, Linguistic, Bias) → Critic (adaptive thresholds) → Meta Editor (facet balancing) → loop or finalize
+- **LLM-as-judge validation**: 7.0 threshold, max 3 retries, Claude Opus 4.6
+- **Smart model allocation**: Opus for validation (accuracy), Sonnet for other agents (80% cost reduction)
+- **Full metadata export**: CSV/JSON/Markdown with validation scores, review feedback, audit trail
+- **Evidence sources**: Local markdown files + Perplexity academic search with domain allowlist
+- **Frontend**: Next.js with model selector, export controls, SSE event streaming, evaluation dashboard
+- **Backend**: FastAPI with MemorySaver (ephemeral checkpoints), streaming endpoints, evaluation API
+- **Evaluation**: 4-dimensional metrics (quality, construct, style, psychometric), 5 benchmark scales (25 items), success criteria (≥15% improvement + dimensions ≥7.0)
 
 **Research Foundation:**
 - SurveyBot3000 paper (synthetic correlations) validates LLM-as-judge approach
@@ -100,10 +98,12 @@ Generate psychometrically valid, production-ready assessment items with automate
 - 10 core principles integrated into Item Writer prompt
 - 7-type bias taxonomy with intersectionality checks
 
-**Known Issues:**
-- Phase 2 Nyquist validation gap (missing automated test coverage for agent optimizations)
+**Known Issues (Tech Debt):**
+- Phase 2 Nyquist validation gap (80% compliant, missing some automated test coverage)
 - Phase 3 token tracking infrastructure ready but implementation deferred
-- Not yet deployed to production (Vercel deployment in Phase 5)
+- Cold start optimization deferred to v2 (DEP-08, ~3-8s typical)
+- Missing navigation link to /evaluation dashboard (accessible via direct URL)
+- Session resumption doesn't work after cold start (in-memory checkpoints only)
 
 ## Constraints
 
@@ -126,9 +126,13 @@ Generate psychometrically valid, production-ready assessment items with automate
 | No Supabase (keep SQLite) | Current checkpointing sufficient, avoid unnecessary complexity | ✓ Good — SQLite checkpoints working well, no issues |
 | Research-driven optimization (not intuition-based) | Psychometric validity requires evidence-based practices, not guesswork | ✓ Good — 10 psychometric principles + 7-type bias taxonomy integrated |
 | Multi-format export (MD/CSV/JSON) | Different use cases require different formats (documentation vs analysis) | ✓ Good — RFC 4180 CSV + full metadata export implemented |
-| Comprehensive evals (4 dimensions) | Need multiple lenses to validate system improvement (items, agents, workflow, validity) | — Pending — Phase 6 |
+| Comprehensive evals (4 dimensions) | Need multiple lenses to validate system improvement (items, agents, workflow, validity) | ✓ Good — v1.1 shipped with 4-dimensional evaluation framework |
 | Positive keying only (no reverse-scored items) | Research shows reverse-scored items reduce reliability and introduce method effects | ✓ Good — Item Writer enforces positive keying with rationale |
 | Validation gate before reviewers (not after) | Catch fundamental construct misalignment early, save API costs on doomed items | ✓ Good — Prevents wasted reviewer cycles on invalid items |
+| Single-project Vercel deployment (not two projects) | Simpler architecture, same-origin (no CORS), single environment config | ✓ Good — v1.1 deployed with monorepo pattern, documented in CLAUDE.md |
+| Native ASGI (not Mangum adapter) | Vercel has native ASGI support; Mangum is AWS-specific and would fail | ✓ Good — Research corrected initial assumption, prevented deployment failure |
+| MemorySaver checkpointing (not persistent storage) | Acceptable v1 trade-off: works during run, no cross-cold-start resumption | ✓ Good — Simplified deployment, session resumption deferred to v2 |
+| Dual-direction comparison (position bias mitigation) | LLM-as-judge research shows position bias; evaluate both orderings and average | ✓ Good — 2x API cost acceptable for unbiased evaluation scoring |
 
 ---
-*Last updated: 2026-03-09 after v1.0 milestone completion*
+*Last updated: 2026-03-09 after v1.1 milestone completion*

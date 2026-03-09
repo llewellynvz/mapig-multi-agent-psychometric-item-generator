@@ -61,6 +61,7 @@ def invoke_structured(
     messages: List[Message],
     agent_name: Optional[str] = None,
     model_provider: Optional[str] = None,
+    use_cache_control: bool = True,
 ) -> SchemaT:
     """
     Invoke the configured LLM and return validated structured output.
@@ -75,11 +76,12 @@ def invoke_structured(
         messages: List of chat messages
         agent_name: Optional agent identifier for smart allocation
         model_provider: Optional provider override ("claude" or "openai")
+        use_cache_control: Enable prompt caching for system messages (default: True)
 
     Returns:
         Validated response instance of schema type
     """
-    result, _ = invoke_structured_with_usage(schema, messages, agent_name, model_provider)
+    result, _ = invoke_structured_with_usage(schema, messages, agent_name, model_provider, use_cache_control)
     return result
 
 
@@ -88,6 +90,7 @@ def invoke_structured_with_usage(
     messages: List[Message],
     agent_name: Optional[str] = None,
     model_provider: Optional[str] = None,
+    use_cache_control: bool = True,
 ) -> Tuple[SchemaT, TokenUsage]:
     """
     Invoke the configured LLM and return validated structured output WITH token usage.
@@ -102,6 +105,7 @@ def invoke_structured_with_usage(
         messages: List of chat messages
         agent_name: Optional agent identifier for smart allocation
         model_provider: Optional provider override ("claude" or "openai")
+        use_cache_control: Enable prompt caching for system messages (default: True)
 
     Returns:
         Tuple of (validated response instance, token usage)
@@ -120,6 +124,30 @@ def invoke_structured_with_usage(
 
     # Determine model name for tracking
     model_name = getattr(llm, "model_name", getattr(llm, "model", "unknown"))
+
+    # Convert messages to LangChain format with optional cache_control
+    # Only apply cache control for Claude models (Anthropic API)
+    is_claude = "claude" in model_name.lower() or settings.APP_MODE == "claude"
+
+    if use_cache_control and is_claude:
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        lc_messages = []
+        for role, content in messages:
+            if role == "system":
+                # Mark system prompts for caching (5-minute TTL per Claude API)
+                lc_messages.append(
+                    SystemMessage(
+                        content=content,
+                        additional_kwargs={"cache_control": {"type": "ephemeral"}}
+                    )
+                )
+            elif role == "human":
+                lc_messages.append(HumanMessage(content=content))
+            else:
+                # Other roles: use tuple format
+                lc_messages.append((role, content))
+        messages = lc_messages
 
     # Primary path: provider/tool-based structured output
     try:

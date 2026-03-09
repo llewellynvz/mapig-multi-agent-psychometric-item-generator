@@ -4,12 +4,12 @@ from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
-from backend.schemas import DraftItem, LinguisticReviewResponse, ReviewComment, UserRequest
+from backend.schemas import AbbreviatedRequest, DraftItem, LinguisticReviewResponse, ReviewComment
 from backend.settings import settings
 
 
 def review_linguistic(
-    request: UserRequest, items: List[DraftItem], iteration: int
+    request: AbbreviatedRequest, items: List[DraftItem], iteration: int
 ) -> Tuple[LinguisticReviewResponse, TokenUsage]:
     """Linguistic review of items."""
     if settings.APP_MODE == "mock":

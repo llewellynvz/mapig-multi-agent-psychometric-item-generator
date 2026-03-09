@@ -126,7 +126,10 @@ def decide(
     model_provider: str = "claude",
 ) -> Tuple[Decision, str]:
     """
-    LLM-based critic with adaptive thresholds.
+    LLM-based critic with adaptive thresholds and rule-based optimization.
+
+    Cost optimization: Uses deterministic logic for clear accept/reject cases,
+    only invoking LLM for borderline decisions (severity = 3).
 
     Returns: (decision, reason)
     """
@@ -148,6 +151,22 @@ def decide(
     # If nothing to review, accept immediately (saves tokens and reduces variability).
     if not all_comments:
         return "accept", f"No review issues detected. {threshold_ctx}"
+
+    # Rule-based optimization: Handle clear cases without LLM invocation
+    if settings.RULE_BASED_CRITIC_ENABLED:
+        max_sev = _max_severity(all_comments)
+        med_plus = _count_medium_plus(all_comments)
+
+        # Clear accept: No medium+ issues or only low-severity issues
+        if max_sev < 3:
+            return "accept", f"All feedback is low-severity (max: {max_sev}). Items are acceptable. {threshold_ctx} [rule-based, 0 tokens]"
+
+        # Clear reject: High-severity issues require revision
+        if max_sev >= 4:
+            return "revise", f"High-severity issues detected (max: {max_sev}). Revision required. {threshold_ctx} [rule-based, 0 tokens]"
+
+        # Borderline case (severity = 3): Fall through to LLM for nuanced judgment
+        # LLM will consider: iteration progress, comment distribution, bias/content priorities
 
     system_prompt = load_prompt("critic.md")
 
@@ -176,7 +195,7 @@ def decide(
             model_provider=model_provider,
         )
         # Ensure threshold mode is in the reason
-        reason_with_mode = f"{resp.reason} {threshold_ctx}"
+        reason_with_mode = f"{resp.reason} {threshold_ctx} [LLM-based]"
         return resp.decision, reason_with_mode
     except Exception as e:
         # If the LLM misbehaves, fall back to deterministic logic so the system keeps running.

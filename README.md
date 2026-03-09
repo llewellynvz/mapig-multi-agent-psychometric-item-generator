@@ -198,64 +198,99 @@ Backend tests (if installed):
 pytest -q
 ```
 
-## Deployment
+## Deployment (Vercel)
 
-### Vercel
+MAPIG can be deployed to Vercel serverless infrastructure with the following setup:
 
-MAPIG can be deployed to Vercel serverless infrastructure:
+### Prerequisites
 
-**1. Environment Variables**
+- Vercel account (free or Pro plan)
+- Vercel Pro plan recommended for longer execution timeouts (300s default, up to 800s with Fluid Compute)
+- API keys: `CLAUDE_API_KEY` and/or `OPENAI_API_KEY`
 
-Add the following to Vercel environment variables (Settings > Environment Variables):
+### Architecture
 
-**Required:**
-- `CLAUDE_API_KEY` - Your Anthropic API key (get from https://console.anthropic.com)
-  - Used by default for item generation
-  - Opus for validation agent, Sonnet for other agents
-- `OPENAI_API_KEY` - Your OpenAI API key (optional, for fallback)
-  - Used when user selects OpenAI provider in UI
+- **Backend**: Python serverless function at `api/index.py` (FastAPI with native ASGI support)
+- **Frontend**: Next.js standalone mode deployed to Vercel
+- **Checkpointing**: In-memory only (MemorySaver) - session resumption not available after cold start
+- **SSE Streaming**: Supported within 300s timeout (typical runs: 20-40s)
 
-**Optional:**
-- `PERPLEXITY_API_KEY` - For web evidence search
-- `PERPLEXITY_DOMAIN_FILTER` - Comma-separated allowlist of domains
+### Backend Deployment
 
-**2. Deploy Backend**
+1. Create new Vercel project from repository
+2. Configure project settings:
+   - **Framework Preset**: Other
+   - **Root Directory**: Leave as `.` (monorepo root)
+   - **Build Command**: `echo 'No build needed for Python'`
+   - **Output Directory**: Leave empty
+3. Configure environment variables in Vercel dashboard:
+   - `CLAUDE_API_KEY`: Your Anthropic API key
+   - `OPENAI_API_KEY`: Your OpenAI API key (optional)
+   - `APP_MODE`: `claude` or `openai` (default: `mock`)
+   - `SEARCH_PROVIDER`: `perplexity` (optional)
+   - `PERPLEXITY_API_KEY`: Your Perplexity API key (if using web search)
+4. Deploy: Vercel auto-detects `api/index.py` and creates serverless function
 
-```bash
-# From project root
-vercel --prod
-```
+Backend URL: `https://your-project.vercel.app/api/index`
 
-**3. Deploy Frontend**
+### Frontend Deployment
 
-```bash
-# From frontend directory
-cd frontend
-vercel --prod
-```
+1. Create separate Vercel project for frontend (or use same project with monorepo detection)
+2. Configure project settings:
+   - **Framework Preset**: Next.js
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `.next`
+3. Configure environment variables:
+   - `NEXT_PUBLIC_API_URL`: Backend Vercel Function URL (e.g., `https://your-backend.vercel.app`)
+4. Deploy: Vercel builds Next.js frontend automatically
 
-**4. Verify Deployment**
+Frontend URL: `https://your-frontend.vercel.app`
 
-1. Visit your Vercel production URL
-2. Open browser DevTools > Console
-3. Select "Claude" in model provider dropdown (default)
-4. Generate items for a test construct
-5. Verify costs display in Results panel after generation
+### Monorepo Linking (Optional)
 
-**Error Handling:**
+Use Vercel's "Related Projects" feature to automatically link frontend preview deployments to corresponding backend preview URLs:
 
-- Missing `CLAUDE_API_KEY`: Generation blocked with error: "CLAUDE_API_KEY not configured. Add to Vercel environment variables or switch to OpenAI."
-- API failures: Automatic retry with exponential backoff (3 attempts, 60s timeout)
-- Rate limits: SSE progress shows retry status in real-time
+1. In frontend project settings, go to "Git"
+2. Enable "Related Projects"
+3. Select backend project
+4. Preview deployments will automatically use corresponding backend preview URL
 
-**Cost Monitoring:**
+### Verification
 
-After each generation run, the Results panel displays:
-- Claude Opus cost (validation agent)
-- Claude Sonnet cost (other agents)
-- Total API spend
+After deployment:
 
-Costs calculated from token usage and displayed in USD with 2 decimal precision.
+1. Visit backend health check: `https://your-backend.vercel.app/healthz`
+   - Should return: `{"status": "healthy"}`
+2. Visit frontend: `https://your-frontend.vercel.app`
+   - Setup form should load
+   - Generate items to test end-to-end flow
+
+### Known Limitations (v1)
+
+- **Session resumption**: Not available after serverless function cold start (checkpoints are in-memory only)
+- **Cold start time**: Initial request may take 3-8 seconds (Python serverless cold start)
+- **Timeout**: Maximum 300s execution time (configurable up to 800s on Pro plan with Fluid Compute)
+
+Most item generation runs complete in 20-40 seconds well within timeout limits.
+
+### Troubleshooting
+
+**CORS errors in browser console:**
+- Verify NEXT_PUBLIC_API_URL matches backend domain exactly
+- Check backend CORS configuration allows frontend domain
+
+**Environment variables not found:**
+- Verify exact spelling in Vercel dashboard (e.g., `CLAUDE_API_KEY` not `ANTHROPIC_API_KEY`)
+- Redeploy after adding new environment variables
+
+**Function timeout errors:**
+- Check Vercel dashboard for actual timeout setting (default 300s on Pro)
+- Complex constructs may take longer; consider increasing maxDuration in vercel.json
+
+**Approved sources not found:**
+- Verify `data/approved_sources/` directory is committed to git
+- Check .vercelignore doesn't exclude data/ directory
 
 ## Contributing
 Issues and pull requests are welcome for:

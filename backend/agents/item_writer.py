@@ -3,10 +3,10 @@ from __future__ import annotations
 import uuid
 from typing import List
 
-from app.agents.llm_utils import invoke_structured
-from app.agents.prompt_loader import load_prompt
-from app.schemas import DraftItem, EvidenceChunk, ItemWriterResponse, UserRequest
-from app.settings import settings
+from backend.agents.llm_utils import invoke_structured
+from backend.agents.prompt_loader import load_prompt
+from backend.schemas import DraftItem, EvidenceChunk, ItemWriterResponse, UserRequest
+from backend.settings import settings
 
 
 def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> ItemWriterResponse:

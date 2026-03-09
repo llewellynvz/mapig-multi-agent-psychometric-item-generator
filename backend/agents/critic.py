@@ -4,10 +4,10 @@ from typing import List, Literal, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agents.llm_utils import invoke_structured
-from app.agents.prompt_loader import load_prompt
-from app.schemas import ReviewComment
-from app.settings import settings
+from backend.agents.llm_utils import invoke_structured
+from backend.agents.prompt_loader import load_prompt
+from backend.schemas import ReviewComment
+from backend.settings import settings
 
 Decision = Literal["accept", "revise", "stop_max_iterations", "needs_human"]
 

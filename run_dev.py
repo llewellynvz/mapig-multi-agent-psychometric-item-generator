@@ -8,7 +8,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-FRONTEND_DIR = ROOT / "frontend"
+# Frontend is now at root, not in subdirectory
+FRONTEND_DIR = ROOT
 
 
 def kill_tree(pid: int) -> None:
@@ -40,7 +41,7 @@ def main() -> int:
     if uvicorn_bin:
         backend_cmd = [
             uvicorn_bin,
-            "app.main:app",
+            "backend.main:app",
             "--reload",
             "--host",
             backend_host,
@@ -60,7 +61,7 @@ def main() -> int:
             sys.executable,
             "-m",
             "uvicorn",
-            "app.main:app",
+            "backend.main:app",
             "--reload",
             "--host",
             backend_host,

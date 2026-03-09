@@ -6,9 +6,9 @@ from typing import List
 
 import httpx
 
-from app.agents.prompt_loader import load_prompt
-from app.schemas import EvidenceChunk, RetrievalResponse, UserRequest
-from app.settings import settings
+from backend.agents.prompt_loader import load_prompt
+from backend.schemas import EvidenceChunk, RetrievalResponse, UserRequest
+from backend.settings import settings
 
 log = logging.getLogger("lmaig.web_surfer")
 

@@ -44,3 +44,19 @@ def test_eval_suite_runs_in_mock_mode():
     assert isinstance(metrics, EvaluationMetrics)
     assert metrics.total_comparisons > 0
     assert 1.0 <= metrics.overall_score <= 10.0
+
+def test_baseline_comparison_documents_success_criteria():
+    """Baseline comparison evaluates success criteria."""
+    from backend.evaluation.baseline_runner import run_baseline_comparison
+
+    comparison = run_baseline_comparison(model_provider="claude")
+
+    assert hasattr(comparison, 'overall_improvement')
+    assert hasattr(comparison, 'meets_improvement_threshold')
+    assert hasattr(comparison, 'all_dimensions_passing')
+    assert hasattr(comparison, 'success')
+
+    # Success requires ≥15% improvement AND all dimensions ≥7.0
+    if comparison.success:
+        assert comparison.overall_improvement >= 15.0
+        assert comparison.all_dimensions_passing

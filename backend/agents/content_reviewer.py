@@ -4,11 +4,11 @@ from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
-from backend.schemas import ContentReviewResponse, DraftItem, ReviewComment, UserRequest
+from backend.schemas import AbbreviatedRequest, ContentReviewResponse, DraftItem, ReviewComment
 from backend.settings import settings
 
 
-def review_content(request: UserRequest, items: List[DraftItem], iteration: int) -> Tuple[ContentReviewResponse, TokenUsage]:
+def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteration: int) -> Tuple[ContentReviewResponse, TokenUsage]:
     if settings.APP_MODE == "mock":
         return ContentReviewResponse(comments=[]), TokenUsage()
 

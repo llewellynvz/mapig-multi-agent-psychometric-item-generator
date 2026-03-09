@@ -54,8 +54,11 @@ def validate_items(
         validations = []
         for idx, item in enumerate(items):
             # Alternate pass/fail for testing: even indices pass, odd indices fail
-            score = 8.0 if idx % 2 == 0 else 6.5
+            is_passing = idx % 2 == 0
+            score = 8.0 if is_passing else 6.5
 
+            # For passing items (score ≥ 7): empty reasoning
+            # For failing items (score < 7): provide detailed reasoning
             validations.append(
                 ItemValidation(
                     item_index=idx,
@@ -63,22 +66,22 @@ def validate_items(
                     dimension_scores=[
                         DimensionScore(
                             dimension="correspondence",
-                            reasoning="Mock reasoning for correspondence",
-                            score=8,
+                            reasoning="" if is_passing else "Mock failing: Item does not fully capture construct definition",
+                            score=8 if is_passing else 6,
                         ),
                         DimensionScore(
                             dimension="distinctiveness",
-                            reasoning="Mock reasoning for distinctiveness",
-                            score=8,
+                            reasoning="" if is_passing else "Mock failing: Item overlaps with related construct",
+                            score=8 if is_passing else 7,
                         ),
                         DimensionScore(
                             dimension="clarity",
-                            reasoning="Mock reasoning for clarity",
+                            reasoning="",  # Always passing in mock
                             score=8,
                         ),
                         DimensionScore(
                             dimension="specificity",
-                            reasoning="Mock reasoning for specificity",
+                            reasoning="",  # Always passing in mock
                             score=8,
                         ),
                     ],
@@ -104,13 +107,9 @@ def validate_items(
             "attempt": attempt,
         }
 
-        messages = [
-            ("system", system_prompt),
-            (
-                "human",
-                f"Validate these items using the 4-dimension rubric.\n\nINPUT:\n{user_payload}",
-            ),
-        ]
+        # Convert to LangChain messages with cache_control for cost optimization
+        # Only apply cache control for Claude models (Anthropic API supports prompt caching)
+        from langchain_core.messages import HumanMessage, SystemMessage
 
         # Smart validation: Use Sonnet first (80% cheaper), only use Opus if items fail
         if _use_smart_validation() and attempt == 1:
@@ -123,8 +122,21 @@ def validate_items(
             model = get_validator_model()
             model_name = getattr(model, "model_name", getattr(model, "model", "opus"))
 
+        # Build messages with cache_control for system prompt
+        # Cache control reduces cost by ~90% on cached portions (5-minute TTL)
+        messages = [
+            SystemMessage(
+                content=system_prompt,
+                additional_kwargs={"cache_control": {"type": "ephemeral"}}
+            ),
+            HumanMessage(
+                content=f"Validate these items using the 4-dimension rubric.\n\nINPUT:\n{user_payload}"
+            ),
+        ]
+
         # Invoke with structured output, capturing raw response for token tracking
-        runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
+        # Note: strict=False to allow minLength=0 for reasoning field (empty for passing dimensions)
+        runnable = model.with_structured_output(ValidationResponse, strict=False, include_raw=True)
         response = runnable.invoke(messages)
 
         # Extract result and token usage

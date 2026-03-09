@@ -1,6 +1,7 @@
 from __future__ import annotations
 from app.logging_utils import step
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
@@ -19,11 +20,17 @@ def _score(query_tokens: set[str], doc_tokens: set[str]) -> int:
 
 def retrieve_evidence(request: UserRequest, top_k: int = 5) -> RetrievalResponse:
     """Retrieve evidence chunks from local allowlisted sources only."""
-    base_dir = Path(settings.APPROVED_SOURCES_DIR)
-    if not base_dir.exists():
-        raise FileNotFoundError(
-            f"Approved sources directory not found: {base_dir.resolve()}"
-        )
+    # Use os.getcwd() for project root (Vercel sets cwd to project base)
+    sources_dir = Path(os.getcwd()) / "data" / "approved_sources"
+
+    if not sources_dir.exists():
+        # Fallback: relative to this file
+        sources_dir = Path(__file__).parent.parent.parent / "data" / "approved_sources"
+
+    if not sources_dir.exists():
+        raise FileNotFoundError(f"Approved sources directory not found. Tried: {sources_dir}")
+
+    base_dir = sources_dir
 
     query_parts = [
         request.construct_name,

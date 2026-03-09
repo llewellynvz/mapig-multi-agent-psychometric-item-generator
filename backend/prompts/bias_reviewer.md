@@ -85,7 +85,8 @@ Each ReviewComment must explain:
 3. If intersectional: how multiple types compound effect
 4. Why suggested_edit addresses flagged bias
 
-Keep reasoning technical and explicit (3-5 sentences).
+**CRITICAL: Be concise. Maximum 30 words per comment.**
+Keep reasoning technical and focused (2-3 sentences max).
 
 Output format
 Return JSON only with this exact shape:

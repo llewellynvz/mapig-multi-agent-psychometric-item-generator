@@ -97,6 +97,8 @@ Return JSON only with this exact shape:
   ]
 }
 
+**CRITICAL: Be concise. Maximum 30 words per comment issue field.**
+
 Comment requirements
 - issue must start with "Item <n>:" where n is the 1-based item number.
 - suggested_edit must be a full rewritten replacement item_text.

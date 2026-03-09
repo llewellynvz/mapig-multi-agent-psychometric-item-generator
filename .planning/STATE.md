@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Deployment
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-09T03:10:40.508Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-09T03:17:00.878Z"
 last_activity: 2026-03-09 — Completed plan 05-01 (Vercel Serverless Conversion)
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 90
 ---
 
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 05 of 7 (Vercel Deployment)
-Plan: 1 of 4
+Plan: 2 of 4
 Status: In Progress
-Last activity: 2026-03-09 — Completed plan 05-01 (Vercel Serverless Conversion)
+Last activity: 2026-03-09 — Completed plan 05-02 (Frontend Production Configuration)
 
-Progress: [█████████░] 90%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [█████████░] 90%
 | Phase 03 P03 | 3.83 | 4 tasks | 11 files |
 | Phase 05 P00 | 1.92 | 3 tasks | 3 files |
 | Phase 05 P01 | 1.83 | 3 tasks | 5 files |
+| Phase 05 P02 | 3.02 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Key v1.0 decisions:
 - [Phase 05]: Native Vercel ASGI pattern instead of Mangum adapter (research proves Vercel has native ASGI support since 2023; Mangum is AWS Lambda-specific)
 - [Phase 05]: MemorySaver for ephemeral checkpointing in serverless (acceptable v1 trade-off; session resumption won't work across cold starts)
 - [Phase 05]: CORS allow_origin_regex for *.vercel.app domains (supports preview and production URLs without hardcoding)
+- [Phase 05]: Commit .env.production as template file for documentation (with gitignore exception)
+- [Phase 05]: Use standalone output mode for Next.js Vercel deployment optimization
+- [Phase 05]: Replace basic Vercel docs with comprehensive deployment guide (architecture, troubleshooting, limitations)
 
 ### Roadmap Evolution
 
@@ -125,8 +129,8 @@ No active blockers for v1.1 planning.
 
 ## Session Continuity
 
-Last session: 2026-03-09T03:10:40.506Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-03-09T03:17:00.877Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
 
 ---

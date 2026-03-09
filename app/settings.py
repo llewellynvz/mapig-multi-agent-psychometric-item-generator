@@ -22,8 +22,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Runtime mode
-    APP_MODE: Literal["mock", "azure", "openai"] = "mock"
+    # Runtime mode (claude mode uses CLAUDE_API_KEY for all agents)
+    APP_MODE: Literal["mock", "azure", "openai", "claude"] = "mock"
 
     # OpenAI (used only in APP_MODE=openai)
     OPENAI_API_KEY: Optional[str] = Field(default=None)

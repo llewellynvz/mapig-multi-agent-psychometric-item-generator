@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Tuple, Type, TypeVar
+from typing import List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -10,21 +10,40 @@ SchemaT = TypeVar("SchemaT", bound=BaseModel)
 Message = Tuple[str, str]
 
 
-def invoke_structured(schema: Type[SchemaT], messages: List[Message]) -> SchemaT:
+def invoke_structured(
+    schema: Type[SchemaT],
+    messages: List[Message],
+    agent_name: Optional[str] = None,
+    model_provider: Optional[str] = None,
+) -> SchemaT:
     """
     Invoke the configured LLM and return validated structured output.
 
     Works for:
       - APP_MODE=openai
       - APP_MODE=azure
+      - APP_MODE=claude
 
+    Args:
+        schema: Pydantic model class for response validation
+        messages: List of chat messages
+        agent_name: Optional agent identifier for smart allocation
+        model_provider: Optional provider override ("claude" or "openai")
+
+    Returns:
+        Validated response instance of schema type
     """
-    if settings.APP_MODE not in ("openai", "azure"):
+    if settings.APP_MODE not in ("openai", "azure", "claude"):
         raise RuntimeError("invoke_structured called in mock mode. Use the mock agents instead.")
 
-    from app.agents.llm_factory import get_chat_model
-
-    llm = get_chat_model()
+    # Use smart allocation if both parameters provided
+    if agent_name and model_provider:
+        from app.agents.llm_factory import get_chat_model_for_agent
+        llm = get_chat_model_for_agent(agent_name, model_provider)
+    else:
+        # Fall back to default get_chat_model()
+        from app.agents.llm_factory import get_chat_model
+        llm = get_chat_model()
 
     # Primary path: provider/tool-based structured output
     try:

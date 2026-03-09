@@ -241,6 +241,143 @@ Project uses Get Shit Done (GSD) workflow for structured execution:
 - Deferred to v2: lazy imports, dependency pruning
 - Not a blocker for v1 deployment
 
+## Recent Fixes and Issues Resolved (2026-03-09)
+
+### Issue 1: Next.js 404 Error - Directory Name Collision ✅
+
+**Problem**: Next.js couldn't find App Router pages, showing 404 on all routes.
+
+**Root Cause**: Python backend directory `/app` conflicted with Next.js App Router detection at `/src/app`.
+
+**Solution**: Renamed Python backend directory:
+- `app/` → `backend/` (all Python code)
+- Updated all imports: `from app.` → `from backend.`
+- Updated `package.json`, `run_dev.py`, `pyproject.toml`
+
+**Commits**:
+- `f3395fe` - Renamed backend directory and updated imports
+
+### Issue 2: Hydration Mismatch - Theme Toggle ✅
+
+**Problem**: React hydration error with theme toggle aria-label mismatch.
+
+**Root Cause**: `useTheme()` hook not available during SSR, causing server/client mismatch.
+
+**Solution**: Added `mounted` state and `suppressHydrationWarning`:
+```tsx
+const [mounted, setMounted] = useState(false);
+useEffect(() => setMounted(true), []);
+// Use generic label until mounted
+aria-label={mounted ? (theme === "dark" ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}
+```
+
+**Commits**:
+- `b41f6c1` - Fixed theme toggle hydration
+
+### Issue 3: Network Error - Backend Not Running ✅
+
+**Problem**: Frontend couldn't connect to backend API.
+
+**Root Cause**: Backend server wasn't started, `uvicorn` not in PATH.
+
+**Solution**: Installed dependencies and started backend:
+```bash
+pip install uvicorn[standard] fastapi langgraph langchain-core ...
+python -m uvicorn backend.main:app --reload
+```
+
+**Current State**: Backend running at http://localhost:8000
+
+### Issue 4: Perplexity API 401 Error ✅
+
+**Problem**: 401 Unauthorized from Perplexity API during generation.
+
+**Root Cause**: Perplexity account had no credits (not invalid API key).
+
+**Solution**: User adding credits to Perplexity account.
+
+**Temporary Workaround**: Can set `SEARCH_PROVIDER=local` to use only local sources.
+
+### Issue 5: Null Cost Error ✅
+
+**Problem**: `can't access property "toFixed", audit.total_cost is null`
+
+**Root Cause**: Cost values were `null` but code only checked for `undefined`.
+
+**Solution**: Changed null checks:
+```tsx
+// Before: audit.total_cost !== undefined
+// After:  audit.total_cost != null  (catches both null and undefined)
+```
+
+**Commits**:
+- `e2008d7` - Fixed null cost handling in EvidenceAuditPanel
+
+## Current Running State
+
+**Development Environment**:
+- ✅ Frontend: http://localhost:3000 (Next.js)
+- ✅ Backend: http://localhost:8000 (FastAPI with uvicorn)
+- ✅ Mode: Claude (using Anthropic API)
+- ✅ Search: Perplexity (requires credits)
+
+**Services Running**:
+1. Next.js dev server: `npm run dev`
+2. FastAPI backend: `python -m uvicorn backend.main:app --reload` (background task)
+
+**API Keys Configured** (in `.env`):
+- `CLAUDE_API_KEY` - ✅ Set
+- `OPENAI_API_KEY` - ✅ Set
+- `PERPLEXITY_API_KEY` - ✅ Set (needs credits)
+
+## Common Development Issues
+
+### "404 Not Found" on localhost:3000
+- **Cause**: Backend directory name conflict with Next.js
+- **Fixed**: Backend renamed to `backend/`
+
+### "Network Error" when generating
+- **Cause**: Backend not running
+- **Fix**: `python -m uvicorn backend.main:app --reload`
+
+### Hydration warnings
+- **Cause**: SSR/client mismatch (theme, dynamic data)
+- **Fix**: Use `mounted` state and `suppressHydrationWarning`
+
+### "401 Unauthorized" from Perplexity
+- **Cause**: No API credits
+- **Fix**: Add credits at https://www.perplexity.ai/settings/api
+- **Workaround**: Set `SEARCH_PROVIDER=local` in `.env`
+
+### "Can't access property on null" errors
+- **Cause**: Null values not handled
+- **Fix**: Use `!= null` instead of `!== undefined`
+
+## Quick Start Commands
+
+**Install Dependencies**:
+```bash
+# Frontend
+npm install
+
+# Backend (if pip available)
+pip install uvicorn[standard] fastapi pydantic langgraph langchain-core langchain-openai langchain-anthropic
+```
+
+**Run Development**:
+```bash
+# Terminal 1: Frontend
+npm run dev
+
+# Terminal 2: Backend
+python -m uvicorn backend.main:app --reload
+```
+
+**Verify**:
+- Frontend: http://localhost:3000
+- Backend health: http://localhost:8000/healthz
+- Should return: `{"status":"ok","mode":"claude"}`
+
 ## Future Work (v2+)
 
 - **Persistent checkpoints**: Vercel Postgres + PostgresSaver
@@ -251,6 +388,7 @@ Project uses Get Shit Done (GSD) workflow for structured execution:
 
 ---
 
-**Last Updated**: 2026-03-09
+**Last Updated**: 2026-03-09 (Session: Restructuring & Bug Fixes)
 **Maintainer**: Psynalytics team
 **GSD Milestone**: v1.1 Deployment (Phase 5 in progress)
+**Git Commits**: aea306a, f3395fe, b41f6c1, e2008d7

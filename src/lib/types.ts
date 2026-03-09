@@ -16,6 +16,8 @@ export interface UserRequest {
   exclude_sources?: string[];
   human_feedback?: string;
   previous_items?: string[];
+  model_provider?: "claude" | "openai";
+  use_chatgpt_critics?: boolean;
 }
 
 export interface DimensionScore {

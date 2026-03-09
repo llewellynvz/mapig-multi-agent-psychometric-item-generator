@@ -8,9 +8,11 @@ import { InsetPanel } from "@/components/ui/surface-card";
 export interface AppDescriptionProps {
   onPrimaryCta?: () => void;
   onSecondaryCta?: () => void;
+  onClearResults?: () => void;
+  showClearButton?: boolean;
 }
 
-export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionProps) {
+export function AppDescription({ onPrimaryCta, onSecondaryCta, onClearResults, showClearButton = false }: AppDescriptionProps) {
   return (
     <section className="animate-fade-up relative overflow-hidden rounded-[2rem] border border-border/60 bg-gradient-to-br from-[#0B2A34] via-[#0F3743] to-[#1A4A53] p-6 text-white shadow-xl md:p-10">
       <div className="absolute -left-20 -top-20 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" aria-hidden />
@@ -39,13 +41,22 @@ export function AppDescription({ onPrimaryCta, onSecondaryCta }: AppDescriptionP
               Start New Run
               <ArrowRight className="ml-2 h-4 w-4" />
             </PrimaryButton>
-            <SecondaryButton
+            <PrimaryButton
               type="button"
               onClick={onSecondaryCta}
-              className="h-11 px-5"
+              className="h-11 px-5 font-semibold"
             >
               Jump to Results
-            </SecondaryButton>
+            </PrimaryButton>
+            {showClearButton && onClearResults && (
+              <PrimaryButton
+                type="button"
+                onClick={onClearResults}
+                className="h-11 px-5 font-semibold"
+              >
+                Clear Results
+              </PrimaryButton>
+            )}
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <InsetPanel className="rounded-2xl p-3 text-center">

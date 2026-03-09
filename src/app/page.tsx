@@ -192,10 +192,10 @@ export default function HomePage() {
       setActiveRun((prev) =>
         prev
           ? {
-              ...prev,
-              status: "error",
-              updatedAt: new Date().toISOString(),
-            }
+            ...prev,
+            status: "error",
+            updatedAt: new Date().toISOString(),
+          }
           : prev
       );
       setLastResponseJson(err.rawText || null);
@@ -286,6 +286,17 @@ export default function HomePage() {
     resetProgress();
   }, [resetProgress]);
 
+  const handleClearResults = React.useCallback(() => {
+    setResult(null);
+    setHumanFeedback("");
+    setFeedbackHistory([]);
+    setActiveRun(null);
+    setLastResponseJson(null);
+    setLastRequestJson(null);
+    resetProgress();
+    // Stay on current step (don't navigate like handleStartNew does)
+  }, [resetProgress]);
+
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -367,12 +378,12 @@ export default function HomePage() {
           setActiveRun((prev) =>
             prev
               ? {
-                  ...prev,
-                  threadId: status.thread_id,
-                  runId: status.run_id,
-                  status: "running",
-                  updatedAt: status.updated_at ?? new Date().toISOString(),
-                }
+                ...prev,
+                threadId: status.thread_id,
+                runId: status.run_id,
+                status: "running",
+                updatedAt: status.updated_at ?? new Date().toISOString(),
+              }
               : prev
           );
           return;
@@ -391,12 +402,12 @@ export default function HomePage() {
           setActiveRun((prev) =>
             prev
               ? {
-                  ...prev,
-                  threadId: status.thread_id,
-                  runId: status.run_id,
-                  status: "complete",
-                  updatedAt: status.updated_at ?? new Date().toISOString(),
-                }
+                ...prev,
+                threadId: status.thread_id,
+                runId: status.run_id,
+                status: "complete",
+                updatedAt: status.updated_at ?? new Date().toISOString(),
+              }
               : prev
           );
           appendHistoryEntry(status.final_output, activeRun.kind, activeRun.feedback);
@@ -414,11 +425,11 @@ export default function HomePage() {
           setActiveRun((prev) =>
             prev
               ? {
-                  ...prev,
-                  runId: status.run_id,
-                  status: "error",
-                  updatedAt: status.updated_at ?? new Date().toISOString(),
-                }
+                ...prev,
+                runId: status.run_id,
+                status: "error",
+                updatedAt: status.updated_at ?? new Date().toISOString(),
+              }
               : prev
           );
           toast({
@@ -468,6 +479,8 @@ export default function HomePage() {
         <AppDescription
           onPrimaryCta={() => setStep("setup")}
           onSecondaryCta={jumpToResults}
+          onClearResults={handleClearResults}
+          showClearButton={result !== null}
         />
         <Stepper current={step} />
 
@@ -559,14 +572,14 @@ export default function HomePage() {
             </div>
             <div className="space-y-4">
               <SetupSnapshotCard values={submittedSetup} />
-              <SecondaryButton
+              <PrimaryButton
                 type="button"
                 onClick={() => setStep("setup")}
                 disabled={mutation.isPending}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to setup
-              </SecondaryButton>
+              </PrimaryButton>
             </div>
           </section>
         )}
@@ -575,14 +588,14 @@ export default function HomePage() {
           <section className="animate-fade-up grid gap-6 xl:grid-cols-3">
             <div className="space-y-4">
               <SetupSnapshotCard values={submittedSetup} />
-              <SecondaryButton
+              <PrimaryButton
                 type="button"
                 className="w-full"
                 onClick={handleStartNew}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Edit setup
-              </SecondaryButton>
+              </PrimaryButton>
             </div>
             <div className="space-y-4">
               <HumanFeedbackPanel

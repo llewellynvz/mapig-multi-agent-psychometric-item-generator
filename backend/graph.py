@@ -136,6 +136,7 @@ class GraphState(TypedDict, total=False):
     opus_tokens_used: int
     sonnet_tokens_used: int
     openai_tokens_used: int
+    chatgpt_tokens_used: int
 
     # Output
     final_output: FinalOutput
@@ -164,6 +165,7 @@ def _create_abbreviated_request(full_request: UserRequest) -> AbbreviatedRequest
         response_scale=full_request.response_scale,
         constraints=full_request.constraints,
         model_provider=full_request.model_provider,
+        use_chatgpt_critics=full_request.use_chatgpt_critics,
     )
 
 
@@ -185,6 +187,7 @@ def init_run(state: GraphState) -> GraphState:
             "opus_tokens_used": 0,
             "sonnet_tokens_used": 0,
             "openai_tokens_used": 0,
+            "chatgpt_tokens_used": 0,
         }
 
 

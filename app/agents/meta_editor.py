@@ -78,4 +78,9 @@ def revise_items(
         ("human", f"Revise the items using the reviewer feedback.\n\nINPUT:\n{payload}"),
     ]
 
-    return invoke_structured(MetaEditorResponse, messages)
+    return invoke_structured(
+        MetaEditorResponse,
+        messages,
+        agent_name="meta_editor",
+        model_provider=request.model_provider,
+    )

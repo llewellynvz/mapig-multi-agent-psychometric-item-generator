@@ -38,7 +38,12 @@ def review_linguistic(
         ("human", f"Review these items for linguistic quality.\n\nINPUT:\n{payload}"),
     ]
 
-    resp = invoke_structured(LinguisticReviewResponse, messages)
+    resp = invoke_structured(
+        LinguisticReviewResponse,
+        messages,
+        agent_name="linguistic_reviewer",
+        model_provider=request.model_provider,
+    )
 
     # Safety: enforce comment type at runtime.
     for c in resp.comments:

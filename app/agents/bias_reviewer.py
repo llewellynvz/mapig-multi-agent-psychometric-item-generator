@@ -25,7 +25,12 @@ def review_bias(request: UserRequest, items: List[DraftItem], iteration: int) ->
         ("human", f"Review these items for bias and fairness risks.\n\nINPUT:\n{payload}"),
     ]
 
-    resp = invoke_structured(BiasReviewResponse, messages)
+    resp = invoke_structured(
+        BiasReviewResponse,
+        messages,
+        agent_name="bias_reviewer",
+        model_provider=request.model_provider,
+    )
 
     # Safety: enforce comment type at runtime.
     for c in resp.comments:

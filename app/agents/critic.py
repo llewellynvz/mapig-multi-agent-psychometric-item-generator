@@ -123,6 +123,7 @@ def decide(
     bias_comments: List[ReviewComment],
     content_comments: List[ReviewComment],
     iteration: int,
+    model_provider: str = "claude",
 ) -> Tuple[Decision, str]:
     """
     LLM-based critic with adaptive thresholds.
@@ -168,7 +169,12 @@ def decide(
     ]
 
     try:
-        resp = invoke_structured(CriticResponse, messages)
+        resp = invoke_structured(
+            CriticResponse,
+            messages,
+            agent_name="critic",
+            model_provider=model_provider,
+        )
         # Ensure threshold mode is in the reason
         reason_with_mode = f"{resp.reason} {threshold_ctx}"
         return resp.decision, reason_with_mode

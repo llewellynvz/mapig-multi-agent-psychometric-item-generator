@@ -115,8 +115,8 @@ def item_writer_node(state: GraphState) -> GraphState:
         return {"draft_items": resp.items}
 
 
-def validation_node(state: GraphState) -> GraphState:
-    """Validate draft items with LLM-as-judge scoring."""
+def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
+    """Validate draft items with LLM-as-judge scoring and route based on results."""
     with step("validation_node", state):
         from app.agents.validator import validate_items
 
@@ -129,37 +129,37 @@ def validation_node(state: GraphState) -> GraphState:
             attempt=attempt
         )
 
-        return {"validation_results": resp.validations}
+        # Store validation results and determine routing
+        validation_results = resp.validations
+        failed = [v for v in validation_results if not v.accept]
+        max_attempts = 3
 
+        if not failed:
+            # All items passed
+            logger.info("Validation passed: all items scored >= 7.0")
+            return Command(
+                update={"validation_results": validation_results},
+                goto="reviewers_fanout_node"
+            )
 
-def route_after_validation(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
-    """Route based on validation results."""
-    validation_results = state.get("validation_results", [])
+        if attempt >= max_attempts:
+            # Max retries exhausted; accept best available
+            logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
+            return Command(
+                update={"validation_results": validation_results},
+                goto="reviewers_fanout_node"
+            )
 
-    # Check for failed items
-    failed = [v for v in validation_results if not v.accept]
-    max_attempts = 3
-    current_attempt = state.get("validation_attempt", 1)
-
-    if not failed:
-        # All items passed
-        logger.info("Validation passed: all items scored >= 7.0")
-        return Command(goto="reviewers_fanout_node")
-
-    if current_attempt >= max_attempts:
-        # Max retries exhausted; accept best available
-        logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
-        return Command(goto="reviewers_fanout_node")
-
-    # Route to regeneration
-    logger.info(f"Validation failed: {len(failed)} items below threshold. Attempt {current_attempt}/{max_attempts}")
-    return Command(
-        update={
-            "validation_attempt": current_attempt + 1,
-            "failed_item_indices": [v.item_index for v in failed]
-        },
-        goto="regenerate_items_node"
-    )
+        # Route to regeneration
+        logger.info(f"Validation failed: {len(failed)} items below threshold. Attempt {attempt}/{max_attempts}")
+        return Command(
+            update={
+                "validation_results": validation_results,
+                "validation_attempt": attempt + 1,
+                "failed_item_indices": [v.item_index for v in failed]
+            },
+            goto="regenerate_items_node"
+        )
 
 
 def regenerate_items_node(state: GraphState) -> GraphState:
@@ -420,11 +420,8 @@ def build_graph(checkpointer=None):
     builder.add_edge("retrieve_node", "item_writer_node")
 
     # Validation gate BEFORE reviewers
+    # validation_node returns Command object for conditional routing
     builder.add_edge("item_writer_node", "validation_node")
-    builder.add_conditional_edges(
-        "validation_node",
-        route_after_validation
-    )
 
     # Regeneration loops back to validation
     builder.add_edge("regenerate_items_node", "validation_node")

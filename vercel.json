@@ -5,5 +5,9 @@
       "maxDuration": 300,
       "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,frontend/**,.planning/**,.git/**,.venv/**,**/__pycache__/**,**/*.pyc,**/.pytest_cache/**,desktop/**,.cursor/**}"
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/healthz", "destination": "/api/index" },
+    { "source": "/v1/:path*", "destination": "/api/index" }
+  ]
 }

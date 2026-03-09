@@ -51,6 +51,11 @@ export interface AuditMetadata {
   approved_sources: string[];
   validation_attempts?: number;
   validation_failures?: number;
+  // Cost tracking fields (added in Phase 03)
+  opus_cost?: number;
+  sonnet_cost?: number;
+  openai_cost?: number;
+  total_cost?: number;
 }
 
 export interface ReviewComment {

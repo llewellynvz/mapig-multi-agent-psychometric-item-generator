@@ -31,47 +31,54 @@ export function SetupSnapshotCard({ values }: SetupSnapshotCardProps) {
         <CardTitle className="text-base md:text-lg">Instrument Setup Snapshot</CardTitle>
       </CardHeader>
       <CardContent className="pt-5">
-        <InsetPanel className="space-y-4 rounded-2xl p-4">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Construct</p>
-            <p className="text-sm font-semibold">{values.construct_name}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Definition</p>
-            <p className="text-sm leading-relaxed">{values.construct_definition}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Population</p>
-            <p className="text-sm">{values.target_population}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Response Scale</p>
-            <p className="text-sm">{values.response_scale}</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Constraints</p>
-            <div className="flex flex-wrap gap-2">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InsetPanel className="col-span-full rounded-xl p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Construct</p>
+            <p className="mt-1 text-sm font-semibold">{values.construct_name}</p>
+          </InsetPanel>
+
+          <InsetPanel className="col-span-full rounded-xl p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Definition</p>
+            <p className="mt-1 text-sm leading-relaxed">{values.construct_definition}</p>
+          </InsetPanel>
+
+          <InsetPanel className="rounded-xl p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Population</p>
+            <p className="mt-1 text-sm">{values.target_population}</p>
+          </InsetPanel>
+
+          <InsetPanel className="rounded-xl p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Response Scale</p>
+            <p className="mt-1 text-sm">{values.response_scale}</p>
+          </InsetPanel>
+
+          <InsetPanel className="rounded-xl p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Item Count</p>
+            <p className="mt-1 text-sm font-medium">{values.item_count}</p>
+          </InsetPanel>
+
+          <InsetPanel className="rounded-xl p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Constraints</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
               {values.constraints.length === 0 ? (
                 <span className="text-sm text-muted-foreground">None</span>
               ) : (
                 values.constraints.map((constraint, index) => (
-                  <Pill key={`${constraint}-${index}`} className="font-normal">
+                  <Pill key={`${constraint}-${index}`} className="font-normal text-xs">
                     {constraint}
                   </Pill>
                 ))
               )}
             </div>
-          </div>
+          </InsetPanel>
+
           {values.construct_exclusions?.trim() && (
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Boundary Exclusions</p>
-              <p className="text-sm leading-relaxed">{values.construct_exclusions}</p>
-            </div>
+            <InsetPanel className="col-span-full rounded-xl p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Boundary Exclusions</p>
+              <p className="mt-1 text-sm leading-relaxed">{values.construct_exclusions}</p>
+            </InsetPanel>
           )}
-          <p className="text-xs text-muted-foreground">
-            Requested item count: <span className="font-medium text-white">{values.item_count}</span>
-          </p>
-        </InsetPanel>
+        </div>
       </CardContent>
     </SurfaceCard>
   );

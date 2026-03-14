@@ -72,9 +72,8 @@ class Settings(BaseSettings):
 
     # Orchestrator tuning
     ITEM_COUNT: int = 10
-    # Cost optimization: Max 2 iterations prevents excessive token usage
-    # Each iteration ~$0.05-0.08, so 2 iterations provides quality/cost balance
-    MAX_ITERATIONS: int = 2
+    # Max 3 iterations: rounds 1-2 are strict, round 3 is a rare safety net
+    MAX_ITERATIONS: int = 3
     CRITIC_MAX_SEVERITY_TO_ACCEPT: int = Field(default=2, ge=1, le=5)
 
     # Persistence (LangGraph checkpointer)

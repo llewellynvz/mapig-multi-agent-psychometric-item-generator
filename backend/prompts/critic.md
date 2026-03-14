@@ -62,6 +62,9 @@ Then:
 - Else:
   - decision = "accept"
 
+Step 3b: Cultural compliance check
+If cultural_group was provided in the request, verify that reviewers addressed cultural appropriateness. If cultural concerns remain unaddressed, prefer "revise".
+
 Step 4: When to choose needs_human
 Choose "needs_human" if ANY of these are true:
 - Review comments conflict in a way that changes construct meaning (for example, content reviewer wants a rewrite that contradicts construct_definition as implied by evidence).

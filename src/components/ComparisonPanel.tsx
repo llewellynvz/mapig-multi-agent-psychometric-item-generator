@@ -22,7 +22,6 @@ export function ComparisonPanel({
 }: ComparisonPanelProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
 
-  // Check if discriminant correlation is high (> 0.85)
   const discriminantCorrelation = crossConstruct?.construct_pairs?.[0]?.estimated_correlation;
   const showDiscriminantWarning = discriminantCorrelation !== undefined && discriminantCorrelation > 0.85;
   const discriminantWarningText = showDiscriminantWarning
@@ -32,7 +31,7 @@ export function ComparisonPanel({
   return (
     <SurfaceCard className="mt-4">
       <CardHeader
-        className="cursor-pointer border-b border-border/60"
+        className="cursor-pointer border-b border-border/60 hover:bg-surface-2/50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center justify-between">
@@ -49,14 +48,12 @@ export function ComparisonPanel({
 
       {isExpanded && (
         <CardContent className="pt-5">
-          {/* Educational one-liner */}
-          <p className="text-sm text-muted-foreground mb-4">
-            Convergent validity: Items measure the same construct. Discriminant validity: Items distinguish from related constructs.
+          <p className="text-sm text-muted-foreground mb-5">
+            Convergent validity: items measure the same construct. Discriminant validity: items distinguish from related constructs.
           </p>
 
-          {/* Two-column grid */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Convergent instrument */}
+          {/* Stacked vertically */}
+          <div className="space-y-4">
             <InstrumentCard
               instrument={convergentInstrument}
               label="Convergent Validity"
@@ -64,18 +61,18 @@ export function ComparisonPanel({
               scoreLabel="Convergent Score"
             />
 
-            {/* Discriminant instrument */}
             <InstrumentCard
               instrument={discriminantInstrument}
               label="Discriminant Validity"
+              score={discriminantCorrelation}
+              scoreLabel="r"
               showWarning={showDiscriminantWarning}
               warningText={discriminantWarningText}
             />
           </div>
 
-          {/* Copyright disclaimer footer */}
-          <div className="mt-4 pt-4 border-t border-border/40">
-            <p className="text-xs italic text-muted-foreground">
+          <div className="mt-5 pt-4 border-t border-border/40">
+            <p className="text-[11px] italic text-muted-foreground/70">
               Only instrument metadata is stored. No copyrighted item text is retrieved or displayed.
             </p>
           </div>

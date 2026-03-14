@@ -102,7 +102,9 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
                 parsed = json.loads(json_str)
 
                 # Process evidence chunks with enhanced metadata
+                _valid_evidence_types = {"theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions"}
                 for chunk_data in parsed.get("evidence", []):
+                    raw_type = chunk_data.get("evidence_type")
                     evidence.append(
                         EvidenceChunk(
                             source_id=chunk_data.get("source_id", ""),
@@ -110,7 +112,7 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
                             snippet=chunk_data.get("quote", "")[:240] + ("…" if len(chunk_data.get("quote", "")) > 240 else ""),
                             url_or_docref=chunk_data.get("url_or_docref", ""),
                             quote=chunk_data.get("quote", ""),
-                            evidence_type=chunk_data.get("evidence_type"),
+                            evidence_type=raw_type if raw_type in _valid_evidence_types else None,
                             authors=chunk_data.get("authors"),
                             theoretical_model=chunk_data.get("theoretical_model"),
                             dimensions=chunk_data.get("dimensions"),
@@ -120,7 +122,7 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
                 log.info("PERPLEXITY parsed structured evidence chunks=%d", len(evidence))
                 return evidence
 
-    except (json.JSONDecodeError, KeyError, IndexError) as e:
+    except Exception as e:
         log.warning("PERPLEXITY failed to parse structured response: %s", e)
 
     # Fallback: use search_results if LLM didn't return structured JSON

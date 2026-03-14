@@ -175,6 +175,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
       response_scale: saved.response_scale ?? defaultInstrumentSetup.response_scale,
       item_count: Number.isFinite(savedItemCount) ? Math.max(2, savedItemCount) : 10,
       constraints: Array.isArray(saved.constraints) ? saved.constraints : [...DEFAULT_CONSTRAINTS],
+      cultural_group: saved.cultural_group ?? "",
       construct_exclusions: saved.construct_exclusions ?? "",
       native_construct: saved.native_construct ?? "",
       example_item: saved.example_item ?? "",
@@ -253,18 +254,28 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="target_population">Target population (required)</Label>
-              <Input
-                id="target_population"
-                placeholder="e.g. Full-time employees in hybrid work"
-                {...form.register("target_population")}
-              />
-              {form.formState.errors.target_population && (
-                <p className="text-sm font-medium text-accent">
-                  {form.formState.errors.target_population.message}
-                </p>
-              )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="target_population">Target population (required)</Label>
+                <Input
+                  id="target_population"
+                  placeholder="e.g. Full-time employees in hybrid work"
+                  {...form.register("target_population")}
+                />
+                {form.formState.errors.target_population && (
+                  <p className="text-sm font-medium text-accent">
+                    {form.formState.errors.target_population.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cultural_group">Cultural / Regional Group</Label>
+                <Input
+                  id="cultural_group"
+                  placeholder="e.g. South African, Zulu, East Asian"
+                  {...form.register("cultural_group")}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">

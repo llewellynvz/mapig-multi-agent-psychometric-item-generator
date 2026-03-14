@@ -23,37 +23,41 @@ class CriticResponse(BaseModel):
 def get_adaptive_thresholds(iteration: int, max_iterations: int) -> dict:
     """Calculate thresholds based on iteration progress.
 
+    Round 1 (iter=0) is strict so major issues get caught early.
+    Round 2 (iter=1) is thorough — accepts if reasonably clean.
+    Round 3 (iter=2) is a relaxed safety net that accepts almost anything.
+
     Args:
-        iteration: Current iteration number (1-based)
+        iteration: Current iteration number (0-based)
         max_iterations: Maximum allowed iterations
 
     Returns:
         dict with keys: mode, bias_blocker, content_blocker,
                        accept_max_severity, accept_medium_plus_count
     """
-    if iteration <= 2:
-        # Early iterations: strict to catch major issues early
+    if iteration <= 0:
+        # Round 1: strictest — force revision on any medium+ issue
         return {
-            "mode": "early",
-            "bias_blocker": 4,
-            "content_blocker": 4,
+            "mode": "strict",
+            "bias_blocker": 3,
+            "content_blocker": 3,
             "accept_max_severity": 2,
             "accept_medium_plus_count": 0
         }
-    elif iteration <= 4:
-        # Mid iterations: standard thresholds
+    elif iteration <= 1:
+        # Round 2: thorough — revise on high severity, tolerate 1 medium
         return {
-            "mode": "mid",
-            "bias_blocker": 4,
+            "mode": "thorough",
+            "bias_blocker": 3,
             "content_blocker": 4,
-            "accept_max_severity": 3,  # default critic_max_severity_to_accept
-            "accept_medium_plus_count": 2
+            "accept_max_severity": 3,
+            "accept_medium_plus_count": 1
         }
     else:
-        # Late iterations: relaxed to prevent infinite loops
+        # Round 3+: relaxed safety net — only block on critical issues
         return {
-            "mode": "late",
-            "bias_blocker": 5,  # only critical issues
+            "mode": "final",
+            "bias_blocker": 5,
             "content_blocker": 5,
             "accept_max_severity": 4,
             "accept_medium_plus_count": 3
@@ -158,16 +162,19 @@ def decide(
         max_sev = _max_severity(all_comments)
         med_plus = _count_medium_plus(all_comments)
 
-        # Clear accept: No medium+ issues or only low-severity issues
-        if max_sev < 3:
-            return "accept", f"All feedback is low-severity (max: {max_sev}). Items are acceptable. {threshold_ctx} [rule-based, 0 tokens]"
+        # Clear accept: All feedback below acceptance threshold
+        if max_sev <= thresholds['accept_max_severity'] and med_plus <= thresholds['accept_medium_plus_count']:
+            return "accept", f"All feedback within threshold (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
 
-        # Clear reject: High-severity issues require revision
+        # Clear reject: Issues exceed threshold — force revision
         if max_sev >= 4:
             return "revise", f"High-severity issues detected (max: {max_sev}). Revision required. {threshold_ctx} [rule-based, 0 tokens]"
 
-        # Borderline case (severity = 3): Fall through to LLM for nuanced judgment
-        # LLM will consider: iteration progress, comment distribution, bias/content priorities
+        # In strict/thorough mode, also force revision on severity=3 to ensure thorough cleanup
+        if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
+            return "revise", f"Medium+ issues detected in {thresholds['mode']} mode (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
+
+        # Borderline case: Fall through to LLM for nuanced judgment
 
     system_prompt = load_prompt("critic.md")
 

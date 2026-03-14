@@ -25,6 +25,7 @@ Evaluate items for bias across these dimensions:
 
 3. Cultural reference bias
    - Assumes knowledge of culture-specific practices, values, contexts
+   - If cultural_group is provided, apply region-specific bias criteria: evaluate assumed norms around work, family, social customs, and religion for that group
    - Example: "I celebrate major holidays with family" (assumes holiday observance)
 
 4. Socioeconomic bias

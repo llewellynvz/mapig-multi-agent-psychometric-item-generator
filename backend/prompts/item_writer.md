@@ -133,6 +133,7 @@ Section D: Bias minimization pre-check
 - Avoid items that could systematically disadvantage groups due to context access differences unless the construct explicitly requires that context, and then generalize the referent.
 - Avoid idioms and culturally specific references.
 - Keep reading level between 8th and 10th grade and in plane language.
+- If cultural_group is provided, ensure items are culturally relevant and natural for that group. Use contexts, examples, and language that resonate with the target cultural setting while maintaining cross-cultural defensibility.
 
 Constraints handling
 - Treat system psychometric rules in this prompt as the baseline standard.

@@ -105,7 +105,9 @@ export function exportConfidenceIntervalsToCsv(
   for (const cell of matrix.cells) {
     const itemI = `Item ${cell.item_i_index + 1}`;
     const itemJ = `Item ${cell.item_j_index + 1}`;
-    csv += `${itemI},${itemJ},${cell.correlation.toFixed(3)},${cell.ci_low.toFixed(3)},${cell.ci_high.toFixed(3)}\r\n`;
+    const ciLow = cell.ci_low != null ? cell.ci_low.toFixed(3) : '';
+    const ciHigh = cell.ci_high != null ? cell.ci_high.toFixed(3) : '';
+    csv += `${itemI},${itemJ},${cell.correlation.toFixed(3)},${ciLow},${ciHigh}\r\n`;
   }
 
   return csv;

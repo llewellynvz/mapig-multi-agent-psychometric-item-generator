@@ -56,22 +56,23 @@ export function CorrelationHeatmap({
   const itemCount = itemTexts.length;
 
   // Responsive sizing: scale down for large item sets
-  const containerWidth = 600; // Max width
-  const cellSize = Math.min(40, containerWidth / itemCount);
+  const containerWidth = 720; // Max width
+  const cellSize = Math.min(52, containerWidth / itemCount);
   const margin = { top: 80, right: 20, bottom: 20, left: 80 };
   const width = cellSize * itemCount + margin.left + margin.right;
   const height = cellSize * itemCount + margin.top + margin.bottom;
 
-  // Psynalytics brand color scale: teal (negative) -> white (zero) -> lime (positive)
+  // Color scale: amber (negative) -> white (zero) -> teal (positive)
   const colorScale = scaleLinear<string>({
     domain: [-1, 0, 1],
-    range: ['#008da1', '#ffffff', '#a7d12b']
+    range: ['#f59e0b', '#ffffff', '#0d9488']
   });
 
   const heatmapData = buildHeatmapData(matrix.cells, itemCount);
 
   return (
     <div className="correlation-heatmap-container">
+      <div className="flex justify-center">
       <svg width={width} height={height}>
         <Group left={margin.left} top={margin.top}>
           {/* Heatmap cells */}
@@ -137,17 +138,18 @@ export function CorrelationHeatmap({
           ))}
         </Group>
       </svg>
+      </div>
 
       {/* Color legend */}
-      <div className="mt-4 flex items-center justify-center gap-2">
-        <span className="text-xs text-muted-foreground">-1.0</span>
-        <div className="flex h-4 w-64 rounded" style={{
-          background: 'linear-gradient(to right, #008da1, #ffffff, #a7d12b)'
+      <div className="mt-4 flex items-center justify-center gap-3">
+        <span className="text-xs font-medium text-amber-400">-1.0</span>
+        <div className="flex h-3 w-56 rounded-full overflow-hidden" style={{
+          background: 'linear-gradient(to right, #f59e0b, #ffffff, #0d9488)'
         }} />
-        <span className="text-xs text-muted-foreground">+1.0</span>
+        <span className="text-xs font-medium text-teal-400">+1.0</span>
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        Correlation strength (teal = negative, lime = positive)
+      <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+        Amber = negative correlation, Teal = positive correlation
       </p>
     </div>
   );

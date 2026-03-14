@@ -332,7 +332,7 @@ async def generate_items_stream(
             # Track seen nodes per iteration
             seen_in_iteration = {}  # {iteration: set of nodes}
             last_iteration = -1
-            final_output_sent = False
+            latest_final_output = None
 
             # Check if graph has astream method
             # #region agent log
@@ -401,32 +401,32 @@ async def generate_items_stream(
                         yield f"data: {json.dumps({'type': 'iteration', 'iteration': current_iteration})}\n\n"
                         last_iteration = current_iteration
 
-                    # Check for final output
-                    if "final_output" in node_state and not final_output_sent:
-                        final_output = node_state["final_output"]
-                        _set_run_status(
-                            thread_id,
-                            run_id,
-                            status="complete",
-                            current_node="finalize_node",
-                            display_name="Finalizing",
-                            final_output=final_output.model_dump(),
-                            error=None,
-                        )
-                        yield f"data: {json.dumps({'type': 'complete', 'data': final_output.model_dump()})}\n\n"
-                        final_output_sent = True
-                        return
+                    # Track latest final_output (analytics nodes update it after finalize_node)
+                    if "final_output" in node_state:
+                        latest_final_output = node_state["final_output"]
 
-            # Fallback: if stream ended without final_output, invoke synchronously
-            if not final_output_sent:
+            # Stream fully consumed — send final output with all analytics data
+            if latest_final_output is not None:
+                _set_run_status(
+                    thread_id,
+                    run_id,
+                    status="complete",
+                    current_node="complete",
+                    display_name="Complete",
+                    final_output=latest_final_output.model_dump(),
+                    error=None,
+                )
+                yield f"data: {json.dumps({'type': 'complete', 'data': latest_final_output.model_dump()})}\n\n"
+            else:
+                # Fallback: if stream ended without final_output, invoke synchronously
                 result_state = await asyncio.to_thread(app.state.graph.invoke, initial_state, config)
                 if "final_output" in result_state:
                     _set_run_status(
                         thread_id,
                         run_id,
                         status="complete",
-                        current_node="finalize_node",
-                        display_name="Finalizing",
+                        current_node="complete",
+                        display_name="Complete",
                         final_output=result_state["final_output"].model_dump(),
                         error=None,
                     )

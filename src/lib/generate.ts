@@ -179,6 +179,7 @@ export function formToRequest(values: {
   response_scale: string;
   item_count: number;
   constraints: string[];
+  cultural_group?: string;
   construct_exclusions?: string;
   native_construct?: string;
   example_item?: string;
@@ -200,6 +201,7 @@ export function formToRequest(values: {
     model_provider: values.model_provider || "claude",
     use_chatgpt_critics: values.use_chatgpt_critics || false,
   };
+  if (values.cultural_group?.trim()) req.cultural_group = values.cultural_group.trim();
   if (values.construct_exclusions?.trim()) req.construct_exclusions = values.construct_exclusions.trim();
   if (values.native_construct?.trim()) req.native_construct = values.native_construct.trim();
   if (values.example_item?.trim()) req.example_item = values.example_item.trim();

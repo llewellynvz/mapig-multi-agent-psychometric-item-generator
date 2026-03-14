@@ -48,6 +48,11 @@ class UserRequest(BaseModel):
 
     target_population: str = Field(..., min_length=2, description="Who will answer these items.")
 
+    cultural_group: Optional[str] = Field(
+        default=None,
+        description="Cultural, regional, or linguistic group for context-appropriate items.",
+    )
+
     response_scale: str = Field(..., min_length=2, description="Response scale, e.g., 5-point Likert.")
 
     item_count: conint(ge=2, le=50) = Field(
@@ -115,6 +120,10 @@ class AbbreviatedRequest(BaseModel):
         description="Operational definition of the construct (in-scope and out-of-scope boundaries).",
     )
     target_population: str = Field(..., min_length=2, description="Who will answer these items.")
+    cultural_group: Optional[str] = Field(
+        default=None,
+        description="Cultural, regional, or linguistic group for context-appropriate items.",
+    )
     response_scale: str = Field(..., min_length=2, description="Response scale, e.g., 5-point Likert.")
     constraints: List[str] = Field(
         default_factory=list,
@@ -295,9 +304,9 @@ class ValidationResponse(BaseModel):
 
 
 class CorrelationCell(BaseModel):
-    """Single correlation between two items with confidence interval.
+    """Single correlation between two items.
 
-    Represents a pairwise correlation estimate from the synthetic correlation matrix.
+    Represents a pairwise correlation estimate from embedding cosine similarity.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -305,8 +314,8 @@ class CorrelationCell(BaseModel):
     item_i_index: int = Field(..., ge=0, description="Index of first item (0-based)")
     item_j_index: int = Field(..., ge=0, description="Index of second item (0-based)")
     correlation: float = Field(..., ge=-1.0, le=1.0, description="Estimated correlation coefficient")
-    ci_low: float = Field(..., ge=-1.0, le=1.0, description="Lower bound of 95% confidence interval")
-    ci_high: float = Field(..., ge=-1.0, le=1.0, description="Upper bound of 95% confidence interval")
+    ci_low: Optional[float] = Field(default=None, ge=-1.0, le=1.0, description="Lower bound of 95% confidence interval")
+    ci_high: Optional[float] = Field(default=None, ge=-1.0, le=1.0, description="Upper bound of 95% confidence interval")
 
 
 class CorrelationMatrix(BaseModel):
@@ -322,7 +331,7 @@ class CorrelationMatrix(BaseModel):
     mcdonalds_omega: float = Field(..., ge=0.0, le=1.0, description="McDonald's omega total for internal consistency reliability")
     mean_inter_item_correlation: float = Field(..., description="Mean of all pairwise correlations")
     internal_consistency_flag: str = Field(..., description="optimal_range/too_low/too_high based on mean inter-item correlation")
-    disclaimer: str = Field(default="LLM-estimated, not empirically validated", description="Standard disclaimer for synthetic estimates")
+    disclaimer: str = Field(default="Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation.", description="Standard disclaimer for embedding-based estimates")
 
 
 class ComparisonInstrument(BaseModel):

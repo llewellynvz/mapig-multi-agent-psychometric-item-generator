@@ -29,6 +29,49 @@ MAPIG generates candidate items and review artifacts. It supports expert judgmen
 
 ---
 
+## The 12 Agents
+
+MAPIG uses 12 specialized AI agents, each with a single job. Think of them as a team of experts passing work down an assembly line — one drafts, others review, one decides if revisions are needed, and the final group checks how good the items really are.
+
+### 🔍 Evidence Gathering
+
+| Agent | What it does |
+|-------|-------------|
+| **Retrieval Agent** | Searches your **local approved sources** (curated research papers in `data/approved_sources/`) to find theoretical grounding for item writing. No LLM needed — pure text matching. |
+| **Web Surfer** | Queries **Perplexity's academic search** to find published research — seminal papers, measurement precedents, and construct definitions from peer-reviewed journals. |
+
+### ✍️ Item Creation
+
+| Agent | What it does |
+|-------|-------------|
+| **Item Writer** | The creative engine. Takes the construct definition, evidence, and constraints, then **drafts the actual Likert-type items** following psychometric best practices (no double-barreled items, appropriate reading level, positive keying, etc.). |
+| **Validator** | The quality gate. **Scores every item on 4 dimensions** — correspondence (50%), distinctiveness (25%), clarity (15%), and specificity (10%). Items below 7.0/10 get sent back for regeneration. |
+
+### 🔬 Triple Review (runs in parallel)
+
+| Agent | What it does |
+|-------|-------------|
+| **Linguistic Reviewer** | Hunts for **readability problems** — vague quantifiers ("often"), absolute terms ("always"), double-barreled items, ambiguous wording, and cultural idioms. |
+| **Bias Reviewer** | Checks for **fairness across groups**. Detects 7 types of bias including cultural, socioeconomic, gender, and intersectional bias that could cause differential item functioning (DIF). |
+| **Content Reviewer** | Tests **construct alignment** by simulating expert judges rating how well each item matches its intended construct — and whether it accidentally measures something else. |
+
+### ⚖️ Decision & Revision
+
+| Agent | What it does |
+|-------|-------------|
+| **Critic** | The decision-maker. Reads all reviewer feedback and decides: **accept the items or send them back for revision**. Uses adaptive thresholds that relax over iterations to prevent infinite loops. 90% of decisions are rule-based (zero tokens). |
+| **Meta Editor** | The surgeon. When the critic says "revise", this agent **applies reviewer feedback precisely** — fixing only the flagged issues while preserving item count and facet balance. |
+
+### 📊 Post-Finalization Analytics
+
+| Agent | What it does |
+|-------|-------------|
+| **Correlation Estimator** | Estimates **how items relate to each other** using text embeddings and cosine similarity (validated method from Hommel & Arslan, 2024). Calculates McDonald's omega, mean inter-item correlation, and flags consistency issues — all without needing real survey data. |
+| **Instrument Searcher** | Automatically **finds published scales** that measure the same or related constructs (e.g., finds the Satisfaction with Life Scale if you're building a life satisfaction measure). Used for benchmarking your items against established instruments. |
+| **Validity Scorer** | Estimates **convergent and discriminant validity** — how well your items align with similar instruments (should be high) and how distinct they are from different constructs (should be low). Uses GPT-5.2 with high reasoning effort. |
+
+---
+
 ## Pipeline Architecture
 
 The generation pipeline flows through distinct phases, each handled by specialized agents:

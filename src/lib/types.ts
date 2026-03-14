@@ -84,7 +84,7 @@ export interface CorrelationCell {
 
 export interface CorrelationMatrix {
   cells: CorrelationCell[];
-  cronbachs_alpha: number;
+  mcdonalds_omega: number;
   mean_inter_item_correlation: number;
   internal_consistency_flag: string;
   disclaimer: string;

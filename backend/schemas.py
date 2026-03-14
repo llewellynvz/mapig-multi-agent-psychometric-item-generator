@@ -313,15 +313,15 @@ class CorrelationMatrix(BaseModel):
     """Synthetic inter-item correlation matrix with aggregates.
 
     Contains pairwise correlations (upper-triangular only) plus scale-level statistics
-    like Cronbach's alpha and mean inter-item correlation.
+    like McDonald's omega and mean inter-item correlation.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     cells: List[CorrelationCell] = Field(..., min_length=1, description="Flat list of N*(N-1)/2 cells (upper-triangular)")
-    cronbachs_alpha: float = Field(..., ge=0.0, le=1.0, description="Estimated Cronbach's alpha for internal consistency")
+    mcdonalds_omega: float = Field(..., ge=0.0, le=1.0, description="McDonald's omega total for internal consistency reliability")
     mean_inter_item_correlation: float = Field(..., description="Mean of all pairwise correlations")
-    internal_consistency_flag: str = Field(..., description="excellent/good/acceptable/poor based on Cronbach's alpha")
+    internal_consistency_flag: str = Field(..., description="optimal_range/too_low/too_high based on mean inter-item correlation")
     disclaimer: str = Field(default="LLM-estimated, not empirically validated", description="Standard disclaimer for synthetic estimates")
 
 

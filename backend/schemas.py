@@ -291,6 +291,90 @@ class ValidationResponse(BaseModel):
     validations: List[ItemValidation] = Field(default_factory=list, description="Validation results for all items")
 
 
+# Phase 7: v2.0 Analytics Models
+
+
+class CorrelationCell(BaseModel):
+    """Single correlation between two items with confidence interval.
+
+    Represents a pairwise correlation estimate from the synthetic correlation matrix.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_i_index: int = Field(..., ge=0, description="Index of first item (0-based)")
+    item_j_index: int = Field(..., ge=0, description="Index of second item (0-based)")
+    correlation: float = Field(..., ge=-1.0, le=1.0, description="Estimated correlation coefficient")
+    ci_low: float = Field(..., ge=-1.0, le=1.0, description="Lower bound of 95% confidence interval")
+    ci_high: float = Field(..., ge=-1.0, le=1.0, description="Upper bound of 95% confidence interval")
+
+
+class CorrelationMatrix(BaseModel):
+    """Synthetic inter-item correlation matrix with aggregates.
+
+    Contains pairwise correlations (upper-triangular only) plus scale-level statistics
+    like Cronbach's alpha and mean inter-item correlation.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cells: List[CorrelationCell] = Field(..., min_length=1, description="Flat list of N*(N-1)/2 cells (upper-triangular)")
+    cronbachs_alpha: float = Field(..., ge=0.0, le=1.0, description="Estimated Cronbach's alpha for internal consistency")
+    mean_inter_item_correlation: float = Field(..., description="Mean of all pairwise correlations")
+    internal_consistency_flag: str = Field(..., description="excellent/good/acceptable/poor based on Cronbach's alpha")
+    disclaimer: str = Field(default="LLM-estimated, not empirically validated", description="Standard disclaimer for synthetic estimates")
+
+
+class ComparisonInstrument(BaseModel):
+    """Validated instrument from literature for comparison.
+
+    Represents an established instrument that measures a similar or related construct,
+    used for convergent/divergent validity assessment.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., min_length=2, description="Instrument name (e.g., 'Rosenberg Self-Esteem Scale')")
+    construct: str = Field(..., min_length=2, description="Construct measured by this instrument")
+    source_citation: str = Field(..., min_length=5, description="APA-format citation for the instrument")
+    publication_year: Optional[int] = Field(default=None, description="Year the instrument was published")
+    sample_items_count: Optional[int] = Field(default=None, ge=0, description="Number of items in the instrument")
+    psychometric_properties: Optional[str] = Field(default=None, description="Reported reliability/validity summary")
+    similarity_rationale: Optional[str] = Field(default=None, description="Why this instrument is relevant for comparison")
+
+
+class ConstructPairAnalysis(BaseModel):
+    """Discriminant validity analysis for a pair of constructs.
+
+    Represents LLM reasoning about expected correlation and discriminant validity
+    between the target construct and one comparison construct.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    construct_a: str = Field(..., description="First construct in the pair")
+    construct_b: str = Field(..., description="Second construct in the pair")
+    estimated_correlation: Optional[float] = Field(default=None, ge=-1.0, le=1.0, description="Expected correlation between constructs")
+    discriminant_validity_flag: Optional[str] = Field(default=None, description="adequate/concern/poor based on estimated correlation")
+    reasoning: Optional[str] = Field(default=None, max_length=500, description="Chain-of-thought explanation for the discriminant validity assessment")
+
+
+class CrossConstructComparison(BaseModel):
+    """Discriminant validity assessment across multiple constructs.
+
+    Analyzes whether the generated items discriminate the target construct
+    from related-but-distinct constructs (e.g., self-esteem vs self-efficacy).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_construct: str = Field(..., min_length=2, description="The construct being measured by generated items")
+    comparison_constructs: List[str] = Field(..., description="List of related-but-distinct constructs for comparison")
+    analysis_summary: str = Field(..., min_length=10, description="Overall discriminant validity assessment across all comparisons")
+    construct_pairs: List[ConstructPairAnalysis] = Field(default_factory=list, description="Per-pair discriminant validity analysis")
+    disclaimer: str = Field(default="LLM-estimated, not empirically validated", description="Standard disclaimer for LLM estimates")
+
+
 class AuditMetadata(BaseModel):
     """Minimal audit trail."""
 
@@ -323,6 +407,9 @@ class FinalOutput(BaseModel):
 
     Phase 03.1 enhancement: Added user_request and review feedback fields
     to enable complete metadata export without breaking existing consumers.
+
+    Phase 7: v2.0 enhancement: Added optional analytics fields (correlation_matrix,
+    comparison_instruments, cross_construct_analysis) for scale-level validation.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -349,6 +436,22 @@ class FinalOutput(BaseModel):
     content_feedback: List[ReviewComment] = Field(
         default_factory=list,
         description="All content reviewer comments across iterations. Includes item_index, issue, severity, and suggested_edit."
+    )
+
+    # Phase 7: v2.0 analytics fields
+    correlation_matrix: Optional[CorrelationMatrix] = Field(
+        default=None,
+        description="Synthetic inter-item correlation matrix with Cronbach's alpha and internal consistency assessment (CORR-01 through CORR-06)"
+    )
+
+    comparison_instruments: List[ComparisonInstrument] = Field(
+        default_factory=list,
+        description="Validated instruments from literature for convergent/divergent validity comparison (INST-01 through INST-06)"
+    )
+
+    cross_construct_analysis: Optional[CrossConstructComparison] = Field(
+        default=None,
+        description="Discriminant validity assessment comparing target construct against related constructs (XCON-01 through XCON-04)"
     )
 
 

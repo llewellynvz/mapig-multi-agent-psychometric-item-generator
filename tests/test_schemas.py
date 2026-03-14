@@ -528,3 +528,397 @@ def test_retrieval_response_with_theoretical_evidence():
     assert response.evidence[0].authors == "Author A"
     assert response.evidence[1].evidence_type == "dimensions"
     assert response.evidence[1].dimensions == ["dim1", "dim2"]
+
+
+# Phase 7: v2.0 Analytics Schema Tests
+
+
+def test_correlation_cell_validation():
+    """Phase 7-01: CorrelationCell validates correlation and confidence interval ranges."""
+    from pydantic import ValidationError
+    from backend.schemas import CorrelationCell
+
+    # Test valid correlation cell
+    valid_cell = CorrelationCell(
+        item_i_index=0,
+        item_j_index=1,
+        correlation=0.75,
+        ci_low=0.65,
+        ci_high=0.85
+    )
+    assert valid_cell.correlation == 0.75
+    assert valid_cell.item_i_index == 0
+    assert valid_cell.item_j_index == 1
+
+    # Test boundary values: correlation at -1.0 and 1.0
+    min_corr = CorrelationCell(
+        item_i_index=0,
+        item_j_index=1,
+        correlation=-1.0,
+        ci_low=-1.0,
+        ci_high=-0.8
+    )
+    assert min_corr.correlation == -1.0
+
+    max_corr = CorrelationCell(
+        item_i_index=2,
+        item_j_index=3,
+        correlation=1.0,
+        ci_low=0.9,
+        ci_high=1.0
+    )
+    assert max_corr.correlation == 1.0
+
+    # Test invalid: correlation > 1.0
+    with pytest.raises(ValidationError) as exc_info:
+        CorrelationCell(
+            item_i_index=0,
+            item_j_index=1,
+            correlation=1.5,
+            ci_low=0.5,
+            ci_high=1.0
+        )
+    assert "correlation" in str(exc_info.value).lower()
+
+    # Test invalid: correlation < -1.0
+    with pytest.raises(ValidationError) as exc_info:
+        CorrelationCell(
+            item_i_index=0,
+            item_j_index=1,
+            correlation=-1.5,
+            ci_low=-1.0,
+            ci_high=-0.5
+        )
+    assert "correlation" in str(exc_info.value).lower()
+
+    # Test invalid: negative item index
+    with pytest.raises(ValidationError) as exc_info:
+        CorrelationCell(
+            item_i_index=-1,
+            item_j_index=1,
+            correlation=0.5,
+            ci_low=0.3,
+            ci_high=0.7
+        )
+    assert "item_i_index" in str(exc_info.value).lower()
+
+
+def test_correlation_matrix_validation():
+    """Phase 7-01: CorrelationMatrix validates aggregates and disclaimer default."""
+    from backend.schemas import CorrelationMatrix, CorrelationCell
+
+    # Arrange: Create valid cells
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85),
+        CorrelationCell(item_i_index=0, item_j_index=2, correlation=0.68, ci_low=0.58, ci_high=0.78),
+        CorrelationCell(item_i_index=1, item_j_index=2, correlation=0.72, ci_low=0.62, ci_high=0.82),
+    ]
+
+    # Act: Create correlation matrix with valid data
+    matrix = CorrelationMatrix(
+        cells=cells,
+        cronbachs_alpha=0.85,
+        mean_inter_item_correlation=0.72,
+        internal_consistency_flag="good"
+    )
+
+    # Assert: All fields populated correctly
+    assert len(matrix.cells) == 3
+    assert matrix.cronbachs_alpha == 0.85
+    assert matrix.mean_inter_item_correlation == 0.72
+    assert matrix.internal_consistency_flag == "good"
+    assert matrix.disclaimer == "LLM-estimated, not empirically validated"
+
+    # Test boundary: cronbachs_alpha at 0.0 and 1.0
+    matrix_min = CorrelationMatrix(
+        cells=cells,
+        cronbachs_alpha=0.0,
+        mean_inter_item_correlation=0.2,
+        internal_consistency_flag="poor"
+    )
+    assert matrix_min.cronbachs_alpha == 0.0
+
+    matrix_max = CorrelationMatrix(
+        cells=cells,
+        cronbachs_alpha=1.0,
+        mean_inter_item_correlation=0.95,
+        internal_consistency_flag="excellent"
+    )
+    assert matrix_max.cronbachs_alpha == 1.0
+
+    # Test invalid: cronbachs_alpha > 1.0
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError) as exc_info:
+        CorrelationMatrix(
+            cells=cells,
+            cronbachs_alpha=1.2,
+            mean_inter_item_correlation=0.8,
+            internal_consistency_flag="excellent"
+        )
+    assert "cronbachs_alpha" in str(exc_info.value).lower()
+
+    # Test invalid: empty cells list
+    with pytest.raises(ValidationError):
+        CorrelationMatrix(
+            cells=[],
+            cronbachs_alpha=0.85,
+            mean_inter_item_correlation=0.72,
+            internal_consistency_flag="good"
+        )
+
+
+def test_comparison_instrument_validation():
+    """Phase 7-01: ComparisonInstrument validates required fields and extra='forbid'."""
+    from pydantic import ValidationError
+    from backend.schemas import ComparisonInstrument
+
+    # Test valid instrument
+    instrument = ComparisonInstrument(
+        name="Rosenberg Self-Esteem Scale",
+        construct="Self-Esteem",
+        source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
+        publication_year=1965,
+        sample_items_count=10,
+        psychometric_properties="Cronbach's alpha: 0.88, test-retest reliability: 0.85",
+        similarity_rationale="Measures global self-worth, similar construct to our self-concept measure"
+    )
+
+    assert instrument.name == "Rosenberg Self-Esteem Scale"
+    assert instrument.construct == "Self-Esteem"
+    assert instrument.publication_year == 1965
+    assert instrument.sample_items_count == 10
+
+    # Test minimal valid (only required fields)
+    minimal = ComparisonInstrument(
+        name="Test Scale",
+        construct="Test Construct",
+        source_citation="Author (2020). Title. Journal."
+    )
+    assert minimal.publication_year is None
+    assert minimal.sample_items_count is None
+    assert minimal.psychometric_properties is None
+    assert minimal.similarity_rationale is None
+
+    # Test invalid: name too short
+    with pytest.raises(ValidationError) as exc_info:
+        ComparisonInstrument(
+            name="A",
+            construct="Test",
+            source_citation="Citation here"
+        )
+    assert "name" in str(exc_info.value).lower()
+
+    # Test invalid: extra field (extra="forbid")
+    with pytest.raises(ValidationError) as exc_info:
+        ComparisonInstrument(
+            name="Test Scale",
+            construct="Test",
+            source_citation="Citation",
+            invalid_field="should fail"
+        )
+    assert "extra" in str(exc_info.value).lower() or "invalid_field" in str(exc_info.value).lower()
+
+
+def test_cross_construct_comparison_validation():
+    """Phase 7-01: CrossConstructComparison validates required fields and extra='forbid'."""
+    from pydantic import ValidationError
+    from backend.schemas import CrossConstructComparison, ConstructPairAnalysis
+
+    # Test valid cross-construct comparison
+    pairs = [
+        ConstructPairAnalysis(
+            construct_a="Self-Esteem",
+            construct_b="Self-Efficacy",
+            estimated_correlation=0.45,
+            discriminant_validity_flag="adequate",
+            reasoning="Moderate correlation expected, constructs are related but distinct"
+        )
+    ]
+
+    comparison = CrossConstructComparison(
+        target_construct="Self-Esteem",
+        comparison_constructs=["Self-Efficacy", "Depression", "Anxiety"],
+        analysis_summary="Self-esteem shows adequate discriminant validity from related constructs",
+        construct_pairs=pairs
+    )
+
+    assert comparison.target_construct == "Self-Esteem"
+    assert len(comparison.comparison_constructs) == 3
+    assert comparison.analysis_summary.startswith("Self-esteem")
+    assert len(comparison.construct_pairs) == 1
+    assert comparison.disclaimer == "LLM-estimated, not empirically validated"
+
+    # Test minimal valid (no construct_pairs)
+    minimal = CrossConstructComparison(
+        target_construct="Test Construct",
+        comparison_constructs=["Related Construct"],
+        analysis_summary="Test analysis summary here"
+    )
+    assert minimal.construct_pairs == []
+
+    # Test invalid: target_construct too short
+    with pytest.raises(ValidationError) as exc_info:
+        CrossConstructComparison(
+            target_construct="A",
+            comparison_constructs=["B"],
+            analysis_summary="Analysis"
+        )
+    assert "target_construct" in str(exc_info.value).lower()
+
+    # Test invalid: extra field (extra="forbid")
+    with pytest.raises(ValidationError) as exc_info:
+        CrossConstructComparison(
+            target_construct="Test",
+            comparison_constructs=["Related"],
+            analysis_summary="Analysis",
+            invalid_field="should fail"
+        )
+    assert "extra" in str(exc_info.value).lower() or "invalid_field" in str(exc_info.value).lower()
+
+
+def test_finaloutput_analytics_backward_compat():
+    """Phase 7-01: FinalOutput backward compatibility - without analytics fields."""
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata
+
+    # Arrange: Create minimal FinalOutput (existing v1.1 pattern)
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test",
+        rationale="Test rationale for item",
+        evidence_citations=[]
+    )
+
+    audit = AuditMetadata(
+        thread_id="test-thread",
+        run_id="test-run",
+        timestamp_utc="2026-03-14T10:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        model_info={},
+        approved_sources=[]
+    )
+
+    # Act: Create FinalOutput WITHOUT analytics fields
+    output = FinalOutput(
+        final_items=[draft_item],
+        audit=audit
+    )
+
+    # Assert: Analytics fields default to None or empty list
+    assert output.correlation_matrix is None
+    assert output.comparison_instruments == []
+    assert output.cross_construct_analysis is None
+
+
+def test_finaloutput_analytics_populated():
+    """Phase 7-01: FinalOutput forward compatibility - with analytics fields populated."""
+    from backend.schemas import (
+        DraftItem, FinalOutput, AuditMetadata,
+        CorrelationMatrix, CorrelationCell,
+        ComparisonInstrument, CrossConstructComparison
+    )
+
+    # Arrange: Create full FinalOutput with analytics
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test",
+        rationale="Test rationale",
+        evidence_citations=[]
+    )
+
+    audit = AuditMetadata(
+        thread_id="test-thread",
+        run_id="test-run",
+        timestamp_utc="2026-03-14T10:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        model_info={},
+        approved_sources=[]
+    )
+
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85)
+    ]
+
+    matrix = CorrelationMatrix(
+        cells=cells,
+        cronbachs_alpha=0.85,
+        mean_inter_item_correlation=0.75,
+        internal_consistency_flag="good"
+    )
+
+    instruments = [
+        ComparisonInstrument(
+            name="Test Scale",
+            construct="Test Construct",
+            source_citation="Author (2020). Title. Journal."
+        )
+    ]
+
+    cross_construct = CrossConstructComparison(
+        target_construct="Test Construct",
+        comparison_constructs=["Related Construct"],
+        analysis_summary="Adequate discriminant validity demonstrated"
+    )
+
+    # Act: Create FinalOutput WITH analytics fields
+    output = FinalOutput(
+        final_items=[draft_item],
+        audit=audit,
+        correlation_matrix=matrix,
+        comparison_instruments=instruments,
+        cross_construct_analysis=cross_construct
+    )
+
+    # Assert: All analytics fields populated
+    assert output.correlation_matrix is not None
+    assert output.correlation_matrix.cronbachs_alpha == 0.85
+    assert len(output.comparison_instruments) == 1
+    assert output.comparison_instruments[0].name == "Test Scale"
+    assert output.cross_construct_analysis is not None
+    assert output.cross_construct_analysis.target_construct == "Test Construct"
+
+    # Assert: model_dump() serializes correctly
+    data = output.model_dump()
+    assert data["correlation_matrix"]["cronbachs_alpha"] == 0.85
+    assert len(data["comparison_instruments"]) == 1
+    assert data["cross_construct_analysis"]["target_construct"] == "Test Construct"
+
+
+def test_finaloutput_analytics_mutable_defaults():
+    """Phase 7-01: FinalOutput comparison_instruments list not shared across instances."""
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, ComparisonInstrument
+
+    # Arrange: Create two FinalOutput instances
+    draft_item = DraftItem(
+        item_text="Item text",
+        construct_name="Test",
+        rationale="Test rationale",
+        evidence_citations=[]
+    )
+
+    audit = AuditMetadata(
+        thread_id="test-thread",
+        run_id="test-run",
+        timestamp_utc="2026-03-14T10:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        model_info={},
+        approved_sources=[]
+    )
+
+    output1 = FinalOutput(final_items=[draft_item], audit=audit)
+    output2 = FinalOutput(final_items=[draft_item], audit=audit)
+
+    # Act: Modify one instance's comparison_instruments
+    instrument = ComparisonInstrument(
+        name="Test Scale",
+        construct="Test",
+        source_citation="Citation"
+    )
+    output1.comparison_instruments.append(instrument)
+
+    # Assert: Other instance unaffected (not shared reference)
+    assert len(output1.comparison_instruments) == 1
+    assert len(output2.comparison_instruments) == 0
+    assert output1.comparison_instruments is not output2.comparison_instruments

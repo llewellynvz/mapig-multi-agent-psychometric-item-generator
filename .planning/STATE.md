@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Psychometric Rigor
-status: planning
-stopped_at: Completed 07-01-PLAN.md (Analytics Schema Foundation)
-last_updated: "2026-03-14T10:04:49.424Z"
-last_activity: 2026-03-14 — v2.0 roadmap created with 4 phases (7-10)
+status: in-progress
+stopped_at: Completed 07-02-PLAN.md (GPT-5.2 Analytics Infrastructure)
+last_updated: "2026-03-14T10:07:44Z"
+last_activity: 2026-03-14 — Completed Plan 07-02 (GPT-5.2 analytics model, token tracking, analytics nodes)
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: Phase 7 (Foundation & Infrastructure)
-Plan: 07-02 (1/2 complete)
-Status: In Progress
-Last activity: 2026-03-14 — Completed 07-01-PLAN.md (Analytics Schema Foundation)
+Plan: Completed (2/2 plans)
+Status: Phase 7 Complete — Ready for Phase 8
+Last activity: 2026-03-14 — Completed Plan 07-02 (GPT-5.2 analytics model, token tracking, analytics nodes)
 
-Progress: [█████░░░░░] 50% (0/4 phases, 1/2 plans)
+Progress: [██████████] 100% (0/4 phases complete, 2/2 plans in Phase 7)
 
 ## Performance Metrics
 
@@ -42,6 +42,15 @@ Progress: [█████░░░░░] 50% (0/4 phases, 1/2 plans)
 
 **Projected for v2.0:**
 - 4 phases at 3.6 plans/phase = ~14-16 plans estimated
+
+**Phase 7 Execution:**
+
+| Plan | Tasks | Duration | Files | Commits |
+|------|-------|----------|-------|---------|
+| 07-01 | 3 tasks | ~15min | 3 files | 3 commits |
+| 07-02 | 2 tasks | 6m 44s | 5 files | 2 commits |
+
+**Phase 7 Total:** 2 plans, 5 tasks, 8 files modified, 5 commits, ~22 minutes
 
 ## Accumulated Context
 
@@ -64,9 +73,17 @@ Key decisions carrying forward:
 - Smart model allocation: Opus for validation, Sonnet for others (80% cost reduction maintained)
 - Single-project Vercel deployment: Monorepo pattern, same-origin, no CORS
 - MemorySaver checkpointing: Ephemeral, acceptable for v2 (persistent checkpointing deferred)
-| Phase 07 P01 | 3 | 2 tasks | 3 files |
-- [Phase 07]: Use flat list for CorrelationMatrix.cells instead of 2D array for simpler serialization and UI iteration
-- [Phase 07]: Store disclaimer as field with default value in CorrelationMatrix and CrossConstructComparison to ensure transparency in exported JSON
+
+**Phase 7 Plan-specific decisions:**
+
+**07-01 (Analytics Schema Foundation):**
+- Use flat list for CorrelationMatrix.cells instead of 2D array for simpler serialization and UI iteration
+- Store disclaimer as field with default value in CorrelationMatrix and CrossConstructComparison to ensure transparency in exported JSON
+
+**07-02 (GPT-5.2 Analytics Infrastructure):**
+- Hardcoded high reasoning effort for GPT-5.2 analytics (not configurable) — ensures consistent analytics quality, simplifies configuration
+- Placeholder nodes emit SSE events via step() context manager — provides frontend progress tracking even though nodes are no-op in Phase 7
+- Separate reasoning_tokens from output_tokens in usage tracking — GPT-5.2 billing separates reasoning from output, enables accurate cost calculation
 
 ### Roadmap Evolution
 
@@ -86,11 +103,11 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 
 ### Pending Todos
 
-**Next steps:**
-1. Begin Phase 7 planning with `/gsd:plan-phase 7`
-2. Focus on schema design (GraphState, FinalOutput extensions)
-3. Establish GPT-5.2 infrastructure (llm_factory upgrade to langchain-openai 2.x)
-4. Create analytics node placeholders in graph builder
+**Phase 7 Complete — Next Phase:**
+1. Begin Phase 8 planning with `/gsd:plan-phase 8`
+2. Implement correlation analysis using GPT-5.2 analytics model
+3. Create correlation matrix UI component with heatmap visualization
+4. Deploy to Vercel preview to test NumPy serverless size impact
 
 ### Blockers/Concerns
 
@@ -99,31 +116,38 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 - Phase 3 token tracking infrastructure deferred — not blocking v2.0
 - Cold start optimization deferred (DEP-08) — may impact Phase 10 (analytics timeout risk)
 - Missing /evaluation nav link — cosmetic, not blocking
+- Pre-existing test failure in test_bias_reviewer.py (references app/prompts/ instead of backend/prompts/) — cosmetic, not blocking Phase 8
 
 **v2.0-specific risks identified in research:**
 
 1. **NumPy serverless size**: Current stack (~100 MB) + NumPy (~30 MB) = ~130 MB total, leaving 120 MB buffer below Vercel 250 MB limit. Mitigation: Deploy to preview in Phase 8, check function size; fallback to client-side correlation if >200 MB.
 
-2. **langchain-openai 2.x compatibility**: GitHub issues (#29632, #29947, #32714) show `max_completion_tokens` parameter problems. Mitigation: Test upgrade in isolation in Phase 7; validate existing agents still work; keep fallback to 1.1.7.
+2. **langchain-openai 2.x compatibility**: ✅ RESOLVED in Phase 7 — Used langchain-openai 1.x API with `max_tokens` instead of `max_completion_tokens`, ChatOpenAI accepts reasoning parameter correctly.
 
 3. **Perplexity retrieval quality**: Unknown if Perplexity Academic can retrieve full instrument metadata vs just abstracts. Mitigation: Test on 10-20 known constructs in Phase 9 before production; supplement with Semantic Scholar if needed.
 
 4. **Serverless timeout**: 50 items = 1,225 pairwise comparisons, timeout risk with 300s limit. Mitigation: Streaming partial results, correlation caching, Fluid Compute upgrade to 800s documented in Phase 10.
 
-No active blockers for Phase 7 planning.
+**No active blockers for Phase 8 planning.**
 
 ## Session Continuity
 
-Last session: 2026-03-14T10:04:49.423Z
-Stopped at: Completed 07-01-PLAN.md (Analytics Schema Foundation)
-Resume: `/gsd:plan-phase 7`
+Last session: 2026-03-14T10:07:44Z
+Stopped at: Completed 07-02-PLAN.md (GPT-5.2 Analytics Infrastructure)
+Resume: `/gsd:plan-phase 8`
+
+**Phase 7 Summary:**
+- ✅ Plan 01: Analytics Schema Foundation (FinalOutput.analytics field, Pydantic models, TypeScript types)
+- ✅ Plan 02: GPT-5.2 Analytics Infrastructure (model factory, token tracking, analytics nodes)
+- Status: Phase 7 complete, ready for Phase 8 (Correlation Analysis)
 
 **Roadmap summary:**
 - 4 phases (7-10) covering 28 requirements
 - Coarse granularity (3-5 phases) applied via consolidation
 - All requirements mapped (100% coverage)
 - Dependencies: 7 → 8 → 9 → 10 (sequential execution)
+- **Phase 7 complete ✅** — Foundation infrastructure ready for analytics features
 
 ---
 *State initialized: 2026-03-14*
-*Last updated: 2026-03-14 (v2.0 roadmap created)*
+*Last updated: 2026-03-14T10:07:44Z (Phase 7 complete)*

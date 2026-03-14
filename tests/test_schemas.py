@@ -922,3 +922,133 @@ def test_finaloutput_analytics_mutable_defaults():
     assert len(output1.comparison_instruments) == 1
     assert len(output2.comparison_instruments) == 0
     assert output1.comparison_instruments is not output2.comparison_instruments
+
+
+# Phase 8: Correlation Matrix Schema Migration Tests
+
+
+def test_correlation_matrix_mcdonalds_omega_field():
+    """Phase 8-01: CorrelationMatrix uses mcdonalds_omega field (cronbachs_alpha removed)."""
+    from backend.schemas import CorrelationMatrix, CorrelationCell
+
+    # Arrange: Create valid cells
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85),
+        CorrelationCell(item_i_index=0, item_j_index=2, correlation=0.68, ci_low=0.58, ci_high=0.78),
+        CorrelationCell(item_i_index=1, item_j_index=2, correlation=0.72, ci_low=0.62, ci_high=0.82),
+    ]
+
+    # Act: Create correlation matrix with mcdonalds_omega
+    matrix = CorrelationMatrix(
+        cells=cells,
+        mcdonalds_omega=0.85,
+        mean_inter_item_correlation=0.72,
+        internal_consistency_flag="good"
+    )
+
+    # Assert: mcdonalds_omega field works
+    assert matrix.mcdonalds_omega == 0.85
+    assert matrix.mean_inter_item_correlation == 0.72
+    assert matrix.internal_consistency_flag == "good"
+    assert matrix.disclaimer == "LLM-estimated, not empirically validated"
+
+
+def test_correlation_matrix_omega_threshold_flagging():
+    """Phase 8-01: McDonald's omega threshold flagging (>= 0.70 pass, < 0.70 warning)."""
+    from backend.schemas import CorrelationMatrix, CorrelationCell
+
+    # Arrange: Create valid cells
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85),
+    ]
+
+    # Test: Omega >= 0.70 (pass)
+    matrix_pass = CorrelationMatrix(
+        cells=cells,
+        mcdonalds_omega=0.85,
+        mean_inter_item_correlation=0.75,
+        internal_consistency_flag="pass"
+    )
+    assert matrix_pass.mcdonalds_omega >= 0.70
+
+    # Test: Omega < 0.70 (warning)
+    matrix_warning = CorrelationMatrix(
+        cells=cells,
+        mcdonalds_omega=0.65,
+        mean_inter_item_correlation=0.65,
+        internal_consistency_flag="warning"
+    )
+    assert matrix_warning.mcdonalds_omega < 0.70
+
+    # Test: Omega exactly 0.70 (boundary - pass)
+    matrix_boundary = CorrelationMatrix(
+        cells=cells,
+        mcdonalds_omega=0.70,
+        mean_inter_item_correlation=0.70,
+        internal_consistency_flag="pass"
+    )
+    assert matrix_boundary.mcdonalds_omega == 0.70
+
+
+def test_correlation_matrix_no_cronbachs_alpha():
+    """Phase 8-01: CorrelationMatrix no longer has cronbachs_alpha field (breaking change)."""
+    from pydantic import ValidationError
+    from backend.schemas import CorrelationMatrix, CorrelationCell
+
+    # Arrange: Create valid cells
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85),
+    ]
+
+    # Act & Assert: cronbachs_alpha should be rejected (extra='forbid')
+    with pytest.raises(ValidationError) as exc_info:
+        CorrelationMatrix(
+            cells=cells,
+            cronbachs_alpha=0.85,  # Old field name - should fail
+            mean_inter_item_correlation=0.75,
+            internal_consistency_flag="good"
+        )
+    # Check that error mentions cronbachs_alpha or extra field
+    error_str = str(exc_info.value).lower()
+    assert "cronbachs_alpha" in error_str or "extra" in error_str
+
+
+def test_correlation_cell_ci_bounds_preserved():
+    """Phase 8-01: CorrelationCell CI bounds preserved after rename (CORR-03)."""
+    from backend.schemas import CorrelationCell
+
+    # Act: Create cell with confidence intervals
+    cell = CorrelationCell(
+        item_i_index=0,
+        item_j_index=1,
+        correlation=0.75,
+        ci_low=0.65,
+        ci_high=0.85
+    )
+
+    # Assert: CI bounds are stored correctly
+    assert cell.ci_low == 0.65
+    assert cell.ci_high == 0.85
+    assert cell.correlation == 0.75
+    assert cell.ci_low <= cell.correlation <= cell.ci_high
+
+
+def test_correlation_matrix_disclaimer_default():
+    """Phase 8-01: CorrelationMatrix disclaimer defaults correctly (CORR-05)."""
+    from backend.schemas import CorrelationMatrix, CorrelationCell
+
+    # Arrange: Create cells
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85),
+    ]
+
+    # Act: Create matrix without explicit disclaimer
+    matrix = CorrelationMatrix(
+        cells=cells,
+        mcdonalds_omega=0.85,
+        mean_inter_item_correlation=0.75,
+        internal_consistency_flag="optimal_range"
+    )
+
+    # Assert: Default disclaimer is set
+    assert matrix.disclaimer == "LLM-estimated, not empirically validated"

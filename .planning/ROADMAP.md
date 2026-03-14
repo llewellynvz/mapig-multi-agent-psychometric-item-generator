@@ -33,7 +33,7 @@
 
 ### v2.0 Psychometric Rigor (Phases 7-10)
 
-- [ ] **Phase 7: Foundation & Infrastructure** - Schema extensions and analytics scaffolding
+- [x] **Phase 7: Foundation & Infrastructure** ✅ COMPLETE (2/2 plans) — Schema extensions and analytics scaffolding
 - [ ] **Phase 8: Synthetic Correlation Analysis** - LLM-estimated inter-item correlations with heatmap visualization
 - [ ] **Phase 9: Dynamic Instrument Comparison** - Literature-grounded validated instruments and cross-construct analysis
 - [ ] **Phase 10: GPT-5.2 Integration & Analytics Optimization** - Advanced reasoning models with parallel execution
@@ -54,14 +54,24 @@
   4. Analytics node placeholders exist in graph builder with no-op implementations that pass through state unchanged
   5. Existing v1.1 generation workflow remains fully functional with all tests passing after schema changes
 
-**Plans:** 1/2 plans executed
+**Status:** ✅ COMPLETE (2/2 plans executed)
 
 Plans:
-- [ ] 07-01-PLAN.md — Analytics Pydantic models, FinalOutput extension, TypeScript types
-- [ ] 07-02-PLAN.md — GPT-5.2 factory, token tracking, analytics placeholder nodes
+- [x] 07-01-PLAN.md — Analytics Pydantic models, FinalOutput extension, TypeScript types
+- [x] 07-02-PLAN.md — GPT-5.2 factory, token tracking, analytics placeholder nodes
+
+**Deliverables:**
+- ✅ FinalOutput.analytics field with CorrelationMatrix, ComparisonInstrument[], CrossConstructComparison types
+- ✅ Pydantic models for all analytics types with proper field validation
+- ✅ TypeScript type mirrors in frontend (CorrelationAnalysis, ComparisonInstrument, etc.)
+- ✅ get_gpt52_analytics_model() factory function with hardcoded high reasoning effort
+- ✅ TokenUsage.reasoning_tokens field for GPT-5.2 token tracking
+- ✅ correlation_node, comparison_node, cross_construct_node placeholders in graph
+- ✅ GraphState extended with gpt52_tokens_used, gpt52_reasoning_tokens, gpt52_output_tokens
+- ✅ Analytics chain wired: finalize -> correlation -> comparison -> cross_construct -> END
 
 ### Phase 8: Synthetic Correlation Analysis
-**Goal**: Generated item sets include LLM-estimated inter-item correlation matrices with Cronbach's alpha and internal consistency metrics displayed in interactive heatmap
+**Goal**: Generated item sets include LLM-estimated inter-item correlation matrices with McDonald's omega and internal consistency metrics displayed in interactive heatmap
 
 **Depends on**: Phase 7
 
@@ -69,13 +79,18 @@ Plans:
 
 **Success Criteria** (what must be TRUE):
   1. User can view correlation heatmap for finalized item sets showing pairwise correlation estimates in 2D grid with color-coded values
-  2. Correlation display shows Cronbach's alpha with threshold flag (alpha >= 0.70 = pass, <0.70 = warning)
+  2. Correlation display shows McDonald's omega with threshold flag (omega >= 0.70 = pass, <0.70 = warning)
   3. Each correlation cell displays confidence interval showing estimate uncertainty
   4. All correlations labeled prominently as "LLM-estimated, not empirically validated" in UI and exported files
   5. Synthetic correlations validated against 5 published scales with known correlation matrices achieving r > 0.6 agreement benchmark
   6. Internal consistency flags display when mean inter-item correlation falls outside 0.15-0.50 optimal range
 
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Backend correlation engine: schema migration, GPT-5.2 estimation, omega calculator, graph node
+- [ ] 08-02-PLAN.md — Frontend heatmap visualization: visx components, quality summary, export functions
+- [ ] 08-03-PLAN.md — Calibration validation: benchmark scales, evaluation suite integration
 
 ### Phase 9: Dynamic Instrument Comparison
 **Goal**: System dynamically discovers validated comparison instruments from academic literature and assesses convergent/discriminant validity without copyright infringement
@@ -130,11 +145,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6 → 7 �
 | 4. Production Features | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 5. Vercel Deployment | v1.1 | 4/4 | Complete | 2026-03-09 |
 | 6. Comprehensive Evaluation Framework | v1.1 | 4/4 | Complete | 2026-03-09 |
-| 7. Foundation & Infrastructure | 1/2 | In Progress|  | - |
-| 8. Synthetic Correlation Analysis | v2.0 | 0/? | Not started | - |
+| 7. Foundation & Infrastructure | v2.0 | 2/2 | Complete | 2026-03-14 |
+| 8. Synthetic Correlation Analysis | v2.0 | 0/3 | In Progress | - |
 | 9. Dynamic Instrument Comparison | v2.0 | 0/? | Not started | - |
 | 10. GPT-5.2 Integration & Analytics Optimization | v2.0 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-14 (Phase 7 planning complete - 2 plans)*
+*Last updated: 2026-03-14 (Phase 8 planning complete - 3 plans)*

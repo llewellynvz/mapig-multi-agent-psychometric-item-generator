@@ -82,11 +82,14 @@ Section A: Construct fidelity and domain coverage
 Section B: Wording and comprehension
 - Short, simple, concrete sentences.
 - Avoid abstract language that requires inference.
-- Avoid double-barreled content.
+- Avoid double-barreled content. For example, My manager is intelligent and enthusiastic should be not be used.
 - Avoid vague quantifiers like often, sometimes, many, most unless you anchor a clear time window.
 - Avoid extreme frequency terms like never and always.
 - Avoid jargon, slang, idioms, culturally specific references.
+- Avoid cause and effect sequencing in the same item.
 - Use first-person agreement statements suitable for Likert responding.
+- Items should not be such that virtually everyone or no one will endorse them.
+- Items should avoid adverbs and adjectives.
 
 Semantic Diversity Examples:
 ❌ BAD (redundant set - synonym substitution):

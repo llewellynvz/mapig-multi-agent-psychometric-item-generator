@@ -52,8 +52,16 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
     sonnet_tokens = state.get("sonnet_tokens_used", 0)
     openai_tokens = state.get("openai_tokens_used", 0)
     chatgpt_tokens = state.get("chatgpt_tokens_used", 0)
+    gpt52_tokens = state.get("gpt52_tokens_used", 0)
+    gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
+    gpt52_output = state.get("gpt52_output_tokens", 0)
 
-    if "opus" in model_name:
+    # Phase 7: GPT-5.2 routing with separate reasoning tracking
+    if "gpt-5.2" in model_name:
+        gpt52_tokens += usage.total_tokens
+        gpt52_reasoning += getattr(usage, "reasoning_tokens", 0)
+        gpt52_output += usage.output_tokens
+    elif "opus" in model_name:
         opus_tokens += usage.total_tokens
     elif "sonnet" in model_name or "claude" in model_name:
         sonnet_tokens += usage.total_tokens
@@ -72,6 +80,9 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
         "sonnet_tokens_used": sonnet_tokens,
         "openai_tokens_used": openai_tokens,
         "chatgpt_tokens_used": chatgpt_tokens,
+        "gpt52_tokens_used": gpt52_tokens,
+        "gpt52_reasoning_tokens": gpt52_reasoning,
+        "gpt52_output_tokens": gpt52_output,
     }
 
 
@@ -137,6 +148,10 @@ class GraphState(TypedDict, total=False):
     sonnet_tokens_used: int
     openai_tokens_used: int
     chatgpt_tokens_used: int
+    # Phase 7: GPT-5.2 token tracking
+    gpt52_tokens_used: int
+    gpt52_reasoning_tokens: int
+    gpt52_output_tokens: int
 
     # Output
     final_output: FinalOutput
@@ -188,6 +203,9 @@ def init_run(state: GraphState) -> GraphState:
             "sonnet_tokens_used": 0,
             "openai_tokens_used": 0,
             "chatgpt_tokens_used": 0,
+            "gpt52_tokens_used": 0,
+            "gpt52_reasoning_tokens": 0,
+            "gpt52_output_tokens": 0,
         }
 
 
@@ -602,6 +620,29 @@ def finalize_node(state: GraphState) -> GraphState:
         return {"final_output": out}
 
 
+def correlation_node(state: GraphState) -> GraphState:
+    """Placeholder for correlation analysis (Phase 8 implementation).
+    Phase 7: No-op pass-through, emits SSE events for frontend progress tracking.
+    """
+    with step("correlation_node", state):
+        logger.info("Correlation analysis placeholder (Phase 8 implementation pending)")
+        return {}
+
+
+def comparison_node(state: GraphState) -> GraphState:
+    """Placeholder for instrument comparison (Phase 9 implementation)."""
+    with step("comparison_node", state):
+        logger.info("Instrument comparison placeholder (Phase 9 implementation pending)")
+        return {}
+
+
+def cross_construct_node(state: GraphState) -> GraphState:
+    """Placeholder for cross-construct analysis (Phase 9 implementation)."""
+    with step("cross_construct_node", state):
+        logger.info("Cross-construct analysis placeholder (Phase 9 implementation pending)")
+        return {}
+
+
 def build_graph(checkpointer=None):
     """Build and compile the LangGraph workflow."""
     builder = StateGraph(GraphState)
@@ -620,6 +661,10 @@ def build_graph(checkpointer=None):
     builder.add_node("critic_node", critic_node)
     builder.add_node("meta_editor_node", meta_editor_node)
     builder.add_node("finalize_node", finalize_node)
+    # Phase 7: Analytics placeholder nodes
+    builder.add_node("correlation_node", correlation_node)
+    builder.add_node("comparison_node", comparison_node)
+    builder.add_node("cross_construct_node", cross_construct_node)
 
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
@@ -638,6 +683,11 @@ def build_graph(checkpointer=None):
     # Critic routes to either meta-editor (revise) or finalize (end)
     # Meta-editor loops back into parallel reviewers.
     builder.add_edge("meta_editor_node", "reviewers_fanout_node")
-    builder.add_edge("finalize_node", END)
+
+    # Phase 7: Analytics chain after finalize, before END
+    builder.add_edge("finalize_node", "correlation_node")
+    builder.add_edge("correlation_node", "comparison_node")
+    builder.add_edge("comparison_node", "cross_construct_node")
+    builder.add_edge("cross_construct_node", END)
 
     return builder.compile(checkpointer=checkpointer)

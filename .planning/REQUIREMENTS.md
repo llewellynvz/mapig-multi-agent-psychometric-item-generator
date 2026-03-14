@@ -51,8 +51,8 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: GraphState schema extended with CorrelationMatrix, ComparisonInstrument, and CrossConstructComparison types
-- [ ] **INFRA-02**: FinalOutput schema extended with correlation_matrix, comparison_instruments, and cross_construct_analysis fields
+- [x] **INFRA-01**: GraphState schema extended with CorrelationMatrix, ComparisonInstrument, and CrossConstructComparison types
+- [x] **INFRA-02**: FinalOutput schema extended with correlation_matrix, comparison_instruments, and cross_construct_analysis fields
 - [ ] **INFRA-03**: Analytics nodes execute post-finalize in parallel using LangGraph Send API (correlation, comparison, cross-construct simultaneously)
 - [ ] **INFRA-04**: Analytics failures handled gracefully (populate null values, item generation completes successfully)
 - [ ] **INFRA-05**: llm_factory.py supports reasoning_effort parameter for GPT-5.2 model allocation
@@ -97,8 +97,8 @@ Which phases cover which requirements. Updated after roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 7 | Pending |
-| INFRA-02 | Phase 7 | Pending |
+| INFRA-01 | Phase 7 | Complete |
+| INFRA-02 | Phase 7 | Complete |
 | INFRA-05 | Phase 7 | Pending |
 | CORR-01 | Phase 8 | Pending |
 | CORR-02 | Phase 8 | Pending |

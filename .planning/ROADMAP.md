@@ -50,11 +50,11 @@
 **Success Criteria** (what must be TRUE):
   1. GraphState schema includes CorrelationMatrix, ComparisonInstrument, and CrossConstructComparison types with proper field validation
   2. FinalOutput schema extended with correlation_matrix, comparison_instruments, and cross_construct_analysis fields without breaking existing exports
-  3. LLM factory supports GPT-5.2 reasoning models with configurable reasoning_effort parameter (none/low/medium/high/xhigh)
+  3. LLM factory supports GPT-5.2 reasoning models with hardcoded high reasoning effort for analytics tasks
   4. Analytics node placeholders exist in graph builder with no-op implementations that pass through state unchanged
   5. Existing v1.1 generation workflow remains fully functional with all tests passing after schema changes
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 07-01-PLAN.md — Analytics Pydantic models, FinalOutput extension, TypeScript types
@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6 → 7 �
 | 4. Production Features | v1.0 | 1/1 | Complete | 2026-03-08 |
 | 5. Vercel Deployment | v1.1 | 4/4 | Complete | 2026-03-09 |
 | 6. Comprehensive Evaluation Framework | v1.1 | 4/4 | Complete | 2026-03-09 |
-| 7. Foundation & Infrastructure | v2.0 | 0/2 | Planning complete | - |
+| 7. Foundation & Infrastructure | 1/2 | In Progress|  | - |
 | 8. Synthetic Correlation Analysis | v2.0 | 0/? | Not started | - |
 | 9. Dynamic Instrument Comparison | v2.0 | 0/? | Not started | - |
 | 10. GPT-5.2 Integration & Analytics Optimization | v2.0 | 0/? | Not started | - |

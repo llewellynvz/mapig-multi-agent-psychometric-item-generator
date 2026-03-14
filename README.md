@@ -7,6 +7,7 @@ MAPIG is a multi-agent platform for designing and generating psychometrically so
 ![MAPIG architecture](./public/mapig_arc.png)
 
 ## Overview
+
 MAPIG is a multi-agent workflow for drafting and refining psychometric items with explicit auditability.
 
 It is designed for teams that need:
@@ -26,74 +27,295 @@ MAPIG generates candidate items and review artifacts. It supports expert judgmen
 - Evidence trail: grouped, clickable web sources and local curated references
 - Audit metadata on every run: `thread_id`, `run_id`, `iteration_count`, `stop_reason`, model info
 
-## Architecture
-**Note**: The Python backend is in the `backend/` directory (renamed from `app/` to avoid conflicts with Next.js App Router).
+---
 
-Core agents:
+## Pipeline Architecture
 
-- Web Surfer Agent.
-The academic detective. Scours peer-reviewed literature and psychometric databases to ground your construct in real science, identifies boundary conditions with similar constructs, and surfaces measurement precedents without reproducing copyrighted items.
+The generation pipeline flows through distinct phases, each handled by specialized agents:
 
-- Item Writer Agent.
-The master craftsperson. Generates Likert-type items following five decades of psychometric principles: unidimensional, bias-minimized, facet-balanced, and written at the right reading level for your population.
+```
+START
+  -> init_run
+  -> retrieve_node          (evidence retrieval)
+  -> item_writer_node       (draft items)
+  -> validation_node        (4-dimension scoring)
+     -> [regenerate loop if items fail validation, up to 3 attempts]
+  -> reviewers_fanout_node  (linguistic + bias + content review in parallel)
+  -> critic_node            (accept / revise decision)
+     -> [meta_editor -> reviewers -> critic loop, up to 3 iterations]
+  -> finalize_node          (audit metadata, cost calculation)
+  -> correlation_node       (embedding-based inter-item correlations)
+  -> comparison_node        (find published instruments, score convergent validity)
+  -> cross_construct_node   (discriminant validity against related constructs)
+END
+```
 
-- Content Reviewer Agent
-The construct purist. Simulates five independent judges rating each item on correspondence (does it measure what you claim?) and distinctiveness (or is it actually measuring something else?) with brutal honesty about contamination risks.
+### Phase 1: Evidence Retrieval
 
-- Linguistic Reviewer Agent
-The clarity enforcer. Hunts down ambiguous referents, vague quantifiers, double-barreled questions, and unnecessary abstractions that force respondents to guess what you mean.
+Two channels provide the theoretical grounding that every generated item cites:
 
-- Bias Reviewer Agent
-The fairness sentinel. Detects construct equivalence risks, flags differential item functioning concerns across demographic groups, and catches assumptions about work context, culture, language, and socioeconomic status that systematically disadvantage populations.
+- **Local approved sources** (`data/approved_sources/*.md`): deterministic token-overlap search, no LLM needed
+- **Perplexity academic search**: queries `sonar-pro` in academic mode with a domain allowlist (doi.org, psycnet.apa.org, etc.) to retrieve seminal papers, conceptual frameworks, measurement precedents, and boundary conditions
 
-- Meta Editor Agent
-The diplomatic synthesizer. Reconciles conflicting reviewer feedback, applies surgical edits while preserving construct coverage, and ensures the item set remains balanced across facets and psychometrically defensible.
+Evidence chunks are tagged with metadata — authors, theoretical model names, and identified dimensions — so the item writer can ground each item in specific literature.
 
-- Critic Agent
-The quality gatekeeper. Decides whether the item set is ready to ship, needs another revision cycle, has hit iteration limits, or requires human judgment on policy questions the agents can't resolve alone.
+### Phase 2: Item Drafting
 
+The **Item Writer Agent** receives the construct definition, target population, constraints, and evidence chunks, then generates Likert-type items following five decades of psychometric principles:
 
-Execution model:
-- Typed schemas between agents
-- Iterative review/revision until acceptance or stop condition
-- Streaming progress events for frontend status updates
+- Unidimensional focus per item
+- Facet-balanced coverage across theoretical dimensions (e.g., emotional, psychological, and social well-being for Keyes' model)
+- Positive keying only (no reverse-coded items, per current best practice)
+- Reading level matched to population (6th-8th grade general, 5th-6th clinical, 10th-12th professional)
+- No double-barreled items, idioms, or vague quantifiers
+- Each item includes a rationale (max 50 words) citing specific evidence sources
+
+The item writer always uses Claude Sonnet 4.5 for generation quality, regardless of the `APP_MODE` setting.
+
+### Phase 3: Validation Gate
+
+The **Validator Agent** acts as an LLM-as-judge, scoring every item on four weighted dimensions:
+
+| Dimension | Weight | What it measures |
+|-----------|--------|-----------------|
+| Correspondence | 50% | Does the item match the construct definition? |
+| Distinctiveness | 25% | Is it clearly this construct, not a neighbor? |
+| Clarity | 15% | Unambiguous, concise, comprehensible? |
+| Specificity | 10% | Concrete language, avoids vague quantifiers? |
+
+Items scoring below 7.0 (weighted) are regenerated — only the failed items, not the whole batch. This selective regeneration runs up to 3 attempts with escalating model power:
+
+- Attempt 1: Claude Sonnet 4.5 (cost-effective)
+- Attempts 2-3: Claude Opus 4.6 (highest accuracy when items are stubborn)
+
+When the ChatGPT critics toggle is enabled, GPT-4o handles validation instead.
+
+### Phase 4: Triple-Reviewer Fanout
+
+Three independent reviewers run **in parallel** (ThreadPoolExecutor), each receiving an abbreviated request payload (60% smaller — no evidence, examples, or retrieval settings):
+
+#### Linguistic Reviewer
+Hunts down clarity and readability issues:
+- Vague quantifiers without time anchors ("often", "sometimes")
+- Absolute terms ("always", "never") — auto-flagged severity 4
+- Double-barreled items, ambiguous referents, negative stems
+- Cultural idioms (when a cultural group is specified)
+- Simulates a 5-point appropriateness rating; mean < 4.0 triggers revision
+
+Uses Claude Sonnet 4.5 (or GPT-4o with ChatGPT toggle).
+
+#### Bias Reviewer
+Detects differential item functioning (DIF) risks across 7 bias types:
+
+1. **Construct bias**: culture-bound meanings (e.g., "independence" in collectivist cultures)
+2. **Linguistic bias**: idioms, complex vocabulary
+3. **Cultural reference bias**: assumes culture-specific knowledge
+4. **Socioeconomic bias**: assumes resources (e.g., "private workspace at home")
+5. **Context access bias**: assumes work arrangements (e.g., "in-person collaboration")
+6. **Protected attribute bias**: gender, race, ethnicity stereotypes
+7. **Intersectional bias**: compounding effects across multiple types (auto-escalated to severity 4+)
+
+Uses GPT-4o-mini by default (20x cheaper, acceptable fairness detection accuracy). Switches to GPT-4o with ChatGPT toggle.
+
+#### Content Reviewer
+Evaluates construct alignment by simulating 5 naive judges rating each item on:
+- **Correspondence** (1-7): does it match the construct definition?
+- **Distinctiveness** (1-7): is it clearly this construct, not a competitor?
+
+Decision thresholds: correspondence mean < 6.0 or distinctiveness mean < 5.0 triggers revision. Also tracks facet coverage — flags imbalance greater than a 2:1 ratio.
+
+Near-neighbor constructs checked (organizational default): job satisfaction, engagement, commitment, psychological safety, inclusion, social support, fairness, team cohesion.
+
+Uses Claude Sonnet 4.5 (or GPT-4o with ChatGPT toggle).
+
+### Phase 5: Critic Decision
+
+The **Critic Agent** decides whether items are ready or need another revision cycle. It uses **adaptive thresholds** that relax over iterations to prevent infinite loops:
+
+| Iteration | Mode | Accept max severity | Medium+ count allowed |
+|-----------|------|--------------------|-----------------------|
+| 0 (Round 1) | Strict | 2 | 0 |
+| 1 (Round 2) | Thorough | 3 | 1 |
+| 2+ (Round 3) | Final | 4 | 3 |
+
+**Cost optimization**: 90% of decisions use zero tokens via rule-based logic:
+- Clear accept (all comments below threshold) — 0 tokens
+- Clear reject (max severity >= 4) — 0 tokens
+- Strict/thorough mode with severity >= 3 — 0 tokens
+- Only borderline cases (severity = 3 in final mode) fall through to the LLM
+
+Hard stop at `MAX_ITERATIONS=3` prevents runaway loops.
+
+### Phase 6: Meta-Editor Revision
+
+When the critic says "revise", the **Meta Editor Agent** applies reviewer feedback surgically:
+
+- **Smart comment filtering**: only passes severity >= 3 comments (40-60% token reduction)
+- **Facet coverage enforcement**: infers 3-5 facets from the construct definition, tracks distribution (target: each facet >= 20% of items), prioritizes replacing overcovered facet items
+- **Conflict resolution**: construct fidelity > bias > linguistic
+- Preserves item count (no additions or deletions)
+
+After editing, the revised items go back through the triple-reviewer fanout for re-evaluation.
+
+### Phase 7: Finalization
+
+Once the critic accepts (or hard stop fires), the **Finalize Node** assembles audit metadata:
+- All reviewer comments (linguistic, bias, content)
+- Validation results per item
+- Token usage across all models
+- Cost breakdown (Opus, Sonnet, GPT-4o, GPT-4o-mini)
+- Stop reason, iteration count, thread/run IDs
+
+---
+
+## Post-Finalization Analytics
+
+After items are finalized, three analytics nodes run to provide psychometric quality indicators.
+
+### Embedding-Based Correlation Matrix
+
+**File**: `backend/agents/correlation_estimator.py`
+
+Rather than requiring empirical data collection, MAPIG estimates inter-item correlations using the validated methodology from Hommel & Arslan (2024). Their research demonstrated that sentence transformer embeddings with cosine similarity accurately predict real correlations (r = .71 for items, r = .89 for scales, r = .86 for reliability estimates).
+
+**How it works**:
+1. All generated items are embedded in a single batch using OpenAI's `text-embedding-3-small` model (1536-dimensional vectors)
+2. The embedding vectors are L2-normalized, then a full NxN cosine similarity matrix is computed via matrix multiplication
+3. Values are clamped to [-1.0, 1.0] to handle IEEE 754 floating point overshoot (a known issue where identical vectors can produce similarity values like 1.0000000000000004)
+4. Upper-triangular pairs are extracted — for N items, this produces N*(N-1)/2 correlation cells
+
+From the similarity matrix, MAPIG calculates:
+- **McDonald's omega** (internal consistency): `omega = (k * r_bar) / (1 + (k-1) * r_bar)` where k = number of items and r_bar = mean inter-item correlation
+- **Mean inter-item correlation**: average of all pairwise similarities
+- **Internal consistency flag**: "too_low" if mean r < 0.15, "too_high" if mean r > 0.50, "optimal_range" otherwise
+
+This approach is fast (single API call, pure matrix math), deterministic, and grounded in published empirical validation — no LLM hallucination risk.
+
+**Reference**: Hommel, B. E., & Arslan, R. C. (2024). Language models accurately infer correlations between psychological items and scales from text alone. *European Journal of Psychological Assessment*. https://doi.org/10.1027/1015-5759/a000838
+
+### Instrument Comparison & Convergent Validity
+
+**Files**: `backend/agents/instrument_searcher.py`, `backend/agents/validity_scorer.py`
+
+MAPIG automatically locates established instruments to benchmark your generated items against, supporting both convergent and discriminant validity estimation.
+
+**Step 1: Find comparison instruments**
+
+The Instrument Searcher queries Perplexity's academic search to find:
+- A **convergent instrument** — one that directly measures the same or very similar construct (e.g., the Satisfaction with Life Scale for a "Life Satisfaction" construct)
+- A **discriminant instrument** — one that measures a related-but-theoretically-distinct construct (e.g., the Flourishing Scale)
+
+The search filters out commercial publishers (Pearson, PAR, MHS, WPS, Hogrefe) and extracts structured metadata: instrument name, authors, publication year, construct measured, and psychometric properties.
+
+If Perplexity is unavailable, hardcoded fallbacks cover 5 psychological domains (personality, clinical, organizational, social, cognitive) with well-known open-access instruments.
+
+**Step 2: Score convergent validity**
+
+The Validity Scorer uses a **dual-direction LLM-as-judge** pattern to mitigate position bias:
+1. **Forward**: "How well do the generated items align with [comparison instrument]?"
+2. **Reverse**: "How well does [comparison instrument] align with the generated items?"
+3. The two scores are averaged for the final convergent validity estimate (0.0-1.0)
+
+This runs on GPT-5.2 with high reasoning effort for maximum accuracy.
+
+**Step 3: Plagiarism detection**
+
+A sentence-transformer model (`all-mpnet-base-v2`) computes semantic similarity between generated items and any published item texts. Items exceeding a 0.85 similarity threshold are flagged. This ensures generated items are original, not paraphrased copies of existing scales.
+
+### Cross-Construct Discriminant Validity
+
+**File**: `backend/agents/validity_scorer.py`
+
+The Cross-Construct Node estimates how distinct your target construct is from related constructs:
+
+1. Takes the discriminant instrument found in the comparison step
+2. Uses the same dual-direction LLM-as-judge pattern to estimate the expected correlation between the target construct and the comparison construct
+3. Flags: "concern" if |r| > 0.85 (dangerously high overlap), "adequate" otherwise
+4. Provides a construct pair analysis with reasoning about where the conceptual boundaries lie
+
+This tells you whether your generated items are measuring what you claim — or accidentally measuring something else.
+
+---
+
+## LLM Allocation Strategy
+
+MAPIG allocates different models to different agents based on task complexity and cost:
+
+| Agent | Default Model | With ChatGPT Toggle | Notes |
+|-------|---------------|---------------------|-------|
+| Item Writer | Claude Sonnet 4.5 | Claude Sonnet 4.5 | Always Sonnet (quality-critical) |
+| Validator | Sonnet 4.5 / Opus 4.6 | GPT-4o | Smart tiering: Sonnet first, Opus on retries |
+| Linguistic Reviewer | Claude Sonnet 4.5 | GPT-4o | |
+| Bias Reviewer | **GPT-4o-mini** | GPT-4o | 20x cheaper, acceptable accuracy |
+| Content Reviewer | Claude Sonnet 4.5 | GPT-4o | |
+| Critic | **GPT-4o-mini** | GPT-4o | 90% rule-based (0 tokens) |
+| Meta Editor | Claude Sonnet 4.5 | Claude Sonnet 4.5 | Always Sonnet |
+| Correlation Estimator | OpenAI embeddings | OpenAI embeddings | `text-embedding-3-small` |
+| Validity Scorer | **GPT-5.2** | **GPT-5.2** | Reasoning model, high effort |
+
+### Cost Optimizations
+- **Smart validation**: Sonnet on attempt 1 (80% cheaper), Opus only on retries
+- **Agent overrides**: Bias reviewer and critic use GPT-4o-mini (20x cheaper)
+- **Rule-based critic**: 90% of accept/reject decisions use 0 tokens
+- **Prompt caching**: Claude system prompts cached with 5-minute TTL (50% input reduction)
+- **Comment filtering**: Meta-editor only receives severity >= 3 comments (40-60% reduction)
+- **Abbreviated requests**: Reviewers receive minimal context (60% payload reduction)
+- **Selective regeneration**: Only failed items are regenerated, not the entire batch
+
+**Typical run cost** (10 items, 1-2 iterations): $0.80-$1.50
+
+---
 
 ## API Contract
-Required request fields:
-- `construct_name`
-- `construct_definition`
-- `target_population`
-- `response_scale`
 
-Optional request fields:
+### Request
+
+Required fields:
+- `construct_name` — name of the psychological construct
+- `construct_definition` — precise definition of what the construct is
+- `target_population` — who will respond to the items
+- `response_scale` — e.g., "5-point Likert: Strongly disagree to Strongly agree"
+
+Optional fields:
 - `item_count` (default `10`, range `2-50`)
-- `constraints`
-- `construct_exclusions` (what this construct is not / overlap boundaries)
-- `native_construct`
-- `example_item`
-- `approved_domains`
-- `exclude_sources`
-- `human_feedback`
-- `previous_items`
+- `constraints` — additional rules beyond baseline (additive, not replacement)
+- `construct_exclusions` — what this construct is not, overlap boundaries
+- `native_construct` — original language if construct was translated
+- `example_item` — reference only, will not be copied
+- `approved_domains` — per-request domain allowlist
+- `exclude_sources` — domains to block
+- `human_feedback` — free-text feedback from previous round
+- `previous_items` — items from previous round for refinement
+- `model_provider` — `"claude"` or `"openai"`
+- `use_chatgpt_critics` — use GPT-4o for reviewer agents
 
-Response:
-- `final_items[]`
-- `audit`
+### Response
 
-## Constraints Model (Important)
+- `final_items[]` — generated items with text, rationale, evidence citations, validation scores
+- `audit` — thread_id, run_id, iteration_count, stop_reason, cost breakdown, model info
+- `correlation_matrix` — pairwise correlations, omega, mean r, consistency flag
+- `comparison_instruments[]` — convergent and discriminant instruments found
+- `convergent_validity_score` — 0.0-1.0
+- `cross_construct_analysis` — discriminant validity results, construct pair analysis
+- `plagiarism_flags` — any items flagged for similarity to published items
+- `linguistic_feedback`, `bias_feedback`, `content_feedback` — all reviewer comments
+
+### Constraints Model
+
 MAPIG applies constraints in two layers:
 
-1. Standard baseline constraints (always active)
-- No double-barrelled items
-- Avoid idioms
-- Minimize reading level
-- Positively keyed only
+1. **Standard baseline constraints** (always active):
+   - No double-barreled items
+   - Avoid idioms
+   - Minimize reading level
+   - Positively keyed only
 
-2. Additional user constraints
-- Anything provided in `constraints` is added on top of the baseline.
-- User constraints are treated as additive, not replacements.
+2. **Additional user constraints**:
+   - Anything provided in `constraints` is added on top of the baseline
+   - User constraints are treated as additive, not replacements
 
-## Approved Sources Policy
+### Approved Sources Policy
+
 MAPIG supports two evidence channels:
 - Local curated sources in `data/approved_sources/`
 - Web retrieval constrained to an approved domain allowlist
@@ -102,10 +324,10 @@ Web retrieval is blocked without allowlisted domains:
 - Configure `PERPLEXITY_DOMAIN_FILTER` in `.env`, or
 - Send `approved_domains` per request
 
-Recommended mode:
-- `SEARCH_PROVIDER=hybrid`
+---
 
 ## Quickstart
+
 ### 1) Install dependencies
 ```bash
 # Backend (Python, via Poetry)
@@ -155,7 +377,7 @@ API docs:
 ```json
 {
   "construct_name": "Workplace belonging",
-  "construct_definition": "A sustained sense of being accepted, included, and valued as a legitimate member of one’s work community.",
+  "construct_definition": "A sustained sense of being accepted, included, and valued as a legitimate member of one's work community.",
   "construct_exclusions": "Exclude job satisfaction and work engagement; keep focus on social inclusion and acceptance.",
   "target_population": "Full-time employees in a hybrid work setting",
   "response_scale": "5-point Likert: Strongly disagree to Strongly agree",
@@ -182,6 +404,50 @@ The UI supports iterative refinement:
 
 Feedback history is tracked per round in the Results view.
 
+## Repository Structure
+
+```
+lmaig-langgraph/
+├── api/                    # Vercel serverless entry point
+│   └── index.py           # Exports FastAPI app for Vercel
+├── backend/               # FastAPI application code
+│   ├── main.py           # FastAPI app, lifespan, routes
+│   ├── graph.py          # LangGraph workflow definition
+│   ├── agents/           # Agent implementations
+│   │   ├── item_writer.py
+│   │   ├── validator.py
+│   │   ├── linguistic_reviewer.py
+│   │   ├── bias_reviewer.py
+│   │   ├── content_reviewer.py
+│   │   ├── critic.py
+│   │   ├── meta_editor.py
+│   │   ├── retrieval_agent.py
+│   │   ├── web_surfer.py
+│   │   ├── correlation_estimator.py
+│   │   ├── instrument_searcher.py
+│   │   ├── validity_scorer.py
+│   │   ├── llm_factory.py
+│   │   └── llm_utils.py
+│   ├── analytics/         # Post-finalization analytics
+│   │   ├── omega_calculator.py
+│   │   └── similarity_calculator.py
+│   ├── prompts/           # Agent system prompts
+│   ├── schemas.py         # Pydantic models
+│   └── settings.py        # Environment configuration
+├── src/                   # Next.js source (App Router)
+│   ├── app/              # Next.js pages
+│   ├── components/       # React components
+│   └── lib/              # Utilities, API client, types
+├── public/               # Static assets
+├── data/                 # Approved sources for evidence retrieval
+├── tests/                # Backend tests
+├── next.config.js        # Next.js configuration
+├── vercel.json           # Vercel serverless config
+├── package.json          # Frontend dependencies + scripts
+├── pyproject.toml        # Backend dependencies (Poetry)
+└── README.md
+```
+
 ## Testing
 Frontend production build:
 ```bash
@@ -200,7 +466,7 @@ MAPIG deploys as a **single Vercel project** with unified frontend and backend.
 ### Architecture
 - **Frontend**: Next.js at repository root (pages in `/src`, public assets in `/public`)
 - **Backend**: Python serverless functions in `/api` directory
-- **Single domain**: Both frontend and backend served from same URL (e.g., `https://mapig.vercel.app`)
+- **Single domain**: Both frontend and backend served from same URL
 - **No CORS needed**: Same-origin requests from frontend to `/api/*` endpoints
 
 ### Prerequisites
@@ -216,7 +482,7 @@ MAPIG deploys as a **single Vercel project** with unified frontend and backend.
    - Root Directory: `.` (leave as root)
    - Build Command: `npm run build` (auto-detected)
 
-2. **Configure Environment Variables** (Vercel Dashboard → Settings → Environment Variables)
+2. **Configure Environment Variables** (Vercel Dashboard)
    ```
    CLAUDE_API_KEY=<your-anthropic-key>
    OPENAI_API_KEY=<your-openai-key>
@@ -228,19 +494,28 @@ MAPIG deploys as a **single Vercel project** with unified frontend and backend.
    ```
 
 3. **Deploy**
-   - Push to `main` branch → Vercel auto-deploys
+   - Push to `main` branch for auto-deploy
    - Preview deployments created for PRs automatically
 
-### URLs
-- **Frontend**: `https://your-project.vercel.app`
-- **Backend API**: `https://your-project.vercel.app/api/*`
-- **Health check**: `https://your-project.vercel.app/api/healthz`
-
 ### Notes
-- **Checkpointing**: In-memory only (MemorySaver) - session resumption not available after cold start
+- **Checkpointing**: In-memory only (MemorySaver) — session resumption not available after cold start
 - **SSE Streaming**: Fully supported within 300s timeout (typical runs: 20-40s)
 - **Cold Starts**: First request may take 3-8s; subsequent requests are fast
 - **Function Timeout**: 300s default (Pro plan), configurable up to 800s with Fluid Compute
+
+## Known Warnings
+
+### Python 3.14 + Pydantic V1 Compatibility
+```
+Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+```
+Comes from `langchain_core` which still imports `pydantic.v1`. Upstream issue — harmless, everything works.
+
+### OpenAI SDK Serialization Warnings
+```
+PydanticSerializationUnexpectedValue: Expected `none` - serialized value may not be as expected
+```
+The OpenAI Python SDK's structured output responses contain complex discriminated unions with 20+ type variants. Pydantic V2's serializer warns when trying each variant. The actual data parses correctly — these are purely cosmetic warnings. They appear whenever the OpenAI SDK's `ParsedResponse` objects are serialized (validation, validity scoring, bias review).
 
 ## Contributing
 Issues and pull requests are welcome for:
@@ -258,6 +533,8 @@ GitHub: https://github.com/llewellynvz
 ## License
 This is proprietary software. Personal, academic, and internal research use is permitted. Redistribution and commercial use are not permitted.
 
-## Reference
+## References
 
-Lee, P., Son, M., & Jia, Z. (2025). AI-powered automatic item generation for psychological tests: A conceptual framework for an LLM-based multi-agent AIG system. Journal of Business and Psychology, 1-29.
+Hommel, B. E., & Arslan, R. C. (2024). Language models accurately infer correlations between psychological items and scales from text alone. *European Journal of Psychological Assessment*. https://doi.org/10.1027/1015-5759/a000838
+
+Lee, P., Son, M., & Jia, Z. (2025). AI-powered automatic item generation for psychological tests: A conceptual framework for an LLM-based multi-agent AIG system. *Journal of Business and Psychology*, 1-29.

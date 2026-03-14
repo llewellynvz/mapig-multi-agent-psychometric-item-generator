@@ -28,17 +28,17 @@ const STEP_COLORS: Record<
 > = {
   setup: {
     cardAccent: "border-cyan-300/70 bg-cyan-400/10",
-    circleActive: "border-cyan-200 bg-cyan-400 text-slate-950 shadow-[0_0_0_4px_rgba(8,145,178,0.45)]",
+    circleActive: "border-lime-100 bg-accent text-slate-950 shadow-[0_0_0_4px_rgba(167,209,43,0.35)]",
     circleDone: "border-cyan-300/80 bg-cyan-400/35 text-white",
   },
   run: {
     cardAccent: "border-sky-300/70 bg-sky-400/10",
-    circleActive: "border-sky-200 bg-sky-400 text-slate-950 shadow-[0_0_0_4px_rgba(56,189,248,0.45)]",
+    circleActive: "border-lime-100 bg-accent text-slate-950 shadow-[0_0_0_4px_rgba(167,209,43,0.35)]",
     circleDone: "border-sky-300/80 bg-sky-400/35 text-white",
   },
   results: {
     cardAccent: "border-lime-300/70 bg-lime-300/10",
-    circleActive: "border-lime-100 bg-lime-300 text-slate-950 shadow-[0_0_0_4px_rgba(190,242,100,0.45)]",
+    circleActive: "border-lime-100 bg-accent text-slate-950 shadow-[0_0_0_4px_rgba(167,209,43,0.35)]",
     circleDone: "border-lime-300/80 bg-lime-300/35 text-white",
   },
 };

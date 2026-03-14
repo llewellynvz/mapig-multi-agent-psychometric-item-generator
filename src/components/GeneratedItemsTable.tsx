@@ -143,23 +143,6 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
 
   const displayItems = onItemsChange ? editedItems : items;
 
-  const copyItemsOnly = () => {
-    const text = displayItems.map((i) => i.item_text).join("\n");
-    navigator.clipboard.writeText(text).then(
-      () => toast({ title: "Copied", description: "Items copied to clipboard." }),
-      () => toast({ title: "Copy failed", description: "Could not copy." })
-    );
-  };
-
-  const payload = fullOutput ?? { final_items: displayItems, audit: {} };
-
-  const copyFullOutput = () => {
-    navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(
-      () => toast({ title: "Copied", description: "Full output copied." }),
-      () => toast({ title: "Copy failed", description: "Could not copy." })
-    );
-  };
-
   const handleFormatChange = (format: 'csv' | 'json' | 'markdown') => {
     setSelectedFormat(format);
     try {
@@ -201,24 +184,8 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
 
   return (
     <SurfaceCard className="border-lime-300/70">
-      <CardHeader className="flex flex-col items-center gap-3 border-b border-border/60 md:flex-row md:items-center md:justify-between">
+      <CardHeader className="border-b border-border/60">
         <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
-        <div className="flex flex-wrap justify-center gap-2 md:justify-end">
-          <PrimaryButton
-            size="sm"
-            onClick={copyItemsOnly}
-            className="h-9 min-w-[148px]"
-          >
-            Copy items only
-          </PrimaryButton>
-          <PrimaryButton
-            size="sm"
-            onClick={copyFullOutput}
-            className="h-9 min-w-[148px]"
-          >
-            Copy full output
-          </PrimaryButton>
-        </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         <div className="space-y-4">

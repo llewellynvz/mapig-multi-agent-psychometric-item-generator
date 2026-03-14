@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Check, Loader2 } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import type { ProgressEvent } from "@/lib/api";
@@ -13,126 +14,236 @@ export interface ProgressState {
   errorMessage?: string;
 }
 
+export interface CompletedNode {
+  node: string;
+  displayName: string;
+  iteration: number;
+  timestamp: number;
+}
+
 interface ProgressIndicatorProps {
   progress: ProgressState;
   logs?: ProgressEvent[];
   useChatGPT?: boolean;
+  completedNodes?: CompletedNode[];
 }
 
 const NODE_DISPLAY_NAMES: Record<string, string> = {
-  init_run: "Initializing",
-  retrieve_node: "Retrieving Evidence",
-  item_writer_node: "Writing Items",
-  content_review_node: "Reviewing Content",
-  linguistic_review_node: "Reviewing Linguistics",
-  bias_review_node: "Reviewing Bias",
-  critic_node: "Evaluating Quality",
-  meta_editor_node: "Revising Items",
-  finalize_node: "Finalizing",
+  init_run: "Initialize",
+  retrieve_node: "Retrieve Evidence",
+  item_writer_node: "Generate Items",
+  content_review_node: "Content Review",
+  linguistic_review_node: "Linguistic Review",
+  bias_review_node: "Bias Review",
+  critic_node: "Quality Check",
+  meta_editor_node: "Revise Items",
+  finalize_node: "Finalize",
+  validation_node: "Validate Items",
+  regenerate_items_node: "Regenerate Items",
+  correlation_node: "Estimating Correlations",
+  comparison_node: "Comparing Instruments",
+  cross_construct_node: "Cross-Construct Analysis",
+  reviewers_fanout_node: "Reviewing Items",
 };
 
-export function ProgressIndicator({ progress, logs = [], useChatGPT = false }: ProgressIndicatorProps) {
+/* ── Stage-aware progress bar ── */
+const FIRST_ITER_NODES = [
+  "init_run", "retrieve_node", "item_writer_node",
+  "content_review_node", "linguistic_review_node", "bias_review_node",
+  "critic_node", "meta_editor_node",
+];
+const LATER_ITER_NODES = [
+  "item_writer_node", "content_review_node", "linguistic_review_node",
+  "bias_review_node", "critic_node", "meta_editor_node",
+];
+const POST_ITER_NODES = [
+  "finalize_node", "correlation_node", "comparison_node", "cross_construct_node",
+];
+
+function computeStageProgress(currentNode: string | null, iteration: number): number {
+  if (!currentNode) return 0;
+
+  const postIdx = POST_ITER_NODES.indexOf(currentNode);
+  if (postIdx >= 0) return (postIdx + 1) / POST_ITER_NODES.length;
+
+  const nodes = iteration <= 1 ? FIRST_ITER_NODES : LATER_ITER_NODES;
+  const idx = nodes.indexOf(currentNode);
+  if (idx >= 0) return (idx + 1) / nodes.length;
+
+  return 0.5;
+}
+
+function getPhaseLabel(currentNode: string | null, iteration: number): string {
+  if (!currentNode) return "Starting";
+  if (POST_ITER_NODES.includes(currentNode)) return "Finalizing";
+  if (iteration > 1) return `Round ${iteration}`;
+  return "Round 1";
+}
+
+export function ProgressIndicator({
+  progress,
+  logs = [],
+  useChatGPT = false,
+  completedNodes = [],
+}: ProgressIndicatorProps) {
   const displayName =
     progress.displayName ||
-    (progress.currentNode ? NODE_DISPLAY_NAMES[progress.currentNode] || progress.currentNode : "Starting...");
+    (progress.currentNode
+      ? NODE_DISPLAY_NAMES[progress.currentNode] || progress.currentNode
+      : "Starting...");
 
   const logContainerRef = React.useRef<HTMLDivElement>(null);
+  const timelineEndRef = React.useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new logs arrive
+  const stageProgress = progress.status === "running"
+    ? computeStageProgress(progress.currentNode, progress.iteration)
+    : progress.status === "complete" ? 1 : 0;
+
+  const phaseLabel = progress.status === "running"
+    ? getPhaseLabel(progress.currentNode, progress.iteration)
+    : "";
+
   React.useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
 
+  React.useEffect(() => {
+    timelineEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [completedNodes.length, progress.currentNode]);
+
   return (
-    <SurfaceCard className="border-sky-300/70 p-6">
-      <div className="space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold">Generation Progress</h3>
-            {useChatGPT ? (
-              <Pill className="border-accent/60 bg-accent/30 text-accent">GPT 5.2</Pill>
-            ) : (
-              <Pill className="border-sky-400/60 bg-sky-400/20 text-sky-300">Claude</Pill>
-            )}
-          </div>
-          {progress.status === "running" && (
-            <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-          )}
-          {progress.status === "complete" && (
-            <Pill className="border-accent/60 bg-accent/30">Complete</Pill>
-          )}
-          {progress.status === "error" && (
-            <Pill className="border-accent/60 bg-accent/30">Error</Pill>
+    <SurfaceCard className="border-sky-300/70 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold tracking-tight">Generation Progress</h3>
+          {useChatGPT ? (
+            <Pill className="border-accent/60 bg-accent/30 text-accent text-[10px]">GPT 5.2</Pill>
+          ) : (
+            <Pill className="border-sky-400/60 bg-sky-400/20 text-sky-300 text-[10px]">Claude</Pill>
           )}
         </div>
-
-        {progress.status === "running" && (
-          <div className="space-y-3">
-            <div className="h-2 overflow-hidden rounded-full bg-white/15">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-              <p className="text-sm font-medium">{displayName}</p>
-            </div>
-            {progress.iteration > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Iteration {progress.iteration} of up to 3
-              </p>
-            )}
-          </div>
+        {progress.status === "running" && phaseLabel && (
+          <Pill className="border-accent/40 bg-accent/15 text-accent text-[10px]">
+            {phaseLabel}
+          </Pill>
         )}
-
         {progress.status === "complete" && (
-          <p className="text-sm text-muted-foreground">Generation completed successfully!</p>
+          <Pill className="border-emerald-500/40 bg-emerald-500/15 text-emerald-400 text-[10px]">
+            Complete
+          </Pill>
         )}
-
-        {progress.status === "error" && progress.errorMessage && (
-          <div className="rounded-md bg-accent/20 p-3">
-            <p className="text-sm font-medium text-slate-100">{progress.errorMessage}</p>
-          </div>
-        )}
-
-        {progress.status === "idle" && (
-          <p className="text-sm text-muted-foreground">Ready to generate items...</p>
-        )}
-
-        {/* Live Logs */}
-        {progress.status === "running" && logs.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-slate-300">Live Logs</h4>
-            <div
-              ref={logContainerRef}
-              className="max-h-60 overflow-y-auto space-y-1 rounded-md bg-white/5 p-3"
-            >
-              {logs.map((log, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-xs font-mono">
-                  <span
-                    className={`shrink-0 ${
-                      log.level === "error"
-                        ? "text-red-400"
-                        : log.level === "warning"
-                          ? "text-yellow-400"
-                          : "text-slate-400"
-                    }`}
-                  >
-                    [{log.timestamp?.split("T")[1]?.slice(0, 8) ?? ""}]
-                  </span>
-                  <span className="text-sky-300 shrink-0">{log.source}:</span>
-                  <span className="text-slate-300">{log.message}</span>
-                  {log.metadata && Object.keys(log.metadata).length > 0 && (
-                    <span className="text-slate-500 text-[10px]">
-                      {JSON.stringify(log.metadata)}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+        {progress.status === "error" && (
+          <Pill className="border-red-500/40 bg-red-500/15 text-red-400 text-[10px]">Error</Pill>
         )}
       </div>
+
+      {/* Progress bar */}
+      {progress.status === "running" && (
+        <div className="px-6 pb-4">
+          <div className="h-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-500 to-accent transition-all duration-700 ease-out"
+              style={{ width: `${Math.round(stageProgress * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+      {progress.status === "complete" && (
+        <div className="px-6 pb-4">
+          <div className="h-1 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full w-full rounded-full bg-emerald-500/80" />
+          </div>
+        </div>
+      )}
+
+      {/* Timeline */}
+      {(completedNodes.length > 0 || (progress.status === "running" && progress.currentNode)) && (
+        <div className="border-t border-white/5 px-6 py-4">
+          <div className="max-h-52 overflow-y-auto pr-1">
+            <div className="relative pl-6">
+              {/* Vertical connecting line */}
+              <div className="absolute left-[7px] top-1 bottom-1 w-px bg-white/10" />
+
+              {completedNodes.map((node, idx) => (
+                <div
+                  key={`${node.node}-${idx}`}
+                  className="relative flex items-center gap-3 pb-3 last:pb-0"
+                >
+                  <div className="absolute left-[-17px] flex h-4 w-4 items-center justify-center rounded-full bg-accent/20">
+                    <Check className="h-2.5 w-2.5 text-accent" />
+                  </div>
+                  <span className="text-sm text-muted-foreground">{node.displayName}</span>
+                </div>
+              ))}
+
+              {progress.status === "running" && progress.currentNode && (
+                <div className="relative flex items-center gap-3 pb-0">
+                  <div className="absolute left-[-17px] flex h-4 w-4 items-center justify-center rounded-full bg-sky-500/20">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin text-sky-400" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">{displayName}</span>
+                </div>
+              )}
+              <div ref={timelineEndRef} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status messages */}
+      {progress.status === "complete" && completedNodes.length === 0 && (
+        <div className="px-6 pb-5">
+          <p className="text-sm text-muted-foreground">Generation completed successfully.</p>
+        </div>
+      )}
+
+      {progress.status === "error" && progress.errorMessage && (
+        <div className="px-6 pb-5">
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+            <p className="text-sm text-red-300">{progress.errorMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {progress.status === "idle" && (
+        <div className="px-6 pb-5">
+          <p className="text-sm text-muted-foreground">Ready to generate items.</p>
+        </div>
+      )}
+
+      {/* Live Logs */}
+      {progress.status === "running" && logs.length > 0 && (
+        <div className="border-t border-white/5 px-6 py-4">
+          <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Live Logs
+          </h4>
+          <div
+            ref={logContainerRef}
+            className="max-h-48 overflow-y-auto space-y-0.5 rounded-lg bg-black/20 p-3"
+          >
+            {logs.map((log, idx) => (
+              <div key={idx} className="flex items-start gap-2 text-xs font-mono leading-relaxed">
+                <span
+                  className={`shrink-0 ${
+                    log.level === "error"
+                      ? "text-red-400"
+                      : log.level === "warning"
+                        ? "text-yellow-400"
+                        : "text-slate-500"
+                  }`}
+                >
+                  {log.timestamp?.split("T")[1]?.slice(0, 8) ?? ""}
+                </span>
+                <span className="shrink-0 text-sky-400/70">{log.source}</span>
+                <span className="text-slate-400">{log.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </SurfaceCard>
   );
 }

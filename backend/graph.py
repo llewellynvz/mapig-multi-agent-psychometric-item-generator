@@ -177,6 +177,7 @@ def _create_abbreviated_request(full_request: UserRequest) -> AbbreviatedRequest
         construct_name=full_request.construct_name,
         construct_definition=full_request.construct_definition,
         target_population=full_request.target_population,
+        cultural_group=full_request.cultural_group,
         response_scale=full_request.response_scale,
         constraints=full_request.constraints,
         model_provider=full_request.model_provider,
@@ -621,10 +622,10 @@ def finalize_node(state: GraphState) -> GraphState:
 
 
 async def correlation_node(state: GraphState) -> GraphState:
-    """Correlation analysis using GPT-5.2 pairwise estimation and McDonald's omega.
+    """Correlation analysis using embedding cosine similarity and McDonald's omega.
 
-    Phase 8: Real implementation - estimates pairwise correlations, calculates omega,
-    populates FinalOutput.correlation_matrix with full analytics.
+    Uses Hommel & Arslan (2024) methodology: sentence-embedding cosine similarity
+    to estimate pairwise correlations, then calculates McDonald's omega.
     """
     with step("correlation_node", state):
         try:
@@ -651,7 +652,7 @@ async def correlation_node(state: GraphState) -> GraphState:
             from backend.analytics.omega_calculator import calculate_omega
             from backend.schemas import CorrelationMatrix
 
-            # Estimate pairwise correlations using GPT-5.2
+            # Estimate pairwise correlations using embedding cosine similarity
             cells = await estimate_pairwise_correlations(item_texts, construct_name)
 
             if not cells:

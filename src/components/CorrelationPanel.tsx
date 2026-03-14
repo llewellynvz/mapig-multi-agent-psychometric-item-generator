@@ -201,9 +201,11 @@ export function CorrelationPanel({
                   <div className="text-lg font-bold">
                     r = {selectedCell.correlation.toFixed(3)}
                   </div>
-                  <div className="text-sm text-slate-300">
-                    95% CI: [{selectedCell.ci_low.toFixed(3)}, {selectedCell.ci_high.toFixed(3)}]
-                  </div>
+                  {selectedCell.ci_low != null && selectedCell.ci_high != null && (
+                    <div className="text-sm text-slate-300">
+                      95% CI: [{selectedCell.ci_low.toFixed(3)}, {selectedCell.ci_high.toFixed(3)}]
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 border-t border-slate-700 pt-3">

@@ -23,6 +23,7 @@ export const instrumentSetupSchema = z.object({
     .min(2, "Minimum 2 items")
     .max(50, "Maximum 50 items"),
   constraints: z.array(z.string()).default([]),
+  cultural_group: z.string().optional(),
   construct_exclusions: z.string().optional(),
   native_construct: z.string().optional(),
   example_item: z.string().optional(),
@@ -66,6 +67,7 @@ export const defaultInstrumentSetup: InstrumentSetupFormValues = {
   response_scale: RESPONSE_SCALE_PRESETS[0],
   item_count: 10,
   constraints: [...DEFAULT_CONSTRAINTS],
+  cultural_group: "",
   construct_exclusions: "",
   native_construct: "",
   example_item: "",

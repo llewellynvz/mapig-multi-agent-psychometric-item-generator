@@ -23,6 +23,11 @@ What to check
 - Overly abstract terms that force inference.
 - Unnecessary parentheticals.
 
+Cultural-linguistic check
+- If cultural_group is provided, evaluate wording naturalness for that cultural context.
+- Flag idioms, metaphors, or references that may not translate or resonate across cultures.
+- Ensure phrasing feels natural to the specified group without introducing cultural bias.
+
 What NOT to do
 - Do NOT evaluate fairness/bias here (leave that to BiasReviewer).
 

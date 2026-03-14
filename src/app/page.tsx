@@ -10,10 +10,10 @@ import { FeedbackHistoryPanel, type FeedbackHistoryEntry } from "@/components/Fe
 import { GeneratedItemsTable } from "@/components/GeneratedItemsTable";
 import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
 import { InstrumentSetupForm } from "@/components/InstrumentSetupForm";
-import { ProgressIndicator, type ProgressState } from "@/components/ProgressIndicator";
+import { ProgressIndicator, type CompletedNode, type ProgressState } from "@/components/ProgressIndicator";
 import { SetupSnapshotCard } from "@/components/SetupSnapshotCard";
 import { Stepper } from "@/components/Stepper";
-import { PrimaryButton, SecondaryButton } from "@/components/ui/action-buttons";
+import { PrimaryButton } from "@/components/ui/action-buttons";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { useToast } from "@/components/ui/use-toast";
@@ -77,6 +77,7 @@ export default function HomePage() {
     iteration: 0,
     status: "idle",
   });
+  const [completedNodes, setCompletedNodes] = React.useState<CompletedNode[]>([]);
   const [logs, setLogs] = React.useState<ProgressEvent[]>([]);
   const [useChatGPT, setUseChatGPT] = React.useState(false);
 
@@ -135,15 +136,30 @@ export default function HomePage() {
               iteration: 0,
               status: "running",
             });
+            setCompletedNodes([]);
             setLogs([]); // Clear logs on new run
           } else if (event.type === "node_start") {
-            setProgress((prev) => ({
-              ...prev,
-              currentNode: event.node || null,
-              displayName: event.display_name || null,
-              iteration: event.iteration || prev.iteration,
-              status: "running",
-            }));
+            // Push the previous current node into completed list
+            setProgress((prev) => {
+              if (prev.currentNode) {
+                setCompletedNodes((nodes) => [
+                  ...nodes,
+                  {
+                    node: prev.currentNode!,
+                    displayName: prev.displayName || prev.currentNode!,
+                    iteration: prev.iteration,
+                    timestamp: Date.now(),
+                  },
+                ]);
+              }
+              return {
+                ...prev,
+                currentNode: event.node || null,
+                displayName: event.display_name || null,
+                iteration: event.iteration || prev.iteration,
+                status: "running",
+              };
+            });
           } else if (event.type === "iteration") {
             setProgress((prev) => ({
               ...prev,
@@ -224,6 +240,7 @@ export default function HomePage() {
       iteration: 0,
       status: "idle",
     });
+    setCompletedNodes([]);
   }, []);
 
   const runGeneration = React.useCallback(
@@ -545,30 +562,7 @@ export default function HomePage() {
         {step === "run" && (
           <section className="animate-fade-up grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-4">
-              <ProgressIndicator progress={progress} logs={logs} useChatGPT={useChatGPT} />
-              <SurfaceCard className="border-sky-300/70">
-                <CardHeader className="border-b border-border/60">
-                  <CardTitle className="text-base md:text-lg">Running Agent Workflow</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-5 text-sm text-muted-foreground">
-                  <InsetPanel className="space-y-2 rounded-2xl p-4">
-                    <p>
-                      The system is executing retrieval, drafting, multi-review, and revision stages. This view updates
-                      in real time.
-                    </p>
-                    {activeRun?.threadId && (
-                      <p>
-                        Active thread: <span className="font-medium text-white">{activeRun.threadId}</span>
-                      </p>
-                    )}
-                    {activeRun?.runId && (
-                      <p>
-                        Active run: <span className="font-medium text-white">{activeRun.runId}</span>
-                      </p>
-                    )}
-                  </InsetPanel>
-                </CardContent>
-              </SurfaceCard>
+              <ProgressIndicator progress={progress} logs={logs} useChatGPT={useChatGPT} completedNodes={completedNodes} />
             </div>
             <div className="space-y-4">
               <SetupSnapshotCard values={submittedSetup} />

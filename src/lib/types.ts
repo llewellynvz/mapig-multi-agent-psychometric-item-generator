@@ -9,6 +9,7 @@ export interface UserRequest {
   response_scale: string;
   item_count?: number;
   constraints?: string[];
+  cultural_group?: string;
   construct_exclusions?: string;
   native_construct?: string;
   example_item?: string;
@@ -78,8 +79,8 @@ export interface CorrelationCell {
   item_i_index: number;
   item_j_index: number;
   correlation: number;
-  ci_low: number;
-  ci_high: number;
+  ci_low?: number | null;
+  ci_high?: number | null;
 }
 
 export interface CorrelationMatrix {

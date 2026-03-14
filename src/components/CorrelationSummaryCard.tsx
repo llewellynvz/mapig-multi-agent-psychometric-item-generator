@@ -1,7 +1,6 @@
 "use client";
 
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pill } from "@/components/ui/pill";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import type { CorrelationMatrix } from "@/lib/types";
 
@@ -9,31 +8,25 @@ export interface CorrelationSummaryCardProps {
   matrix: CorrelationMatrix;
 }
 
-/**
- * Get status pill for McDonald's Omega
- */
-function getOmegaStatus(omega: number): { label: string; className: string } {
-  return omega >= 0.70
-    ? { label: 'Pass', className: 'bg-green-500/20 text-green-400 border-green-500/40' }
-    : { label: 'Warning', className: 'bg-amber-500/20 text-amber-400 border-amber-500/40' };
+function getOmegaColor(omega: number): string {
+  return omega >= 0.70 ? "text-emerald-400" : "text-amber-400";
 }
 
-/**
- * Get status pill for mean inter-item correlation
- */
-function getMeanRStatus(meanR: number): { label: string; className: string } {
-  if (meanR >= 0.15 && meanR <= 0.50) {
-    return { label: 'Optimal', className: 'bg-green-500/20 text-green-400 border-green-500/40' };
-  }
-  if (meanR < 0.15) {
-    return { label: 'Low', className: 'bg-amber-500/20 text-amber-400 border-amber-500/40' };
-  }
-  return { label: 'High', className: 'bg-amber-500/20 text-amber-400 border-amber-500/40' };
+function getOmegaLabel(omega: number): string {
+  return omega >= 0.70 ? "Reliable" : "Below threshold";
 }
 
-/**
- * Get consistency assessment text based on flag
- */
+function getMeanRColor(meanR: number): string {
+  if (meanR >= 0.15 && meanR <= 0.50) return "text-emerald-400";
+  return "text-amber-400";
+}
+
+function getMeanRLabel(meanR: number): string {
+  if (meanR >= 0.15 && meanR <= 0.50) return "Optimal";
+  if (meanR < 0.15) return "Low";
+  return "High";
+}
+
 function getConsistencyText(flag: string): string {
   switch (flag) {
     case 'optimal_range':
@@ -49,63 +42,52 @@ function getConsistencyText(flag: string): string {
   }
 }
 
-export function CorrelationSummaryCard({ matrix }: CorrelationSummaryCardProps) {
-  const omegaStatus = getOmegaStatus(matrix.mcdonalds_omega);
-  const meanRStatus = getMeanRStatus(matrix.mean_inter_item_correlation);
+function getConsistencyColor(flag: string): string {
+  return flag === 'optimal_range' ? 'text-emerald-400' : 'text-amber-400';
+}
 
+export function CorrelationSummaryCard({ matrix }: CorrelationSummaryCardProps) {
   return (
     <SurfaceCard className="mt-4">
       <CardHeader className="border-b border-border/60">
         <CardTitle className="text-base">Quality Metrics</CardTitle>
       </CardHeader>
       <CardContent className="pt-5">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           {/* McDonald's Omega */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">
-                McDonald's Omega:
-              </span>
-              <span className="text-lg font-bold text-foreground">
-                {matrix.mcdonalds_omega.toFixed(3)}
-              </span>
-              <Pill className={omegaStatus.className}>{omegaStatus.label}</Pill>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Measures how well items consistently measure the same construct
-            </p>
+          <div className="flex flex-col items-center text-center rounded-lg border border-border/40 bg-slate-900/30 p-4">
+            <h4 className="text-sm font-semibold text-foreground">McDonald&apos;s Omega</h4>
+            <span className={`mt-2 text-2xl font-bold tabular-nums ${getOmegaColor(matrix.mcdonalds_omega)}`}>
+              {matrix.mcdonalds_omega.toFixed(3)}
+            </span>
+            <span className={`mt-1 text-[10px] font-medium uppercase ${getOmegaColor(matrix.mcdonalds_omega)}`}>
+              {getOmegaLabel(matrix.mcdonalds_omega)}
+            </span>
           </div>
 
           {/* Mean Inter-Item Correlation */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">
-                Mean Inter-Item r:
-              </span>
-              <span className="text-lg font-bold text-foreground">
-                {matrix.mean_inter_item_correlation.toFixed(3)}
-              </span>
-              <Pill className={meanRStatus.className}>{meanRStatus.label}</Pill>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Average correlation between all item pairs; 0.15-0.50 is optimal for broad constructs
-            </p>
+          <div className="flex flex-col items-center text-center rounded-lg border border-border/40 bg-slate-900/30 p-4">
+            <h4 className="text-sm font-semibold text-foreground">Mean Inter-Item r</h4>
+            <span className={`mt-2 text-2xl font-bold tabular-nums ${getMeanRColor(matrix.mean_inter_item_correlation)}`}>
+              {matrix.mean_inter_item_correlation.toFixed(3)}
+            </span>
+            <span className={`mt-1 text-[10px] font-medium uppercase ${getMeanRColor(matrix.mean_inter_item_correlation)}`}>
+              {getMeanRLabel(matrix.mean_inter_item_correlation)}
+            </span>
           </div>
 
           {/* Internal Consistency Assessment */}
-          <div className="space-y-2 md:col-span-2">
-            <div className="text-sm font-semibold text-foreground">
-              Internal Consistency Assessment
-            </div>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-center text-center rounded-lg border border-border/40 bg-slate-900/30 p-4">
+            <h4 className="text-sm font-semibold text-foreground">Internal Consistency</h4>
+            <span className={`mt-2 text-xs font-medium ${getConsistencyColor(matrix.internal_consistency_flag)}`}>
               {getConsistencyText(matrix.internal_consistency_flag)}
-            </p>
+            </span>
           </div>
         </div>
 
         {/* Disclaimer */}
-        <div className="mt-4 border-t border-border/40 pt-4">
-          <p className="text-xs italic text-muted-foreground">
+        <div className="mt-4 pt-4 border-t border-border/30">
+          <p className="text-[11px] italic text-muted-foreground/70">
             {matrix.disclaimer}
           </p>
         </div>

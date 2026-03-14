@@ -5,8 +5,5 @@ __pycache__/
 tests/
 .planning/
 .git/
-frontend/node_modules/
 desktop/
 .cursor/
-nul
-*.pdf

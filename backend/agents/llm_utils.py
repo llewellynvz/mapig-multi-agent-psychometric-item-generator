@@ -14,6 +14,7 @@ class TokenUsage(BaseModel):
     """Token usage information from LLM response."""
     input_tokens: int = 0
     output_tokens: int = 0
+    reasoning_tokens: int = 0  # Phase 7: GPT-5.2 reasoning token tracking
     total_tokens: int = 0
     model_name: str = ""
 

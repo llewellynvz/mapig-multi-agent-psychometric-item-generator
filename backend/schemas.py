@@ -459,6 +459,13 @@ class FinalOutput(BaseModel):
         description="Per-item plagiarism warnings keyed by item index (INST-06). Format: {0: 'Potential similarity to X (r = 0.87)'}"
     )
 
+    convergent_validity_score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Convergent validity score (0-1) from dual-direction LLM-as-judge comparison with convergent instrument (INST-04)"
+    )
+
 
 # --- Agent I/O wrappers (contracts) ---
 

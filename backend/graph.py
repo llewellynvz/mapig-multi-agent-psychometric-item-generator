@@ -770,6 +770,7 @@ def comparison_node(state: GraphState) -> GraphState:
             updated_final_output = final_output.model_copy(deep=True)
             updated_final_output.comparison_instruments = [convergent_instrument, discriminant_instrument]
             updated_final_output.plagiarism_flags = plagiarism_flags if plagiarism_flags else None
+            updated_final_output.convergent_validity_score = convergent_score
 
             logger.info(
                 f"Comparison analysis complete: {len(updated_final_output.comparison_instruments)} instruments, "

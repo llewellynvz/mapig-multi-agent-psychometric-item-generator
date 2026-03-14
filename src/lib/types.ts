@@ -131,6 +131,7 @@ export interface FinalOutput {
   comparison_instruments?: ComparisonInstrument[];
   cross_construct_analysis?: CrossConstructComparison;
   plagiarism_flags?: Record<number, string>;
+  convergent_validity_score?: number;
 }
 
 export interface HealthResponse {

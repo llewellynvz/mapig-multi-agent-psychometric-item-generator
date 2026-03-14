@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import type { FinalItem, FinalOutput, ItemValidation } from "@/lib/types";
 import { exportToCsv, exportToJson, exportToMarkdown, generateFilename } from "@/lib/export";
 import { QualityChecksPanel } from "./QualityChecksPanel";
+import { CorrelationPanel } from "./CorrelationPanel";
 
 function ValidationScoreDisplay({
   validation,
@@ -267,6 +268,13 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           ))}
         </div>
         <QualityChecksPanel items={displayItems} />
+        {fullOutput?.correlation_matrix && (
+          <CorrelationPanel
+            matrix={fullOutput.correlation_matrix}
+            itemTexts={displayItems.map(item => item.item_text)}
+            constructName={fullOutput.final_items[0]?.construct_name}
+          />
+        )}
         {fullOutput?.audit?.validation_attempts && fullOutput.audit.validation_attempts > 0 && (
           <InsetPanel className="rounded-2xl p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

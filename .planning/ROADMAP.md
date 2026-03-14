@@ -34,7 +34,7 @@
 ### v2.0 Psychometric Rigor (Phases 7-10)
 
 - [x] **Phase 7: Foundation & Infrastructure** ✅ COMPLETE (2/2 plans) — Schema extensions and analytics scaffolding
-- [ ] **Phase 8: Synthetic Correlation Analysis** - LLM-estimated inter-item correlations with heatmap visualization
+- [x] **Phase 8: Synthetic Correlation Analysis** ✅ COMPLETE (3/3 plans) — LLM-estimated inter-item correlations with heatmap visualization
 - [ ] **Phase 9: Dynamic Instrument Comparison** - Literature-grounded validated instruments and cross-construct analysis
 - [ ] **Phase 10: GPT-5.2 Integration & Analytics Optimization** - Advanced reasoning models with parallel execution
 
@@ -85,12 +85,21 @@ Plans:
   5. Synthetic correlations validated against 5 published scales with known correlation matrices achieving r > 0.6 agreement benchmark
   6. Internal consistency flags display when mean inter-item correlation falls outside 0.15-0.50 optimal range
 
-**Plans:** 3 plans
+**Status:** ✅ COMPLETE (3/3 plans executed)
 
 Plans:
-- [ ] 08-01-PLAN.md — Backend correlation engine: schema migration, GPT-5.2 estimation, omega calculator, graph node
-- [ ] 08-02-PLAN.md — Frontend heatmap visualization: visx components, quality summary, export functions
-- [ ] 08-03-PLAN.md — Calibration validation: benchmark scales, evaluation suite integration
+- [x] 08-01-PLAN.md — Backend correlation engine: schema migration, GPT-5.2 estimation, omega calculator, graph node
+- [x] 08-02-PLAN.md — Frontend heatmap visualization: visx components, quality summary, export functions
+- [x] 08-03-PLAN.md — Calibration validation: benchmark scales, evaluation suite integration
+
+**Deliverables:**
+- ✅ GPT-5.2 pairwise correlation estimation with batching (20 pairs/batch, 5 concurrent)
+- ✅ McDonald's omega reliability metric (simplified formula, migrated from Cronbach's alpha)
+- ✅ Internal consistency flagging (optimal_range/too_low/too_high based on mean inter-item r)
+- ✅ visx heatmap with Psynalytics brand colors (teal-white-lime), tooltips, popovers
+- ✅ Collapsible CorrelationPanel with CorrelationSummaryCard
+- ✅ CSV/JSON correlation export functions
+- ✅ 5-scale calibration validation (RSES, PHQ-9, UWES-9, UCLA Loneliness, SWLS) with r > 0.6 threshold
 
 ### Phase 9: Dynamic Instrument Comparison
 **Goal**: System dynamically discovers validated comparison instruments from academic literature and assesses convergent/discriminant validity without copyright infringement
@@ -146,10 +155,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6 → 7 �
 | 5. Vercel Deployment | v1.1 | 4/4 | Complete | 2026-03-09 |
 | 6. Comprehensive Evaluation Framework | v1.1 | 4/4 | Complete | 2026-03-09 |
 | 7. Foundation & Infrastructure | v2.0 | 2/2 | Complete | 2026-03-14 |
-| 8. Synthetic Correlation Analysis | v2.0 | 0/3 | In Progress | - |
+| 8. Synthetic Correlation Analysis | v2.0 | 3/3 | Complete | 2026-03-14 |
 | 9. Dynamic Instrument Comparison | v2.0 | 0/? | Not started | - |
 | 10. GPT-5.2 Integration & Analytics Optimization | v2.0 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-14 (Phase 8 planning complete - 3 plans)*
+*Last updated: 2026-03-14 (Phase 8 complete - 3/3 plans executed)*

@@ -61,14 +61,23 @@ Generate psychometrically valid, production-ready assessment items with automate
 - ✓ Success criteria: ≥15% improvement + all dimensions ≥7.0/10 — v1.1
 - ✓ Baseline comparison framework (current vs pre-optimization) — v1.1
 
+### Validated
+
+<!-- v2.0 Phase 8 -->
+
+- ✓ Synthetic inter-item correlation analysis for generated item sets — Phase 8
+- ✓ Correlation display card in results UI (visx heatmap with Psynalytics brand colors) — Phase 8
+- ✓ McDonald's omega reliability metric (migrated from Cronbach's alpha) — Phase 8
+- ✓ Calibration validation against 5 published psychological scales — Phase 8
+- ✓ Internal consistency flagging (optimal/low/high based on mean inter-item r) — Phase 8
+- ✓ CSV/JSON correlation export functions — Phase 8
+
 ### Active
 
 <!-- v2.0 Psychometric Rigor -->
 
 - [ ] Dynamic literature search for validated comparison instruments (replace hardcoded nearest neighbors)
-- [ ] Synthetic inter-item correlation analysis for generated item sets
 - [ ] Cross-construct comparison against known validated instruments
-- [ ] Correlation display card in results UI
 - [ ] GPT 5.2 thinking mode configuration (high by default)
 
 ### Out of Scope
@@ -137,6 +146,9 @@ Generate psychometrically valid, production-ready assessment items with automate
 | Native ASGI (not Mangum adapter) | Vercel has native ASGI support; Mangum is AWS-specific and would fail | ✓ Good — Research corrected initial assumption, prevented deployment failure |
 | MemorySaver checkpointing (not persistent storage) | Acceptable v1 trade-off: works during run, no cross-cold-start resumption | ✓ Good — Simplified deployment, session resumption deferred to v2 |
 | Dual-direction comparison (position bias mitigation) | LLM-as-judge research shows position bias; evaluate both orderings and average | ✓ Good — 2x API cost acceptable for unbiased evaluation scoring |
+| Simplified omega formula (not reliabiliPy) | reliabiliPy incompatible with scikit-learn 1.8.0; direct formula equivalent for tau-equivalent items | ✓ Good — Avoids dependency conflict, formula mathematically sound |
+| Psynalytics brand colors for heatmap (teal-white-lime) | Brand consistency, avoids red-green colorblind issues | ✓ Good — Distinctive visual identity for correlation visualization |
+| Collapsed correlation panel by default | Progressive disclosure reduces cognitive load | ✓ Good — Users expand on demand |
 
 ## Current Milestone: v2.0 Psychometric Rigor
 
@@ -150,4 +162,4 @@ Generate psychometrically valid, production-ready assessment items with automate
 - GPT 5.2 reasoning model support with high thinking mode by default
 
 ---
-*Last updated: 2026-03-14 after v2.0 milestone start*
+*Last updated: 2026-03-14 after Phase 8*

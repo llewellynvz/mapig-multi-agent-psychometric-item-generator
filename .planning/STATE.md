@@ -22,16 +22,16 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Generate psychometrically valid, production-ready assessment items with automated construct validation that ensures items truly measure what they claim to measure, backed by established test development principles
 
-**Current focus:** v2.0 Psychometric Rigor — Adding scale-level validation through synthetic correlations, instrument comparison, and advanced reasoning models
+**Current focus:** v2.0 Psychometric Rigor — Phase 9: Dynamic instrument comparison and cross-construct analysis
 
 ## Current Position
 
-Phase: Phase 8 (Synthetic Correlation Analysis)
-Plan: Plan 03 Complete (2/3 plans)
-Status: Phase 8 In Progress — Correlation Calibration Complete
-Last activity: 2026-03-14 — Completed Plan 08-03 (Correlation calibration validation)
+Phase: Phase 9 (Dynamic Instrument Comparison)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-03-14 — Phase 8 complete (3/3 plans, 8/8 requirements verified)
 
-Progress: [██████░░░░] 60% (0/4 phases complete, 3/5 total plans across phases)
+Progress: [█████████░] 50% (2/4 phases complete, 5/5 total plans across completed phases)
 
 ## Performance Metrics
 
@@ -51,9 +51,16 @@ Progress: [██████░░░░] 60% (0/4 phases complete, 3/5 total p
 | 07-02 | 2 tasks | 6m 44s | 5 files | 2 commits |
 
 **Phase 7 Total:** 2 plans, 5 tasks, 8 files modified, 5 commits, ~22 minutes
-| Phase 08 P01 | 533 | 2 tasks | 12 files |
-| Phase 08 P02 | 260 | 3 tasks | 8 files |
-| Phase 08 P03 | 339 | 1 tasks | 2 files |
+
+**Phase 8 Execution:**
+
+| Plan | Tasks | Duration | Files | Commits |
+|------|-------|----------|-------|---------|
+| 08-01 | 2 tasks | 8m 53s | 12 files | 3 commits |
+| 08-02 | 3 tasks | 4m 20s | 8 files | 2 commits |
+| 08-03 | 1 task | 5m 39s | 2 files | 1 commit |
+
+**Phase 8 Total:** 3 plans, 6 tasks, 22 files modified, 6 commits, ~19 minutes
 
 ## Accumulated Context
 
@@ -111,11 +118,11 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 
 ### Pending Todos
 
-**Phase 7 Complete — Next Phase:**
-1. Begin Phase 8 planning with `/gsd:plan-phase 8`
-2. Implement correlation analysis using GPT-5.2 analytics model
-3. Create correlation matrix UI component with heatmap visualization
-4. Deploy to Vercel preview to test NumPy serverless size impact
+**Phase 8 Complete — Next Phase:**
+1. Begin Phase 9 planning with `/gsd:plan-phase 9`
+2. Implement dynamic instrument comparison with Perplexity Academic search
+3. Build cross-construct analysis with discriminant validity assessment
+4. Deploy to Vercel preview to test NumPy serverless size impact (carried from Phase 8)
 
 ### Blockers/Concerns
 
@@ -124,38 +131,42 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 - Phase 3 token tracking infrastructure deferred — not blocking v2.0
 - Cold start optimization deferred (DEP-08) — may impact Phase 10 (analytics timeout risk)
 - Missing /evaluation nav link — cosmetic, not blocking
-- Pre-existing test failure in test_bias_reviewer.py (references app/prompts/ instead of backend/prompts/) — cosmetic, not blocking Phase 8
+- Pre-existing test failure in test_bias_reviewer.py (references app/prompts/ instead of backend/prompts/) — cosmetic, not blocking
+- reliabiliPy incompatible with scikit-learn 1.8.0 — resolved with simplified omega formula in Phase 8
+- GPT-5.2 token tracking not accumulated in GraphState yet — minor enhancement for Phase 10
 
 **v2.0-specific risks identified in research:**
 
-1. **NumPy serverless size**: Current stack (~100 MB) + NumPy (~30 MB) = ~130 MB total, leaving 120 MB buffer below Vercel 250 MB limit. Mitigation: Deploy to preview in Phase 8, check function size; fallback to client-side correlation if >200 MB.
+1. **NumPy serverless size**: Current stack (~100 MB) + NumPy (~30 MB) = ~130 MB total, leaving 120 MB buffer below Vercel 250 MB limit. Still needs preview deployment test.
 
-2. **langchain-openai 2.x compatibility**: ✅ RESOLVED in Phase 7 — Used langchain-openai 1.x API with `max_tokens` instead of `max_completion_tokens`, ChatOpenAI accepts reasoning parameter correctly.
+2. **langchain-openai 2.x compatibility**: ✅ RESOLVED in Phase 7.
 
-3. **Perplexity retrieval quality**: Unknown if Perplexity Academic can retrieve full instrument metadata vs just abstracts. Mitigation: Test on 10-20 known constructs in Phase 9 before production; supplement with Semantic Scholar if needed.
+3. **Perplexity retrieval quality**: Critical for Phase 9. Unknown if Perplexity Academic can retrieve full instrument metadata vs just abstracts. Mitigation: Test on 10-20 known constructs before production; supplement with Semantic Scholar if needed.
 
-4. **Serverless timeout**: 50 items = 1,225 pairwise comparisons, timeout risk with 300s limit. Mitigation: Streaming partial results, correlation caching, Fluid Compute upgrade to 800s documented in Phase 10.
+4. **Serverless timeout**: 50 items = 1,225 pairwise comparisons, timeout risk with 300s limit. Mitigation in Phase 10.
 
-**No active blockers for Phase 8 planning.**
+**No active blockers for Phase 9 planning.**
 
 ## Session Continuity
 
-Last session: 2026-03-14T11:50:40.783Z
-Stopped at: Completed 08-03-PLAN.md
-Resume: `/gsd:plan-phase 8`
+Last session: 2026-03-14
+Stopped at: Phase 8 complete, ready to plan Phase 9
+Resume: `/gsd:discuss-phase 9`
 
-**Phase 7 Summary:**
-- ✅ Plan 01: Analytics Schema Foundation (FinalOutput.analytics field, Pydantic models, TypeScript types)
-- ✅ Plan 02: GPT-5.2 Analytics Infrastructure (model factory, token tracking, analytics nodes)
-- Status: Phase 7 complete, ready for Phase 8 (Correlation Analysis)
+**Phase 8 Summary:**
+- ✅ Plan 01: Correlation Analysis Engine (GPT-5.2 pairwise estimation, McDonald's omega, graph.py wired)
+- ✅ Plan 02: Correlation Heatmap UI (visx visualization, brand colors, export, collapsible panel)
+- ✅ Plan 03: Calibration Validation (5-scale benchmark suite proving estimation reliability)
+- Status: Phase 8 complete, verified (8/8 requirements), ready for Phase 9 (Dynamic Instrument Comparison)
 
 **Roadmap summary:**
 - 4 phases (7-10) covering 28 requirements
 - Coarse granularity (3-5 phases) applied via consolidation
 - All requirements mapped (100% coverage)
 - Dependencies: 7 → 8 → 9 → 10 (sequential execution)
-- **Phase 7 complete ✅** — Foundation infrastructure ready for analytics features
+- **Phase 7 complete ✅** — Foundation infrastructure ready
+- **Phase 8 complete ✅** — Correlation analysis fully implemented and verified
 
 ---
 *State initialized: 2026-03-14*
-*Last updated: 2026-03-14T10:07:44Z (Phase 7 complete)*
+*Last updated: 2026-03-14 (Phase 8 complete)*

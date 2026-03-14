@@ -57,7 +57,11 @@ export interface AuditMetadata {
   opus_cost?: number;
   sonnet_cost?: number;
   openai_cost?: number;
+  chatgpt_cost?: number;
   total_cost?: number;
+  // Smart validation tracking
+  smart_validation_used?: boolean;
+  validation_model_used?: string;
 }
 
 export interface ReviewComment {
@@ -66,6 +70,50 @@ export interface ReviewComment {
   issue: string;
   severity: number;  // 1-5
   suggested_edit: string;
+}
+
+// Phase 7: v2.0 Analytics Types
+
+export interface CorrelationCell {
+  item_i_index: number;
+  item_j_index: number;
+  correlation: number;
+  ci_low: number;
+  ci_high: number;
+}
+
+export interface CorrelationMatrix {
+  cells: CorrelationCell[];
+  cronbachs_alpha: number;
+  mean_inter_item_correlation: number;
+  internal_consistency_flag: string;
+  disclaimer: string;
+}
+
+export interface ComparisonInstrument {
+  name: string;
+  construct: string;
+  source_citation: string;
+  publication_year?: number;
+  sample_items_count?: number;
+  psychometric_properties?: string;
+  similarity_rationale?: string;
+}
+
+export interface ConstructPairAnalysis {
+  construct_a: string;
+  construct_b: string;
+  estimated_correlation?: number;
+  discriminant_validity_flag?: string;
+  reasoning?: string;
+}
+
+export interface CrossConstructComparison {
+  target_construct: string;
+  comparison_constructs: string[];
+  analysis_summary: string;
+  construct_pairs?: ConstructPairAnalysis[];
+  disclaimer: string;
 }
 
 export interface FinalOutput {
@@ -77,6 +125,11 @@ export interface FinalOutput {
   linguistic_feedback?: ReviewComment[];
   bias_feedback?: ReviewComment[];
   content_feedback?: ReviewComment[];
+
+  // Phase 7: v2.0 analytics fields
+  correlation_matrix?: CorrelationMatrix;
+  comparison_instruments?: ComparisonInstrument[];
+  cross_construct_analysis?: CrossConstructComparison;
 }
 
 export interface HealthResponse {

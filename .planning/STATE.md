@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Psychometric Rigor
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-14T14:28:24Z"
-last_activity: 2026-03-14 — Phase 9 Plan 02 complete (validity scoring engine and graph wiring)
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-03-14T15:16:56Z"
+last_activity: 2026-03-14 — Phase 9 Plan 03 complete (comparison UI components)
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 70
+  completed_phases: 3
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: Phase 9 (Dynamic Instrument Comparison)
-Plan: 2 of 3 complete (09-01 ✅, 09-02 ✅)
-Status: In progress
-Last activity: 2026-03-14 — Phase 9 Plan 02 complete (validity scoring engine and graph wiring)
+Plan: 3 of 3 complete (09-01 ✅, 09-02 ✅, 09-03 ✅)
+Status: Complete
+Last activity: 2026-03-14 — Phase 9 Plan 03 complete (comparison UI components)
 
-Progress: [██████████░] 70% (2/4 phases in progress, 7/10 total plans complete)
+Progress: [██████████] 100% (3/4 phases complete, 8/8 total plans complete)
 
 ## Performance Metrics
 
@@ -68,8 +68,9 @@ Progress: [██████████░] 70% (2/4 phases in progress, 7/10 
 |------|-------|----------|-------|---------|
 | 09-01 | 3 tasks | 8m 51s | 9 files | 4 commits |
 | 09-02 | 2 tasks | 6m 48s | 5 files | 2 commits |
+| 09-03 | 3 tasks | 4m 11s | 8 files | 3 commits |
 
-**Phase 9 Total (so far):** 2 plans, 5 tasks, 14 files modified, 6 commits, ~16 minutes
+**Phase 9 Total:** 3 plans, 8 tasks, 22 files modified, 9 commits, ~20 minutes
 
 ## Accumulated Context
 
@@ -121,6 +122,22 @@ Key decisions carrying forward:
 - Wave 0 stubs created for all Phase 9 plans to ensure Nyquist compliance
 - Adjust test thresholds to 0.60 for semantic paraphrases (realistic r=0.6-0.8) vs production threshold of 0.85 for near-verbatim matches
 
+**09-02 (Validity Scoring Engine):**
+- Use dual-direction averaging for both convergent and discriminant validity (XCON-02)
+- Set discriminant validity flag to "concern" when correlation > 0.85 (XCON-03)
+- Graceful error defaults: 0.5 for convergent validity, 0.3 for discriminant validity
+- Show only averaged results to users (individual directions are implementation detail)
+- Plagiarism detection infrastructure in place but returns empty dict (no published items available due to copyright safeguard)
+
+**09-03 (Comparison UI):**
+- Use default score of 0.5 when convergent_validity_score is missing for backward compatibility
+- Parse author/year from citation with multiple fallback patterns for robust display
+- Show plagiarism badge inline below item text (not blocking, informational only)
+- Copyright disclaimer in ComparisonPanel footer per user decision
+- Educational one-liner explaining convergent and discriminant validity concepts
+- Comparison panel collapsed by default for progressive disclosure
+- Added convergent_validity_score field to FinalOutput schema (backward compatible with Optional/undefined)
+
 ### Roadmap Evolution
 
 **Phase structure rationale:**
@@ -167,19 +184,19 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 
 4. **Serverless timeout**: 50 items = 1,225 pairwise comparisons, timeout risk with 300s limit. Mitigation in Phase 10.
 
-**No active blockers for Phase 9 Plan 02.**
+**No active blockers for Phase 9 (complete).**
 
 ## Session Continuity
 
-Last session: 2026-03-14T14:28:24Z
-Stopped at: Completed 09-02-PLAN.md
-Resume: Continue with Plan 09-03 (Comparison UI)
+Last session: 2026-03-14T15:16:56Z
+Stopped at: Completed 09-03-PLAN.md
+Resume: Phase 9 complete - ready for Phase 10 planning
 
-**Phase 9 Summary (in progress):**
+**Phase 9 Summary (complete):**
 - ✅ Plan 01: Instrument Search & Plagiarism Detection (Perplexity Academic search, hardcoded defaults, sentence-transformers plagiarism detection, Wave 0 stubs)
 - ✅ Plan 02: Validity Scoring Engine (Dual-direction LLM-as-judge, GPT-5.2 analytics, graph node wiring, plagiarism_flags schema)
-- ⏳ Plan 03: Comparison UI (pending)
-- Status: Phase 9 in progress (2/3 plans complete)
+- ✅ Plan 03: Comparison UI (ComparisonPanel, InstrumentCard, PlagiarismBadge, convergent_validity_score field)
+- Status: Phase 9 complete (3/3 plans complete)
 
 **Roadmap summary:**
 - 4 phases (7-10) covering 28 requirements
@@ -188,6 +205,7 @@ Resume: Continue with Plan 09-03 (Comparison UI)
 - Dependencies: 7 → 8 → 9 → 10 (sequential execution)
 - **Phase 7 complete ✅** — Foundation infrastructure ready
 - **Phase 8 complete ✅** — Correlation analysis fully implemented and verified
+- **Phase 9 complete ✅** — Dynamic instrument comparison and cross-construct analysis ready
 
 ---
 *State initialized: 2026-03-14*

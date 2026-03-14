@@ -12,7 +12,7 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 - [x] **CORR-01**: System generates LLM-estimated inter-item correlation matrix for finalized item sets without requiring response data
 - [x] **CORR-02**: System computes Cronbach's alpha from synthetic correlation matrix with minimum threshold flag (alpha >= 0.70)
 - [x] **CORR-03**: System provides confidence intervals for each synthetic correlation estimate
-- [ ] **CORR-04**: System validates synthetic correlations against 5+ published scales with known correlation matrices (benchmark: r > 0.6 agreement)
+- [x] **CORR-04**: System validates synthetic correlations against 5+ published scales with known correlation matrices (benchmark: r > 0.6 agreement)
 - [x] **CORR-05**: System labels all synthetic correlations as "LLM-estimated, not empirically validated" in UI and exports
 - [x] **CORR-06**: System computes internal consistency flags (mean inter-item correlation in 0.15-0.50 optimal range)
 
@@ -103,7 +103,7 @@ Which phases cover which requirements. Updated after roadmap creation.
 | CORR-01 | Phase 8 | Complete |
 | CORR-02 | Phase 8 | Complete |
 | CORR-03 | Phase 8 | Complete |
-| CORR-04 | Phase 8 | Pending |
+| CORR-04 | Phase 8 | Complete |
 | CORR-05 | Phase 8 | Complete |
 | CORR-06 | Phase 8 | Complete |
 | UI-01 | Phase 8 | Complete |

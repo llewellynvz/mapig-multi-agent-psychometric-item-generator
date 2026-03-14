@@ -34,11 +34,11 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 
 ### Visualization & UI
 
-- [ ] **UI-01**: User can view correlation heatmap for generated item set using visx visualization
+- [x] **UI-01**: User can view correlation heatmap for generated item set using visx visualization
 - [ ] **UI-02**: User can view psychometric analytics panel below results showing correlation matrix, comparison instruments, and cross-construct analysis
 - [ ] **UI-03**: User can view comparison display card showing matched validated instruments with source citations
 - [ ] **UI-04**: User can view cross-construct comparison table with discriminant validity assessments
-- [ ] **UI-05**: User can export correlation matrices in CSV and JSON formats with labeled rows/columns
+- [x] **UI-05**: User can export correlation matrices in CSV and JSON formats with labeled rows/columns
 - [ ] **UI-06**: All new UI components match existing shadcn/ui design patterns and Radix primitives
 
 ### GPT-5.2 Reasoning Models
@@ -106,8 +106,8 @@ Which phases cover which requirements. Updated after roadmap creation.
 | CORR-04 | Phase 8 | Pending |
 | CORR-05 | Phase 8 | Complete |
 | CORR-06 | Phase 8 | Complete |
-| UI-01 | Phase 8 | Pending |
-| UI-05 | Phase 8 | Pending |
+| UI-01 | Phase 8 | Complete |
+| UI-05 | Phase 8 | Complete |
 | INST-01 | Phase 9 | Pending |
 | INST-02 | Phase 9 | Pending |
 | INST-03 | Phase 9 | Pending |

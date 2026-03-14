@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Psychometric Rigor
 status: executing
-stopped_at: Completed 08-01-PLAN.md (Correlation analysis engine)
-last_updated: "2026-03-14T11:41:49.951Z"
+stopped_at: Completed 08-02-PLAN.md (Correlation heatmap UI)
+last_updated: "2026-03-14T11:49:41.942Z"
 last_activity: 2026-03-14 — Completed Plan 08-01 (Correlation analysis engine with McDonald's omega)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 60
 ---
 
@@ -52,6 +52,7 @@ Progress: [██████░░░░] 60% (0/4 phases complete, 3/5 total p
 
 **Phase 7 Total:** 2 plans, 5 tasks, 8 files modified, 5 commits, ~22 minutes
 | Phase 08 P01 | 533 | 2 tasks | 12 files |
+| Phase 08 P02 | 260 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Key decisions carrying forward:
 - Placeholder nodes emit SSE events via step() context manager — provides frontend progress tracking even though nodes are no-op in Phase 7
 - Separate reasoning_tokens from output_tokens in usage tracking — GPT-5.2 billing separates reasoning from output, enables accurate cost calculation
 - [Phase 08]: Simplified omega formula instead of reliabiliPy due to scikit-learn 1.8.0 incompatibility
+- [Phase 08]: Psynalytics brand color scale (teal-white-lime) for heatmap instead of blue-white-red to maintain brand consistency
+- [Phase 08]: Correlation panel collapsed by default to reduce initial cognitive load, follows progressive disclosure pattern
+- [Phase 08]: Export buttons inside correlation panel context instead of main export dropdown for domain-specific exports
 
 ### Roadmap Evolution
 
@@ -134,8 +138,8 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 
 ## Session Continuity
 
-Last session: 2026-03-14T11:41:49.950Z
-Stopped at: Completed 08-01-PLAN.md (Correlation analysis engine)
+Last session: 2026-03-14T11:49:41.941Z
+Stopped at: Completed 08-02-PLAN.md (Correlation heatmap UI)
 Resume: `/gsd:plan-phase 8`
 
 **Phase 7 Summary:**

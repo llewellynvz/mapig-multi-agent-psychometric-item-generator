@@ -15,6 +15,7 @@ import { exportToCsv, exportToJson, exportToMarkdown, generateFilename } from "@
 import { QualityChecksPanel } from "./QualityChecksPanel";
 import { CorrelationPanel } from "./CorrelationPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
+import { PlagiarismBadge } from "./PlagiarismBadge";
 
 function ValidationScoreDisplay({
   validation,
@@ -245,6 +246,11 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
                 ) : (
                   <div className="flex-1">
                     <p className="text-sm text-slate-100">{item.item_text}</p>
+                    {fullOutput?.plagiarism_flags?.[index] && (
+                      <div className="mt-2">
+                        <PlagiarismBadge warning={fullOutput.plagiarism_flags[index]} />
+                      </div>
+                    )}
                     {onItemsChange && (
                       <Button
                         variant="ghost"

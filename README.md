@@ -250,14 +250,13 @@ Issues and pull requests are welcome for:
 - Performance and observability upgrades
 
 ## Maintainer
-Created by Prof. Llewellyn E. van Zyl  
+Created by Prof. Llewellyn E. van Zyl (Ph.D)  
 Website: https://www.psynalytics.com  
+Personal: https://www.llewellynvanzyl.com
 GitHub: https://github.com/llewellynvz
 
 ## License
-Proprietary software.  
-Personal, academic, and internal research use is permitted.  
-Redistribution and commercial use are not permitted.
+This is proprietary software. Personal, academic, and internal research use is permitted. Redistribution and commercial use are not permitted.
 
 ## Reference
 

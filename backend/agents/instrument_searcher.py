@@ -1,0 +1,339 @@
+"""Instrument search engine for dynamic comparison instrument discovery.
+
+Phase 9 Plan 01: Hybrid search strategy combining Perplexity Academic search
+with hardcoded fallback defaults across 5 psychological domains.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from typing import Literal, Optional
+
+import httpx
+
+from backend.schemas import ComparisonInstrument
+from backend.settings import settings
+
+log = logging.getLogger("lmaig.instrument_searcher")
+
+
+def search_instruments(
+    construct_name: str,
+    construct_definition: str
+) -> tuple[ComparisonInstrument, ComparisonInstrument]:
+    """Search for convergent and discriminant comparison instruments.
+
+    Returns exactly 2 instruments:
+    - Convergent: Instrument measuring the same construct
+    - Discriminant: Instrument measuring a related-but-distinct construct
+
+    Args:
+        construct_name: Name of the target construct
+        construct_definition: Operational definition of the construct
+
+    Returns:
+        (convergent_instrument, discriminant_instrument)
+    """
+    log.info("INSTRUMENT_SEARCH start construct=%s", construct_name)
+
+    # Try Perplexity search first
+    convergent = _search_perplexity_instrument(construct_name, "convergent")
+    discriminant = _search_perplexity_instrument(construct_name, "discriminant")
+
+    # Fall back to defaults if either search failed
+    if convergent is None or discriminant is None:
+        log.info("INSTRUMENT_SEARCH fallback to defaults (perplexity_failed)")
+        convergent_default, discriminant_default = _get_hardcoded_defaults(construct_name)
+        if convergent is None:
+            convergent = convergent_default
+        if discriminant is None:
+            discriminant = discriminant_default
+
+    log.info("INSTRUMENT_SEARCH done convergent=%s discriminant=%s", convergent.name, discriminant.name)
+    return convergent, discriminant
+
+
+def _search_perplexity_instrument(
+    construct_name: str,
+    search_type: Literal["convergent", "discriminant"]
+) -> Optional[ComparisonInstrument]:
+    """Search Perplexity Academic for a specific instrument type.
+
+    Args:
+        construct_name: Target construct name
+        search_type: "convergent" for same construct, "discriminant" for related-but-distinct
+
+    Returns:
+        ComparisonInstrument if found and not blocked, None otherwise
+    """
+    if not settings.PERPLEXITY_API_KEY:
+        log.warning("PERPLEXITY_INSTRUMENT_SEARCH skipped (no API key)")
+        return None
+
+    # Build query based on search type
+    if search_type == "convergent":
+        query = (
+            f"Find a validated psychometric instrument that directly measures {construct_name}. "
+            f"Return structured metadata including: instrument name, author(s), publication year, "
+            f"construct measured, number of items, and key psychometric properties (reliability, validity). "
+            f"Prioritize widely-used, well-validated instruments from peer-reviewed sources."
+        )
+    else:  # discriminant
+        query = (
+            f"Find a validated psychometric instrument that measures a construct related to but distinct from {construct_name}. "
+            f"The instrument should measure something conceptually adjacent (e.g., if {construct_name} is self-esteem, "
+            f"find instruments measuring depression, anxiety, or life satisfaction - not self-esteem itself). "
+            f"Return structured metadata including: instrument name, author(s), publication year, "
+            f"construct measured, number of items, and why this construct is related but distinct."
+        )
+
+    # Use academic domain filter if configured
+    domains = settings.perplexity_domains()
+
+    payload = {
+        "model": settings.PERPLEXITY_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a psychometric instrument search assistant. Return instrument metadata "
+                    "in JSON format with these fields: name, authors, year, construct, item_count, "
+                    "psychometric_properties, similarity_rationale. Do not include instruments from "
+                    "commercial publishers that require purchase (e.g., Pearson, PAR, MHS, WPS, Hogrefe)."
+                )
+            },
+            {"role": "user", "content": query}
+        ],
+        "temperature": 0,
+    }
+
+    # Add domain filter if configured
+    if domains:
+        payload["web_search_options"] = {
+            "search_mode": settings.PERPLEXITY_SEARCH_MODE,
+            "num_search_results": settings.PERPLEXITY_MAX_RESULTS,
+            "search_domain_filter": domains,
+        }
+
+    url = settings.PERPLEXITY_BASE_URL.rstrip("/") + "/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.PERPLEXITY_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+
+        # Parse LLM response
+        message_content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not message_content:
+            log.warning("PERPLEXITY_INSTRUMENT_SEARCH no content returned")
+            return None
+
+        # Extract JSON from response
+        json_start = message_content.find("{")
+        json_end = message_content.rfind("}") + 1
+        if json_start < 0 or json_end <= json_start:
+            log.warning("PERPLEXITY_INSTRUMENT_SEARCH no JSON found in response")
+            return None
+
+        json_str = message_content[json_start:json_end]
+        parsed = json.loads(json_str)
+
+        # Check for blocked publishers
+        citation = f"{parsed.get('authors', '')} ({parsed.get('year', '')})"
+        if _is_blocked_publisher(citation, message_content):
+            log.info("PERPLEXITY_INSTRUMENT_SEARCH blocked publisher detected, skipping")
+            return None
+
+        # Build ComparisonInstrument
+        instrument = ComparisonInstrument(
+            name=parsed.get("name", "Unknown Instrument"),
+            construct=parsed.get("construct", construct_name),
+            source_citation=citation,
+            publication_year=parsed.get("year"),
+            sample_items_count=parsed.get("item_count"),
+            psychometric_properties=parsed.get("psychometric_properties"),
+            similarity_rationale=parsed.get("similarity_rationale")
+        )
+
+        log.info("PERPLEXITY_INSTRUMENT_SEARCH success type=%s instrument=%s", search_type, instrument.name)
+        return instrument
+
+    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError) as e:
+        log.warning("PERPLEXITY_INSTRUMENT_SEARCH failed: %s", e)
+        return None
+
+
+def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, ComparisonInstrument]:
+    """Get fallback instruments based on domain heuristics.
+
+    Covers 5 psychological domains: personality, clinical, organizational, social, cognitive.
+
+    Args:
+        construct_name: Target construct name for domain matching
+
+    Returns:
+        (convergent_instrument, discriminant_instrument)
+    """
+    construct_lower = construct_name.lower()
+
+    # Personality domain
+    if any(kw in construct_lower for kw in ["personality", "extraversion", "openness", "conscientiousness", "agreeableness", "neuroticism", "big five"]):
+        return (
+            ComparisonInstrument(
+                name="IPIP-NEO",
+                construct="Big Five personality traits",
+                source_citation="Goldberg, L. R. (1999). A broad-bandwidth, public domain, personality inventory measuring the lower-level facets of several five-factor models. Personality Psychology in Europe, 7(1), 7-28.",
+                publication_year=1999,
+                sample_items_count=50,
+                psychometric_properties="α = 0.77-0.89 across dimensions, well-established construct validity",
+                similarity_rationale="Measures personality traits similar to target construct"
+            ),
+            ComparisonInstrument(
+                name="PHQ-9",
+                construct="depression severity",
+                source_citation="Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
+                publication_year=2001,
+                sample_items_count=9,
+                psychometric_properties="α = 0.89, sensitivity 88%, specificity 88% for major depression",
+                similarity_rationale="Related to personality but measures distinct clinical construct (depression)"
+            )
+        )
+
+    # Clinical domain
+    if any(kw in construct_lower for kw in ["depression", "anxiety", "mood", "symptom", "mental health", "clinical", "disorder"]):
+        return (
+            ComparisonInstrument(
+                name="PHQ-9",
+                construct="depression severity",
+                source_citation="Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
+                publication_year=2001,
+                sample_items_count=9,
+                psychometric_properties="α = 0.89, sensitivity 88%, specificity 88% for major depression",
+                similarity_rationale="Directly measures depression/clinical symptoms"
+            ),
+            ComparisonInstrument(
+                name="Rosenberg Self-Esteem Scale",
+                construct="self-esteem",
+                source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
+                publication_year=1965,
+                sample_items_count=10,
+                psychometric_properties="α = 0.77-0.88, test-retest reliability = 0.82-0.88",
+                similarity_rationale="Related to mood/clinical constructs but measures distinct positive self-evaluation"
+            )
+        )
+
+    # Organizational domain
+    if any(kw in construct_lower for kw in ["work", "job", "engagement", "burnout", "organizational", "employee", "occupation"]):
+        return (
+            ComparisonInstrument(
+                name="Utrecht Work Engagement Scale (UWES-9)",
+                construct="work engagement",
+                source_citation="Schaufeli, W. B., Bakker, A. B., & Salanova, M. (2006). The measurement of work engagement with a short questionnaire: A cross-national study. Educational and Psychological Measurement, 66(4), 701-716.",
+                publication_year=2006,
+                sample_items_count=9,
+                psychometric_properties="α = 0.85-0.92 across dimensions (vigor, dedication, absorption)",
+                similarity_rationale="Measures positive work-related well-being"
+            ),
+            ComparisonInstrument(
+                name="Maslach Burnout Inventory (MBI-GS)",
+                construct="burnout",
+                source_citation="Schaufeli, W. B., Leiter, M. P., Maslach, C., & Jackson, S. E. (1996). Maslach Burnout Inventory-General Survey. In C. Maslach, S. E. Jackson, & M. P. Leiter (Eds.), MBI Manual (3rd ed.). Consulting Psychologists Press.",
+                publication_year=1996,
+                sample_items_count=16,
+                psychometric_properties="α = 0.87-0.89 across exhaustion, cynicism, professional efficacy",
+                similarity_rationale="Related to work constructs but measures negative work-related state (opposite valence)"
+            )
+        )
+
+    # Social domain
+    if any(kw in construct_lower for kw in ["social", "loneliness", "relationship", "interpersonal", "isolation", "connection"]):
+        return (
+            ComparisonInstrument(
+                name="UCLA Loneliness Scale (Version 3)",
+                construct="loneliness",
+                source_citation="Russell, D. W. (1996). UCLA Loneliness Scale (Version 3): Reliability, validity, and factor structure. Journal of Personality Assessment, 66(1), 20-40.",
+                publication_year=1996,
+                sample_items_count=20,
+                psychometric_properties="α = 0.89-0.94, test-retest reliability = 0.73",
+                similarity_rationale="Measures subjective social isolation"
+            ),
+            ComparisonInstrument(
+                name="Rosenberg Self-Esteem Scale",
+                construct="self-esteem",
+                source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
+                publication_year=1965,
+                sample_items_count=10,
+                psychometric_properties="α = 0.77-0.88, test-retest reliability = 0.82-0.88",
+                similarity_rationale="Related to social constructs but measures distinct self-evaluation"
+            )
+        )
+
+    # Cognitive domain
+    if any(kw in construct_lower for kw in ["cognition", "cognitive", "thinking", "intelligence", "reasoning", "memory", "attention"]):
+        return (
+            ComparisonInstrument(
+                name="Need for Cognition Scale",
+                construct="need for cognition",
+                source_citation="Cacioppo, J. T., Petty, R. E., & Kao, C. F. (1984). The efficient assessment of need for cognition. Journal of Personality Assessment, 48(3), 306-307.",
+                publication_year=1984,
+                sample_items_count=18,
+                psychometric_properties="α = 0.85-0.90, test-retest reliability = 0.88",
+                similarity_rationale="Measures individual differences in cognitive engagement"
+            ),
+            ComparisonInstrument(
+                name="Big Five Inventory - Openness Subscale",
+                construct="openness to experience",
+                source_citation="John, O. P., Donahue, E. M., & Kentle, R. L. (1991). The Big Five Inventory--Versions 4a and 54. Berkeley, CA: University of California, Berkeley, Institute of Personality and Social Research.",
+                publication_year=1991,
+                sample_items_count=10,
+                psychometric_properties="α = 0.79-0.81 for openness dimension",
+                similarity_rationale="Related to cognitive constructs but measures broader personality trait"
+            )
+        )
+
+    # Fallback (unmatched constructs) - use widely applicable instruments
+    return (
+        ComparisonInstrument(
+            name="Rosenberg Self-Esteem Scale",
+            construct="self-esteem",
+            source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
+            publication_year=1965,
+            sample_items_count=10,
+            psychometric_properties="α = 0.77-0.88, test-retest reliability = 0.82-0.88",
+            similarity_rationale="General positive self-evaluation construct"
+        ),
+        ComparisonInstrument(
+            name="PHQ-9",
+            construct="depression severity",
+            source_citation="Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
+            publication_year=2001,
+            sample_items_count=9,
+            psychometric_properties="α = 0.89, sensitivity 88%, specificity 88% for major depression",
+            similarity_rationale="General negative affect/clinical construct"
+        )
+    )
+
+
+def _is_blocked_publisher(citation: str, content: str) -> bool:
+    """Check if citation or content contains blocked publisher domains.
+
+    Args:
+        citation: Citation string to check
+        content: Full response content to check
+
+    Returns:
+        True if any blocked domain is found, False otherwise
+    """
+    blocked = settings.publisher_blocklist_domains()
+    combined_text = (citation + " " + content).lower()
+
+    for domain in blocked:
+        if domain.lower() in combined_text:
+            return True
+
+    return False

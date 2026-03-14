@@ -75,8 +75,8 @@ def test_hardcoded_defaults_coverage():
 def test_search_fallback_on_failure():
     """Test graceful fallback to defaults when Perplexity fails."""
     with patch('backend.agents.instrument_searcher._search_perplexity_instrument') as mock_search:
-        # Mock timeout error
-        mock_search.side_effect = httpx.TimeoutException("Connection timeout")
+        # Mock search failure (returns None)
+        mock_search.return_value = None
 
         convergent, discriminant = search_instruments("self-esteem", "A person's overall evaluation of their worth")
 

@@ -120,7 +120,12 @@ Plans:
   9. Automated validity flagging warns when correlation > 0.85 with related construct indicates potential discriminant validity concern
   10. Related-but-distinct constructs identified via dynamic neighbor discovery validated at > 70% agreement with expert-curated benchmarks
 
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Instrument search engine with Perplexity Academic, hardcoded defaults, publisher blocklist, and plagiarism detector
+- [ ] 09-02-PLAN.md — Dual-direction validity scoring engine and graph node wiring (comparison_node + cross_construct_node)
+- [ ] 09-03-PLAN.md — Frontend ComparisonPanel, InstrumentCard, PlagiarismBadge, and GeneratedItemsTable integration
 
 ### Phase 10: GPT-5.2 Integration & Analytics Optimization
 **Goal**: System supports GPT-5.2 reasoning models with cost controls and executes all analytics in parallel for optimal performance
@@ -156,9 +161,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6 → 7 �
 | 6. Comprehensive Evaluation Framework | v1.1 | 4/4 | Complete | 2026-03-09 |
 | 7. Foundation & Infrastructure | v2.0 | 2/2 | Complete | 2026-03-14 |
 | 8. Synthetic Correlation Analysis | v2.0 | 3/3 | Complete | 2026-03-14 |
-| 9. Dynamic Instrument Comparison | v2.0 | 0/? | Not started | - |
+| 9. Dynamic Instrument Comparison | v2.0 | 0/3 | Planned | - |
 | 10. GPT-5.2 Integration & Analytics Optimization | v2.0 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-14 (Phase 8 complete - 3/3 plans executed)*
+*Last updated: 2026-03-14 (Phase 9 planned - 3 plans created)*

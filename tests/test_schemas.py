@@ -617,51 +617,51 @@ def test_correlation_matrix_validation():
     # Act: Create correlation matrix with valid data
     matrix = CorrelationMatrix(
         cells=cells,
-        cronbachs_alpha=0.85,
+        mcdonalds_omega=0.85,
         mean_inter_item_correlation=0.72,
         internal_consistency_flag="good"
     )
 
     # Assert: All fields populated correctly
     assert len(matrix.cells) == 3
-    assert matrix.cronbachs_alpha == 0.85
+    assert matrix.mcdonalds_omega == 0.85
     assert matrix.mean_inter_item_correlation == 0.72
     assert matrix.internal_consistency_flag == "good"
     assert matrix.disclaimer == "LLM-estimated, not empirically validated"
 
-    # Test boundary: cronbachs_alpha at 0.0 and 1.0
+    # Test boundary: mcdonalds_omega at 0.0 and 1.0
     matrix_min = CorrelationMatrix(
         cells=cells,
-        cronbachs_alpha=0.0,
+        mcdonalds_omega=0.0,
         mean_inter_item_correlation=0.2,
         internal_consistency_flag="poor"
     )
-    assert matrix_min.cronbachs_alpha == 0.0
+    assert matrix_min.mcdonalds_omega == 0.0
 
     matrix_max = CorrelationMatrix(
         cells=cells,
-        cronbachs_alpha=1.0,
+        mcdonalds_omega=1.0,
         mean_inter_item_correlation=0.95,
         internal_consistency_flag="excellent"
     )
-    assert matrix_max.cronbachs_alpha == 1.0
+    assert matrix_max.mcdonalds_omega == 1.0
 
-    # Test invalid: cronbachs_alpha > 1.0
+    # Test invalid: mcdonalds_omega > 1.0
     from pydantic import ValidationError
     with pytest.raises(ValidationError) as exc_info:
         CorrelationMatrix(
             cells=cells,
-            cronbachs_alpha=1.2,
+            mcdonalds_omega=1.2,
             mean_inter_item_correlation=0.8,
             internal_consistency_flag="excellent"
         )
-    assert "cronbachs_alpha" in str(exc_info.value).lower()
+    assert "mcdonalds_omega" in str(exc_info.value).lower()
 
     # Test invalid: empty cells list
     with pytest.raises(ValidationError):
         CorrelationMatrix(
             cells=[],
-            cronbachs_alpha=0.85,
+            mcdonalds_omega=0.85,
             mean_inter_item_correlation=0.72,
             internal_consistency_flag="good"
         )
@@ -842,7 +842,7 @@ def test_finaloutput_analytics_populated():
 
     matrix = CorrelationMatrix(
         cells=cells,
-        cronbachs_alpha=0.85,
+        mcdonalds_omega=0.85,
         mean_inter_item_correlation=0.75,
         internal_consistency_flag="good"
     )
@@ -872,7 +872,7 @@ def test_finaloutput_analytics_populated():
 
     # Assert: All analytics fields populated
     assert output.correlation_matrix is not None
-    assert output.correlation_matrix.cronbachs_alpha == 0.85
+    assert output.correlation_matrix.mcdonalds_omega == 0.85
     assert len(output.comparison_instruments) == 1
     assert output.comparison_instruments[0].name == "Test Scale"
     assert output.cross_construct_analysis is not None
@@ -880,7 +880,7 @@ def test_finaloutput_analytics_populated():
 
     # Assert: model_dump() serializes correctly
     data = output.model_dump()
-    assert data["correlation_matrix"]["cronbachs_alpha"] == 0.85
+    assert data["correlation_matrix"]["mcdonalds_omega"] == 0.85
     assert len(data["comparison_instruments"]) == 1
     assert data["cross_construct_analysis"]["target_construct"] == "Test Construct"
 

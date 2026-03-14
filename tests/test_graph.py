@@ -239,8 +239,9 @@ def test_claude_end_to_end_workflow():
         model_provider="claude"
     )
 
-    # Mock CLAUDE_API_KEY
-    with patch.object(settings, 'CLAUDE_API_KEY', "test-key-12345"):
+    # Mock CLAUDE_API_KEY and disable agent overrides to test base allocation
+    with patch.object(settings, 'CLAUDE_API_KEY', "test-key-12345"), \
+         patch.object(settings, 'AGENT_MODEL_OVERRIDES_ENABLED', False):
         # Clear LRU cache to force new instances
         from backend.agents.llm_factory import get_claude_chat_model
         if hasattr(get_claude_chat_model, 'cache_clear'):
@@ -303,3 +304,121 @@ def test_missing_claude_key_raises_error():
         assert ".env" in expected_error
         assert "Vercel" in expected_error
         assert "environment" in expected_error
+
+
+# Phase 07 Task 2: Analytics Placeholder Nodes and GPT-5.2 Token Tracking
+
+
+def test_graphstate_gpt52_token_fields():
+    """Phase 07-02 Task 2: GraphState accepts GPT-5.2 token tracking fields."""
+    from backend.graph import GraphState
+
+    # Create a dict with GPT-5.2 token fields (TypedDict with total=False allows optional keys)
+    state: GraphState = {
+        "gpt52_tokens_used": 1000,
+        "gpt52_reasoning_tokens": 800,
+        "gpt52_output_tokens": 200,
+    }
+
+    # Verify fields are accepted (no TypedDict error)
+    assert state["gpt52_tokens_used"] == 1000
+    assert state["gpt52_reasoning_tokens"] == 800
+    assert state["gpt52_output_tokens"] == 200
+
+
+def test_accumulate_tokens_gpt52():
+    """Phase 07-02 Task 2: _accumulate_tokens routes GPT-5.2 tokens with reasoning tracking."""
+    from backend.graph import _accumulate_tokens
+    from backend.agents.llm_utils import TokenUsage
+
+    # Create state with initial zero counters
+    state = {
+        "gpt52_tokens_used": 0,
+        "gpt52_reasoning_tokens": 0,
+        "gpt52_output_tokens": 0,
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+    }
+
+    # Create GPT-5.2 usage with reasoning tokens
+    usage = TokenUsage(
+        model_name="gpt-5.2",
+        total_tokens=1000,
+        reasoning_tokens=800,
+        output_tokens=200,
+        input_tokens=100
+    )
+
+    # Act: Accumulate tokens
+    result = _accumulate_tokens(state, usage)
+
+    # Assert: GPT-5.2 counters updated correctly
+    assert result["gpt52_tokens_used"] == 1000, "Total GPT-5.2 tokens should be 1000"
+    assert result["gpt52_reasoning_tokens"] == 800, "Reasoning tokens should be 800"
+    assert result["gpt52_output_tokens"] == 200, "Output tokens should be 200"
+
+    # Assert: Other counters unchanged
+    assert result["opus_tokens_used"] == 0
+    assert result["sonnet_tokens_used"] == 0
+    assert result["openai_tokens_used"] == 0
+    assert result["chatgpt_tokens_used"] == 0
+
+
+def test_accumulate_tokens_existing_models_unchanged():
+    """Phase 07-02 Task 2: GPT-5.2 routing doesn't affect existing model routing (regression)."""
+    from backend.graph import _accumulate_tokens
+    from backend.agents.llm_utils import TokenUsage
+
+    # Create state with zero counters
+    state = {
+        "gpt52_tokens_used": 0,
+        "gpt52_reasoning_tokens": 0,
+        "gpt52_output_tokens": 0,
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+    }
+
+    # Test existing model (Sonnet)
+    sonnet_usage = TokenUsage(
+        model_name="claude-sonnet-4-5",
+        total_tokens=500,
+        output_tokens=200,
+        input_tokens=300
+    )
+
+    result = _accumulate_tokens(state, sonnet_usage)
+
+    # Assert: Sonnet counter updated, GPT-5.2 counters stay zero
+    assert result["sonnet_tokens_used"] == 500
+    assert result["gpt52_tokens_used"] == 0
+    assert result["gpt52_reasoning_tokens"] == 0
+    assert result["gpt52_output_tokens"] == 0
+
+
+def test_analytics_placeholders_no_op():
+    """Phase 07-02 Task 2: Analytics placeholder nodes return empty dict (no-op)."""
+    from backend.graph import correlation_node, comparison_node, cross_construct_node
+
+    # Minimal state dict
+    state = {"user_request": None, "draft_items": []}
+
+    # Test each placeholder returns empty dict
+    assert correlation_node(state) == {}, "correlation_node should return empty dict"
+    assert comparison_node(state) == {}, "comparison_node should return empty dict"
+    assert cross_construct_node(state) == {}, "cross_construct_node should return empty dict"
+
+
+def test_analytics_nodes_in_graph():
+    """Phase 07-02 Task 2: Analytics nodes exist in graph topology."""
+    from backend.graph import build_graph
+
+    graph = build_graph()
+
+    # Verify all three analytics nodes exist
+    assert "correlation_node" in graph.nodes, "correlation_node must exist in graph"
+    assert "comparison_node" in graph.nodes, "comparison_node must exist in graph"
+    assert "cross_construct_node" in graph.nodes, "cross_construct_node must exist in graph"

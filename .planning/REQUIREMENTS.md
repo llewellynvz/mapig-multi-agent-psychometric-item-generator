@@ -21,16 +21,16 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 - [x] **INST-01**: System dynamically searches for validated comparison instruments via Perplexity Academic based on user's construct definition
 - [x] **INST-02**: System replaces hardcoded org psych nearest neighbor constructs with literature-grounded search results
 - [x] **INST-03**: System uses hybrid approach for neighbor constructs (hardcoded defaults + literature supplements, fallback to defaults if search fails)
-- [ ] **INST-04**: System provides convergent validity evidence by comparing generated items to instruments measuring the same construct
+- [x] **INST-04**: System provides convergent validity evidence by comparing generated items to instruments measuring the same construct
 - [x] **INST-05**: System enforces copyright safeguards (public-domain allowlist, publisher blocklist, metadata-only storage, never store copyrighted item text)
 - [x] **INST-06**: System detects potential plagiarism by flagging generated items with cosine similarity > 0.85 to retrieved instrument items
 
 ### Cross-Construct Comparison
 
-- [ ] **XCON-01**: System assesses discriminant validity by comparing generated items against instruments measuring related-but-distinct constructs
-- [ ] **XCON-02**: System uses dual-direction LLM-as-judge scoring (A to B and B to A averaged) to mitigate position bias in cross-construct comparisons
-- [ ] **XCON-03**: System provides automated validity flagging (correlation > 0.85 with related construct = discriminant validity concern)
-- [ ] **XCON-04**: System identifies related-but-distinct constructs for comparison using dynamic neighbor discovery (validated against expert-curated at > 70% agreement)
+- [x] **XCON-01**: System assesses discriminant validity by comparing generated items against instruments measuring related-but-distinct constructs
+- [x] **XCON-02**: System uses dual-direction LLM-as-judge scoring (A to B and B to A averaged) to mitigate position bias in cross-construct comparisons
+- [x] **XCON-03**: System provides automated validity flagging (correlation > 0.85 with related construct = discriminant validity concern)
+- [x] **XCON-04**: System identifies related-but-distinct constructs for comparison using dynamic neighbor discovery (validated against expert-curated at > 70% agreement)
 
 ### Visualization & UI
 
@@ -111,13 +111,13 @@ Which phases cover which requirements. Updated after roadmap creation.
 | INST-01 | Phase 9 | Complete |
 | INST-02 | Phase 9 | Complete |
 | INST-03 | Phase 9 | Complete |
-| INST-04 | Phase 9 | Pending |
+| INST-04 | Phase 9 | Complete |
 | INST-05 | Phase 9 | Complete |
 | INST-06 | Phase 9 | Complete |
-| XCON-01 | Phase 9 | Pending |
-| XCON-02 | Phase 9 | Pending |
-| XCON-03 | Phase 9 | Pending |
-| XCON-04 | Phase 9 | Pending |
+| XCON-01 | Phase 9 | Complete |
+| XCON-02 | Phase 9 | Complete |
+| XCON-03 | Phase 9 | Complete |
+| XCON-04 | Phase 9 | Complete |
 | UI-02 | Phase 9 | Pending |
 | UI-03 | Phase 9 | Pending |
 | UI-04 | Phase 9 | Pending |

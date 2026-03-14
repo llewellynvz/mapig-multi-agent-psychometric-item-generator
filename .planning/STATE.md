@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Psychometric Rigor
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-14T14:17:43Z"
-last_activity: 2026-03-14 — Phase 9 Plan 01 complete (instrument search and plagiarism detection)
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-14T14:28:24Z"
+last_activity: 2026-03-14 — Phase 9 Plan 02 complete (validity scoring engine and graph wiring)
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 60
+  total_plans: 7
+  completed_plans: 7
+  percent: 70
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: Phase 9 (Dynamic Instrument Comparison)
-Plan: 1 of 3 complete (09-01 ✅)
+Plan: 2 of 3 complete (09-01 ✅, 09-02 ✅)
 Status: In progress
-Last activity: 2026-03-14 — Phase 9 Plan 01 complete (instrument search and plagiarism detection)
+Last activity: 2026-03-14 — Phase 9 Plan 02 complete (validity scoring engine and graph wiring)
 
-Progress: [██████████░] 60% (2/4 phases in progress, 6/10 total plans complete)
+Progress: [██████████░] 70% (2/4 phases in progress, 7/10 total plans complete)
 
 ## Performance Metrics
 
@@ -67,8 +67,9 @@ Progress: [██████████░] 60% (2/4 phases in progress, 6/10 
 | Plan | Tasks | Duration | Files | Commits |
 |------|-------|----------|-------|---------|
 | 09-01 | 3 tasks | 8m 51s | 9 files | 4 commits |
+| 09-02 | 2 tasks | 6m 48s | 5 files | 2 commits |
 
-**Phase 9 Total (so far):** 1 plan, 3 tasks, 9 files modified, 4 commits, ~9 minutes
+**Phase 9 Total (so far):** 2 plans, 5 tasks, 14 files modified, 6 commits, ~16 minutes
 
 ## Accumulated Context
 
@@ -170,15 +171,15 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 
 ## Session Continuity
 
-Last session: 2026-03-14T14:17:43Z
-Stopped at: Completed 09-01-PLAN.md
-Resume: Continue with Plan 09-02 (Validity Scoring Engine)
+Last session: 2026-03-14T14:28:24Z
+Stopped at: Completed 09-02-PLAN.md
+Resume: Continue with Plan 09-03 (Comparison UI)
 
 **Phase 9 Summary (in progress):**
 - ✅ Plan 01: Instrument Search & Plagiarism Detection (Perplexity Academic search, hardcoded defaults, sentence-transformers plagiarism detection, Wave 0 stubs)
-- ⏳ Plan 02: Validity Scoring Engine (pending)
+- ✅ Plan 02: Validity Scoring Engine (Dual-direction LLM-as-judge, GPT-5.2 analytics, graph node wiring, plagiarism_flags schema)
 - ⏳ Plan 03: Comparison UI (pending)
-- Status: Phase 9 in progress (1/3 plans complete)
+- Status: Phase 9 in progress (2/3 plans complete)
 
 **Roadmap summary:**
 - 4 phases (7-10) covering 28 requirements

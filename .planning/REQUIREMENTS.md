@@ -1,0 +1,109 @@
+# Requirements: MAPIG v2.0 Psychometric Rigor
+
+**Defined:** 2026-03-14
+**Core Value:** Generate psychometrically valid, production-ready assessment items with automated construct validation that ensures items truly measure what they claim to measure, backed by established test development principles.
+
+## v2.0 Requirements
+
+Requirements for v2.0 milestone. Each maps to roadmap phases.
+
+### Synthetic Correlations
+
+- [ ] **CORR-01**: System generates LLM-estimated inter-item correlation matrix for finalized item sets without requiring response data
+- [ ] **CORR-02**: System computes Cronbach's alpha from synthetic correlation matrix with minimum threshold flag (alpha >= 0.70)
+- [ ] **CORR-03**: System provides confidence intervals for each synthetic correlation estimate
+- [ ] **CORR-04**: System validates synthetic correlations against 5+ published scales with known correlation matrices (benchmark: r > 0.6 agreement)
+- [ ] **CORR-05**: System labels all synthetic correlations as "LLM-estimated, not empirically validated" in UI and exports
+- [ ] **CORR-06**: System computes internal consistency flags (mean inter-item correlation in 0.15-0.50 optimal range)
+
+### Instrument Comparison
+
+- [ ] **INST-01**: System dynamically searches for validated comparison instruments via Perplexity Academic based on user's construct definition
+- [ ] **INST-02**: System replaces hardcoded org psych nearest neighbor constructs with literature-grounded search results
+- [ ] **INST-03**: System uses hybrid approach for neighbor constructs (hardcoded defaults + literature supplements, fallback to defaults if search fails)
+- [ ] **INST-04**: System provides convergent validity evidence by comparing generated items to instruments measuring the same construct
+- [ ] **INST-05**: System enforces copyright safeguards (public-domain allowlist, publisher blocklist, metadata-only storage, never store copyrighted item text)
+- [ ] **INST-06**: System detects potential plagiarism by flagging generated items with cosine similarity > 0.85 to retrieved instrument items
+
+### Cross-Construct Comparison
+
+- [ ] **XCON-01**: System assesses discriminant validity by comparing generated items against instruments measuring related-but-distinct constructs
+- [ ] **XCON-02**: System uses dual-direction LLM-as-judge scoring (A to B and B to A averaged) to mitigate position bias in cross-construct comparisons
+- [ ] **XCON-03**: System provides automated validity flagging (correlation > 0.85 with related construct = discriminant validity concern)
+- [ ] **XCON-04**: System identifies related-but-distinct constructs for comparison using dynamic neighbor discovery (validated against expert-curated at > 70% agreement)
+
+### Visualization & UI
+
+- [ ] **UI-01**: User can view correlation heatmap for generated item set using visx visualization
+- [ ] **UI-02**: User can view psychometric analytics panel below results showing correlation matrix, comparison instruments, and cross-construct analysis
+- [ ] **UI-03**: User can view comparison display card showing matched validated instruments with source citations
+- [ ] **UI-04**: User can view cross-construct comparison table with discriminant validity assessments
+- [ ] **UI-05**: User can export correlation matrices in CSV and JSON formats with labeled rows/columns
+- [ ] **UI-06**: All new UI components match existing shadcn/ui design patterns and Radix primitives
+
+### GPT-5.2 Reasoning Models
+
+- [ ] **GPT-01**: System supports GPT-5.2 reasoning model with configurable reasoning effort (none/low/medium/high/xhigh)
+- [ ] **GPT-02**: System defaults to high reasoning effort for GPT-5.2 analytics tasks
+- [ ] **GPT-03**: User can toggle GPT-5.2 for analytics via UI with cost warning modal (4-6x multiplier displayed)
+- [ ] **GPT-04**: System enforces budget caps per run and aborts if reasoning token cost exceeds threshold
+- [ ] **GPT-05**: System provides post-run audit breakdown showing reasoning tokens vs output tokens separately
+
+### Infrastructure
+
+- [ ] **INFRA-01**: GraphState schema extended with CorrelationMatrix, ComparisonInstrument, and CrossConstructComparison types
+- [ ] **INFRA-02**: FinalOutput schema extended with correlation_matrix, comparison_instruments, and cross_construct_analysis fields
+- [ ] **INFRA-03**: Analytics nodes execute post-finalize in parallel using LangGraph Send API (correlation, comparison, cross-construct simultaneously)
+- [ ] **INFRA-04**: Analytics failures handled gracefully (populate null values, item generation completes successfully)
+- [ ] **INFRA-05**: llm_factory.py supports reasoning_effort parameter for GPT-5.2 model allocation
+
+## Future Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Advanced Psychometrics
+
+- **ADV-01**: System computes polychoric/tetrachoric correlations for ordinal Likert data
+- **ADV-02**: System predicts factor structure from item text alone (CFA without response data)
+- **ADV-03**: System provides model fit indices (RMSEA, CFI, TLI) for predicted factor structure
+- **ADV-04**: System supports multi-model synthetic validation (compare Claude + GPT-5.2 estimates for higher confidence)
+
+### Visualization Enhancements
+
+- **VIS-01**: System displays nomological network visualization (graph showing construct relationships)
+- **VIS-02**: System provides instrument versioning and run comparison across sessions
+
+### Performance
+
+- **PERF-01**: System uses persistent checkpointing (Vercel Postgres + PostgresSaver) for timeout resumption
+- **PERF-02**: System caches correlation results (Redis/Vercel KV) for identical item pairs
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Generating synthetic response data | LLMs as respondents have narrow variability, semantic drift, "AI-slop" contamination risk |
+| Causal claims from correlations | Correlation != causation; fundamental misinterpretation risk |
+| Treating synthetic correlations as empirical | Synthetic estimates are predictions, not observations; claiming equivalence damages credibility |
+| IRT parameter estimation without data | IRT requires response data; difficulty/discrimination estimates from text alone are unreliable |
+| Recursive AI training on generated items | "AI-slop" degrades training data; pollutes item pools with derivative content |
+| Correlation "cut-offs" as absolute rules | Context-dependent; provide guidance ranges, not hard thresholds |
+| Generating reverse-scored items | Research shows reverse-scored items reduce reliability and introduce method effects |
+| Full instrument item text display | Copyright restrictions; store metadata only, never copyrighted item text |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| — | — | — |
+
+**Coverage:**
+- v2.0 requirements: 28 total
+- Mapped to phases: 0
+- Unmapped: 28
+
+---
+*Requirements defined: 2026-03-14*
+*Last updated: 2026-03-14 after initial definition*

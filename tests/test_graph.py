@@ -400,18 +400,19 @@ def test_accumulate_tokens_existing_models_unchanged():
 
 
 def test_analytics_placeholders_no_op():
-    """Phase 07-02 Task 2: Analytics placeholder nodes (comparison, cross_construct) return empty dict.
+    """Phase 09-02 Task 2: comparison_node and cross_construct_node gracefully skip on missing data.
 
-    Note: correlation_node is now functional (Phase 8-01), so only testing remaining placeholders.
+    Note: correlation_node is functional (Phase 8-01), comparison_node and cross_construct_node
+    are functional (Phase 9-02). This test verifies graceful failure on missing state.
     """
     from backend.graph import comparison_node, cross_construct_node
 
-    # Minimal state dict
+    # Minimal state dict (missing final_output)
     state = {"user_request": None, "draft_items": []}
 
-    # Test placeholder nodes return empty dict
-    assert comparison_node(state) == {}, "comparison_node should return empty dict"
-    assert cross_construct_node(state) == {}, "cross_construct_node should return empty dict"
+    # Test nodes return empty dict on missing data (graceful failure)
+    assert comparison_node(state) == {}, "comparison_node should return empty dict on missing final_output"
+    assert cross_construct_node(state) == {}, "cross_construct_node should return empty dict on missing final_output"
 
 
 def test_analytics_nodes_in_graph():
@@ -580,3 +581,233 @@ async def test_correlation_node_failure_graceful():
 
         # Assert: Should return empty dict (graceful failure)
         assert result == {}
+
+
+# Phase 9-02: Comparison and Cross-Construct Node Integration Tests
+
+
+def test_comparison_node_with_mocked_search():
+    """Phase 9-02 Task 2: comparison_node populates comparison_instruments and plagiarism_flags."""
+    from unittest.mock import patch, MagicMock
+    from backend.graph import comparison_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest, ComparisonInstrument
+
+    # Arrange: Create state with FinalOutput containing 3 items
+    items = [
+        DraftItem(item_text="I feel confident", construct_name="Self-Efficacy", rationale="Rationale 1", evidence_citations=[]),
+        DraftItem(item_text="I can succeed", construct_name="Self-Efficacy", rationale="Rationale 2", evidence_citations=[]),
+        DraftItem(item_text="I believe in myself", construct_name="Self-Efficacy", rationale="Rationale 3", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T14:00:00Z",
+        iteration_count=1,
+        stop_reason="complete"
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Self-Efficacy",
+        construct_definition="Belief in one's ability to succeed",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Mock instrument search
+    mock_convergent = ComparisonInstrument(
+        name="General Self-Efficacy Scale",
+        construct="self-efficacy",
+        source_citation="Schwarzer & Jerusalem (1995)"
+    )
+    mock_discriminant = ComparisonInstrument(
+        name="Rosenberg Self-Esteem Scale",
+        construct="self-esteem",
+        source_citation="Rosenberg (1965)"
+    )
+
+    # Mock validity scorer
+    mock_score = 0.75
+
+    # Mock plagiarism detector
+    mock_plagiarism_flags = {}  # Empty dict (no published items available)
+
+    with patch("backend.agents.instrument_searcher.search_instruments", return_value=(mock_convergent, mock_discriminant)), \
+         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=mock_score), \
+         patch("backend.analytics.similarity_calculator.get_plagiarism_detector") as mock_detector:
+
+        mock_detector.return_value.detect_plagiarism.return_value = mock_plagiarism_flags
+
+        # Act
+        result = comparison_node(state)
+
+        # Assert
+        assert "final_output" in result
+        updated_output = result["final_output"]
+        assert len(updated_output.comparison_instruments) == 2
+        assert updated_output.comparison_instruments[0].name == "General Self-Efficacy Scale"
+        assert updated_output.comparison_instruments[1].name == "Rosenberg Self-Esteem Scale"
+        assert updated_output.plagiarism_flags == None or updated_output.plagiarism_flags == {}
+
+
+def test_comparison_node_graceful_failure():
+    """Phase 9-02 Task 2: comparison_node gracefully handles search errors."""
+    from unittest.mock import patch
+    from backend.graph import comparison_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest
+
+    # Arrange: Create state with FinalOutput
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale 1", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T14:00:00Z",
+        iteration_count=1,
+        stop_reason="complete"
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Test",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Mock search to raise error
+    with patch("backend.agents.instrument_searcher.search_instruments", side_effect=Exception("Search error")):
+        # Act
+        result = comparison_node(state)
+
+        # Assert: Should return empty dict (graceful failure)
+        assert result == {}
+
+
+def test_cross_construct_node_with_mocked_scorer():
+    """Phase 9-02 Task 2: cross_construct_node produces CrossConstructComparison."""
+    from unittest.mock import patch
+    from backend.graph import cross_construct_node
+    from backend.schemas import (
+        DraftItem, FinalOutput, AuditMetadata, UserRequest,
+        ComparisonInstrument, ConstructPairAnalysis
+    )
+
+    # Arrange: Create state with FinalOutput containing comparison_instruments
+    items = [
+        DraftItem(item_text="I feel confident", construct_name="Self-Efficacy", rationale="Rationale 1", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T14:00:00Z",
+        iteration_count=1,
+        stop_reason="complete"
+    )
+
+    convergent = ComparisonInstrument(
+        name="General Self-Efficacy Scale",
+        construct="self-efficacy",
+        source_citation="Schwarzer & Jerusalem (1995)"
+    )
+    discriminant = ComparisonInstrument(
+        name="Rosenberg Self-Esteem Scale",
+        construct="self-esteem",
+        source_citation="Rosenberg (1965)"
+    )
+
+    final_output = FinalOutput(
+        final_items=items,
+        audit=audit,
+        comparison_instruments=[convergent, discriminant]
+    )
+
+    user_request = UserRequest(
+        construct_name="Self-Efficacy",
+        construct_definition="Belief in one's ability to succeed",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Mock discriminant validity scorer
+    mock_pair_analysis = ConstructPairAnalysis(
+        construct_a="Self-Efficacy",
+        construct_b="self-esteem",
+        estimated_correlation=0.65,
+        discriminant_validity_flag="adequate",
+        reasoning="Moderate correlation, constructs are distinct"
+    )
+
+    with patch("backend.agents.validity_scorer.score_discriminant_validity", return_value=mock_pair_analysis):
+        # Act
+        result = cross_construct_node(state)
+
+        # Assert
+        assert "final_output" in result
+        updated_output = result["final_output"]
+        assert updated_output.cross_construct_analysis is not None
+        assert updated_output.cross_construct_analysis.target_construct == "Self-Efficacy"
+        assert "self-esteem" in updated_output.cross_construct_analysis.comparison_constructs
+        assert len(updated_output.cross_construct_analysis.construct_pairs) == 1
+        assert updated_output.cross_construct_analysis.construct_pairs[0].estimated_correlation == 0.65
+        assert updated_output.cross_construct_analysis.disclaimer == "LLM-estimated, not empirically validated"
+
+
+def test_cross_construct_node_graceful_failure():
+    """Phase 9-02 Task 2: cross_construct_node gracefully handles missing comparison_instruments."""
+    from backend.graph import cross_construct_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest
+
+    # Arrange: Create state with FinalOutput but no comparison_instruments
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale 1", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T14:00:00Z",
+        iteration_count=1,
+        stop_reason="complete"
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Test",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Act
+    result = cross_construct_node(state)
+
+    # Assert: Should return empty dict (graceful skip)
+    assert result == {}

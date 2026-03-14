@@ -454,6 +454,11 @@ class FinalOutput(BaseModel):
         description="Discriminant validity assessment comparing target construct against related constructs (XCON-01 through XCON-04)"
     )
 
+    plagiarism_flags: Optional[dict[int, str]] = Field(
+        default=None,
+        description="Per-item plagiarism warnings keyed by item index (INST-06). Format: {0: 'Potential similarity to X (r = 0.87)'}"
+    )
+
 
 # --- Agent I/O wrappers (contracts) ---
 

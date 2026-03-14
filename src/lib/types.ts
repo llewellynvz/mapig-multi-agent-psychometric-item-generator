@@ -130,6 +130,7 @@ export interface FinalOutput {
   correlation_matrix?: CorrelationMatrix;
   comparison_instruments?: ComparisonInstrument[];
   cross_construct_analysis?: CrossConstructComparison;
+  plagiarism_flags?: Record<number, string>;
 }
 
 export interface HealthResponse {

@@ -699,17 +699,183 @@ async def correlation_node(state: GraphState) -> GraphState:
 
 
 def comparison_node(state: GraphState) -> GraphState:
-    """Placeholder for instrument comparison (Phase 9 implementation)."""
+    """Instrument comparison: search for convergent/discriminant instruments and detect plagiarism.
+
+    Phase 9 Plan 02: Real implementation - discovers comparison instruments via Perplexity search,
+    scores convergent validity, runs plagiarism detection, and updates FinalOutput.
+    """
     with step("comparison_node", state):
-        logger.info("Instrument comparison placeholder (Phase 9 implementation pending)")
-        return {}
+        try:
+            # Extract finalized items from state
+            final_output = state.get("final_output")
+            if not final_output:
+                logger.warning("No final_output in state, skipping comparison analysis")
+                return {}
+
+            final_items = final_output.final_items
+            if not final_items:
+                logger.warning("No final items in final_output, skipping comparison analysis")
+                return {}
+
+            # Extract user request for construct info
+            user_request = state.get("user_request")
+            if not user_request:
+                logger.warning("No user_request in state, skipping comparison analysis")
+                return {}
+
+            construct_name = user_request.construct_name
+            construct_definition = user_request.construct_definition
+
+            logger.info(f"Starting instrument comparison for '{construct_name}'")
+
+            # Import search and scoring modules
+            from backend.agents.instrument_searcher import search_instruments
+            from backend.agents.validity_scorer import score_convergent_validity
+            from backend.analytics.similarity_calculator import get_plagiarism_detector
+
+            # Search for convergent and discriminant instruments
+            convergent_instrument, discriminant_instrument = search_instruments(
+                construct_name, construct_definition
+            )
+
+            logger.info(
+                f"Found comparison instruments: convergent={convergent_instrument.name}, "
+                f"discriminant={discriminant_instrument.name}"
+            )
+
+            # Extract item texts for validity scoring
+            item_texts = [item.item_text for item in final_items]
+
+            # Score convergent validity
+            convergent_score = score_convergent_validity(
+                item_texts,
+                convergent_instrument.name,
+                convergent_instrument.construct,
+                construct_name
+            )
+
+            logger.info(f"Convergent validity score: {convergent_score:.2f}")
+
+            # Run plagiarism detection
+            # Note: We don't have published item texts (copyright safeguard), so this returns empty dict
+            # Infrastructure supports future enhancement if Perplexity snippets contain sample items
+            plagiarism_detector = get_plagiarism_detector()
+            plagiarism_flags = plagiarism_detector.detect_plagiarism(
+                item_texts,
+                [],  # No published items available (copyright protection)
+                convergent_instrument.name
+            )
+
+            # Update FinalOutput with comparison data
+            updated_final_output = final_output.model_copy(deep=True)
+            updated_final_output.comparison_instruments = [convergent_instrument, discriminant_instrument]
+            updated_final_output.plagiarism_flags = plagiarism_flags if plagiarism_flags else None
+
+            logger.info(
+                f"Comparison analysis complete: {len(updated_final_output.comparison_instruments)} instruments, "
+                f"{len(plagiarism_flags)} plagiarism flags"
+            )
+
+            return {"final_output": updated_final_output}
+
+        except Exception as e:
+            logger.error(f"Comparison analysis failed: {e}", exc_info=True)
+            # Graceful failure: return empty dict, comparison fields stay default
+            return {}
 
 
 def cross_construct_node(state: GraphState) -> GraphState:
-    """Placeholder for cross-construct analysis (Phase 9 implementation)."""
+    """Cross-construct discriminant validity analysis.
+
+    Phase 9 Plan 02: Real implementation - scores discriminant validity between target construct
+    and comparison constructs, builds CrossConstructComparison with validity flags.
+    """
     with step("cross_construct_node", state):
-        logger.info("Cross-construct analysis placeholder (Phase 9 implementation pending)")
-        return {}
+        try:
+            # Extract finalized items from state
+            final_output = state.get("final_output")
+            if not final_output:
+                logger.warning("No final_output in state, skipping cross-construct analysis")
+                return {}
+
+            # Check if comparison instruments were found
+            if not final_output.comparison_instruments:
+                logger.warning("No comparison_instruments in final_output, skipping cross-construct analysis")
+                return {}
+
+            final_items = final_output.final_items
+            if not final_items:
+                logger.warning("No final items in final_output, skipping cross-construct analysis")
+                return {}
+
+            # Extract user request for construct info
+            user_request = state.get("user_request")
+            if not user_request:
+                logger.warning("No user_request in state, skipping cross-construct analysis")
+                return {}
+
+            construct_name = user_request.construct_name
+
+            logger.info(f"Starting cross-construct analysis for '{construct_name}'")
+
+            # Import scoring module
+            from backend.agents.validity_scorer import score_discriminant_validity
+            from backend.schemas import CrossConstructComparison
+
+            # Get discriminant instrument (second one from comparison_instruments)
+            discriminant_instrument = final_output.comparison_instruments[1]
+
+            # Extract item texts
+            item_texts = [item.item_text for item in final_items]
+
+            # Score discriminant validity
+            discriminant_pair = score_discriminant_validity(
+                item_texts,
+                discriminant_instrument.name,
+                discriminant_instrument.construct,
+                construct_name
+            )
+
+            logger.info(
+                f"Discriminant validity: correlation={discriminant_pair.estimated_correlation:.2f}, "
+                f"flag={discriminant_pair.discriminant_validity_flag}"
+            )
+
+            # Build analysis summary
+            flag = discriminant_pair.discriminant_validity_flag
+            corr = discriminant_pair.estimated_correlation
+            if flag == "concern":
+                summary = (
+                    f"High overlap detected between '{construct_name}' and '{discriminant_instrument.construct}' "
+                    f"(estimated r = {corr:.2f}). Consider refining item wording to improve discriminant validity."
+                )
+            else:
+                summary = (
+                    f"Adequate discriminant validity between '{construct_name}' and '{discriminant_instrument.construct}' "
+                    f"(estimated r = {corr:.2f}). Constructs appear sufficiently distinct."
+                )
+
+            # Build CrossConstructComparison
+            cross_construct_analysis = CrossConstructComparison(
+                target_construct=construct_name,
+                comparison_constructs=[discriminant_instrument.construct],
+                analysis_summary=summary,
+                construct_pairs=[discriminant_pair],
+                disclaimer="LLM-estimated, not empirically validated"
+            )
+
+            # Update FinalOutput
+            updated_final_output = final_output.model_copy(deep=True)
+            updated_final_output.cross_construct_analysis = cross_construct_analysis
+
+            logger.info("Cross-construct analysis complete")
+
+            return {"final_output": updated_final_output}
+
+        except Exception as e:
+            logger.error(f"Cross-construct analysis failed: {e}", exc_info=True)
+            # Graceful failure: return empty dict, cross_construct_analysis stays None
+            return {}
 
 
 def build_graph(checkpointer=None):

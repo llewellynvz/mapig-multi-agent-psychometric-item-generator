@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     # Retrieval allowlist
     APPROVED_SOURCES_DIR: str = "data/approved_sources"
 
+    # Phase 9: Instrument comparison and plagiarism detection
+    PUBLISHER_BLOCKLIST: str = "pearson.com,parinc.com,mhs.com,wpspublish.com,hogrefe.com,proedinc.com,mindgarden.com"
+    PLAGIARISM_SIMILARITY_THRESHOLD: float = 0.85
+
+    def publisher_blocklist_domains(self) -> list[str]:
+        """Return blocked publisher domains for copyright protection."""
+        raw = (self.PUBLISHER_BLOCKLIST or "").strip()
+        if not raw:
+            return []
+        return [d.strip() for d in raw.split(",") if d.strip()]
+
     @field_validator(
         'APP_MODE',
         'OPENAI_API_KEY',
@@ -104,6 +115,7 @@ class Settings(BaseSettings):
         'PERPLEXITY_DOMAIN_FILTER',
         'CHECKPOINT_DB_PATH',
         'APPROVED_SOURCES_DIR',
+        'PUBLISHER_BLOCKLIST',
         mode='before'
     )
     @classmethod

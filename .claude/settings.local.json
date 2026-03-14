@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix\\(settings\\): strip whitespace from environment variables for Vercel compatibility\n\nRoot Cause: Vercel dashboard environment variables contained trailing newlines\n\\(e.g., ''claude\\\\n'' instead of ''claude''\\), causing Pydantic Literal validation\nto fail during serverless function initialization.\n\nSolution: Added field_validator with mode=''before'' to strip whitespace from\nall string environment variables before validation. This handles:\n- Trailing newlines from copy/paste\n- Leading/trailing spaces\n- Any whitespace characters\n\nImpact:\n- Fixes 404 on /api/healthz \\(API now initializes correctly\\)\n- Prevents future whitespace-related validation errors\n- Backwards compatible \\(existing clean values unaffected\\)\n\nTesting: Added test_settings_whitespace.py with coverage for:\n- Trailing newlines \\(APP_MODE\\)\n- Trailing spaces \\(CLAUDE_API_KEY\\)\n- Leading spaces \\(SEARCH_PROVIDER\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git push:*)"
-    ]
-  }
-}

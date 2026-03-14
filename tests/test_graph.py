@@ -400,14 +400,16 @@ def test_accumulate_tokens_existing_models_unchanged():
 
 
 def test_analytics_placeholders_no_op():
-    """Phase 07-02 Task 2: Analytics placeholder nodes return empty dict (no-op)."""
-    from backend.graph import correlation_node, comparison_node, cross_construct_node
+    """Phase 07-02 Task 2: Analytics placeholder nodes (comparison, cross_construct) return empty dict.
+
+    Note: correlation_node is now functional (Phase 8-01), so only testing remaining placeholders.
+    """
+    from backend.graph import comparison_node, cross_construct_node
 
     # Minimal state dict
     state = {"user_request": None, "draft_items": []}
 
-    # Test each placeholder returns empty dict
-    assert correlation_node(state) == {}, "correlation_node should return empty dict"
+    # Test placeholder nodes return empty dict
     assert comparison_node(state) == {}, "comparison_node should return empty dict"
     assert cross_construct_node(state) == {}, "cross_construct_node should return empty dict"
 
@@ -422,3 +424,159 @@ def test_analytics_nodes_in_graph():
     assert "correlation_node" in graph.nodes, "correlation_node must exist in graph"
     assert "comparison_node" in graph.nodes, "comparison_node must exist in graph"
     assert "cross_construct_node" in graph.nodes, "cross_construct_node must exist in graph"
+
+
+# Phase 8-01: Correlation Node Integration Tests
+
+
+@pytest.mark.asyncio
+async def test_correlation_node_with_mocked_estimator():
+    """Phase 8-01 Task 2: correlation_node produces CorrelationMatrix in FinalOutput."""
+    from unittest.mock import patch, AsyncMock
+    from backend.graph import correlation_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest, CorrelationCell
+
+    # Arrange: Create state with FinalOutput containing 3 items
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale 1", evidence_citations=[]),
+        DraftItem(item_text="Item 2", construct_name="Test", rationale="Rationale 2", evidence_citations=[]),
+        DraftItem(item_text="Item 3", construct_name="Test", rationale="Rationale 3", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T12:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        model_info={},
+        approved_sources=[]
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Mock correlation estimation
+    mock_cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.75, ci_low=0.65, ci_high=0.85),
+        CorrelationCell(item_i_index=0, item_j_index=2, correlation=0.68, ci_low=0.58, ci_high=0.78),
+        CorrelationCell(item_i_index=1, item_j_index=2, correlation=0.72, ci_low=0.62, ci_high=0.82),
+    ]
+
+    with patch("backend.agents.correlation_estimator.estimate_pairwise_correlations", new_callable=AsyncMock) as mock_est:
+        mock_est.return_value = mock_cells
+
+        # Act
+        result = await correlation_node(state)
+
+        # Assert
+        assert "final_output" in result
+        updated_output = result["final_output"]
+        assert updated_output.correlation_matrix is not None
+        assert updated_output.correlation_matrix.mcdonalds_omega > 0.0
+        assert len(updated_output.correlation_matrix.cells) == 3
+        assert updated_output.correlation_matrix.internal_consistency_flag in ["optimal_range", "too_low", "too_high"]
+        assert updated_output.correlation_matrix.disclaimer == "LLM-estimated, not empirically validated"
+
+
+@pytest.mark.asyncio
+async def test_correlation_node_with_too_few_items():
+    """Phase 8-01 Task 2: correlation_node skips when < 3 items."""
+    from backend.graph import correlation_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest
+
+    # Arrange: Create state with only 2 items
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale 1", evidence_citations=[]),
+        DraftItem(item_text="Item 2", construct_name="Test", rationale="Rationale 2", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T12:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        model_info={},
+        approved_sources=[]
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Act
+    result = await correlation_node(state)
+
+    # Assert: Should return empty dict (graceful skip)
+    assert result == {}
+
+
+@pytest.mark.asyncio
+async def test_correlation_node_failure_graceful():
+    """Phase 8-01 Task 2: correlation_node graceful failure doesn't crash."""
+    from unittest.mock import patch, AsyncMock
+    from backend.graph import correlation_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest
+
+    # Arrange: Create state with 3 items
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale 1", evidence_citations=[]),
+        DraftItem(item_text="Item 2", construct_name="Test", rationale="Rationale 2", evidence_citations=[]),
+        DraftItem(item_text="Item 3", construct_name="Test", rationale="Rationale 3", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test",
+        run_id="test",
+        timestamp_utc="2026-03-14T12:00:00Z",
+        iteration_count=1,
+        stop_reason="complete",
+        model_info={},
+        approved_sources=[]
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request
+    }
+
+    # Mock correlation estimation to raise error
+    with patch("backend.agents.correlation_estimator.estimate_pairwise_correlations", new_callable=AsyncMock) as mock_est:
+        mock_est.side_effect = Exception("Test error")
+
+        # Act
+        result = await correlation_node(state)
+
+        # Assert: Should return empty dict (graceful failure)
+        assert result == {}

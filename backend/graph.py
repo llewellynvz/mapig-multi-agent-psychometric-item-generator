@@ -620,13 +620,82 @@ def finalize_node(state: GraphState) -> GraphState:
         return {"final_output": out}
 
 
-def correlation_node(state: GraphState) -> GraphState:
-    """Placeholder for correlation analysis (Phase 8 implementation).
-    Phase 7: No-op pass-through, emits SSE events for frontend progress tracking.
+async def correlation_node(state: GraphState) -> GraphState:
+    """Correlation analysis using GPT-5.2 pairwise estimation and McDonald's omega.
+
+    Phase 8: Real implementation - estimates pairwise correlations, calculates omega,
+    populates FinalOutput.correlation_matrix with full analytics.
     """
     with step("correlation_node", state):
-        logger.info("Correlation analysis placeholder (Phase 8 implementation pending)")
-        return {}
+        try:
+            # Extract finalized items from state
+            final_output = state.get("final_output")
+            if not final_output:
+                logger.warning("No final_output in state, skipping correlation analysis")
+                return {}
+
+            final_items = final_output.final_items
+            if len(final_items) < 3:
+                logger.info(f"Too few items ({len(final_items)}) for correlation analysis (minimum 3), skipping")
+                return {}
+
+            # Extract item texts and construct name
+            item_texts = [item.item_text for item in final_items]
+            user_request = state.get("user_request")
+            construct_name = user_request.construct_name if user_request else "Unknown Construct"
+
+            logger.info(f"Starting correlation analysis for {len(item_texts)} items measuring '{construct_name}'")
+
+            # Import correlation modules
+            from backend.agents.correlation_estimator import estimate_pairwise_correlations
+            from backend.analytics.omega_calculator import calculate_omega
+            from backend.schemas import CorrelationMatrix
+
+            # Estimate pairwise correlations using GPT-5.2
+            cells = await estimate_pairwise_correlations(item_texts, construct_name)
+
+            if not cells:
+                logger.warning("Correlation estimation returned no cells, skipping omega calculation")
+                return {}
+
+            # Calculate McDonald's omega and internal consistency metrics
+            omega_result = calculate_omega(cells, num_items=len(item_texts))
+
+            # Handle calculation failure
+            if omega_result["omega_total"] is None:
+                logger.warning("Omega calculation failed (non-positive-definite matrix), setting omega=0.0")
+                omega_total = 0.0
+                internal_consistency_flag = "calculation_failed"
+            else:
+                omega_total = omega_result["omega_total"]
+                internal_consistency_flag = omega_result["internal_consistency_flag"]
+
+            # Build CorrelationMatrix
+            correlation_matrix = CorrelationMatrix(
+                cells=cells,
+                mcdonalds_omega=omega_total,
+                mean_inter_item_correlation=omega_result["mean_inter_item_correlation"],
+                internal_consistency_flag=internal_consistency_flag
+            )
+
+            # Update FinalOutput with correlation_matrix
+            updated_final_output = final_output.model_copy(deep=True)
+            updated_final_output.correlation_matrix = correlation_matrix
+
+            logger.info(
+                f"Correlation analysis complete: omega={omega_total:.3f}, "
+                f"mean_r={omega_result['mean_inter_item_correlation']:.3f}, "
+                f"flag={internal_consistency_flag}"
+            )
+
+            # TODO: Track GPT-5.2 token usage from correlation estimation
+            # For now, return updated FinalOutput
+            return {"final_output": updated_final_output}
+
+        except Exception as e:
+            logger.error(f"Correlation analysis failed: {e}", exc_info=True)
+            # Graceful failure: return empty dict, FinalOutput.correlation_matrix stays None
+            return {}
 
 
 def comparison_node(state: GraphState) -> GraphState:

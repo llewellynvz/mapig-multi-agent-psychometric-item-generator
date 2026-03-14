@@ -110,6 +110,40 @@ def get_validator_model() -> ChatAnthropic:
     return get_claude_chat_model(model=settings.VALIDATOR_MODEL)
 
 
+def get_gpt52_analytics_model() -> ChatOpenAI:
+    """Get GPT-5.2 reasoning model for analytics tasks.
+
+    Configured with hardcoded high reasoning effort per user decision.
+    Used by correlation_node, comparison_node, cross_construct_node in Phases 8-10.
+    GPT-5.2 for analytics only — item writer/reviewers stay Claude (existing allocation preserved).
+
+    Returns:
+        ChatOpenAI configured with GPT-5.2 and high reasoning effort
+
+    Raises:
+        ValueError: If OPENAI_API_KEY not configured
+    """
+    if not settings.OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY required for GPT-5.2 analytics")
+
+    reasoning_config = {
+        "effort": "high",    # Hardcoded per user decision (not configurable)
+        "summary": "auto",
+    }
+
+    # Note: Using max_tokens instead of max_completion_tokens for compatibility
+    # langchain-openai maps max_tokens to the appropriate OpenAI parameter
+    return ChatOpenAI(
+        model="gpt-5.2",
+        api_key=settings.OPENAI_API_KEY,
+        reasoning=reasoning_config,
+        max_tokens=25000,
+        temperature=0.2,
+        max_retries=3,
+        timeout=60,
+    )
+
+
 def get_chat_model_for_agent(
     agent_name: str,
     model_provider: str = "claude",

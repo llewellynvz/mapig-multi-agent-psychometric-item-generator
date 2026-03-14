@@ -93,17 +93,54 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements. Updated after roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| — | — | — |
+| INFRA-01 | Phase 7 | Pending |
+| INFRA-02 | Phase 7 | Pending |
+| INFRA-05 | Phase 7 | Pending |
+| CORR-01 | Phase 8 | Pending |
+| CORR-02 | Phase 8 | Pending |
+| CORR-03 | Phase 8 | Pending |
+| CORR-04 | Phase 8 | Pending |
+| CORR-05 | Phase 8 | Pending |
+| CORR-06 | Phase 8 | Pending |
+| UI-01 | Phase 8 | Pending |
+| UI-05 | Phase 8 | Pending |
+| INST-01 | Phase 9 | Pending |
+| INST-02 | Phase 9 | Pending |
+| INST-03 | Phase 9 | Pending |
+| INST-04 | Phase 9 | Pending |
+| INST-05 | Phase 9 | Pending |
+| INST-06 | Phase 9 | Pending |
+| XCON-01 | Phase 9 | Pending |
+| XCON-02 | Phase 9 | Pending |
+| XCON-03 | Phase 9 | Pending |
+| XCON-04 | Phase 9 | Pending |
+| UI-02 | Phase 9 | Pending |
+| UI-03 | Phase 9 | Pending |
+| UI-04 | Phase 9 | Pending |
+| GPT-01 | Phase 10 | Pending |
+| GPT-02 | Phase 10 | Pending |
+| GPT-03 | Phase 10 | Pending |
+| GPT-04 | Phase 10 | Pending |
+| GPT-05 | Phase 10 | Pending |
+| INFRA-03 | Phase 10 | Pending |
+| INFRA-04 | Phase 10 | Pending |
+| UI-06 | Phase 10 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28
+- Mapped to phases: 28 (100% coverage)
+- Unmapped: 0
+
+**Phase distribution:**
+- Phase 7 (Foundation & Infrastructure): 3 requirements
+- Phase 8 (Synthetic Correlation Analysis): 8 requirements
+- Phase 9 (Dynamic Instrument Comparison): 14 requirements
+- Phase 10 (GPT-5.2 Integration & Analytics Optimization): 8 requirements
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after initial definition*
+*Last updated: 2026-03-14 (traceability mapping complete - 28/28 requirements mapped)*

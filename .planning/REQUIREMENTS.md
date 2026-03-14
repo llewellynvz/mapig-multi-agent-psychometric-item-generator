@@ -18,12 +18,12 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 
 ### Instrument Comparison
 
-- [ ] **INST-01**: System dynamically searches for validated comparison instruments via Perplexity Academic based on user's construct definition
-- [ ] **INST-02**: System replaces hardcoded org psych nearest neighbor constructs with literature-grounded search results
-- [ ] **INST-03**: System uses hybrid approach for neighbor constructs (hardcoded defaults + literature supplements, fallback to defaults if search fails)
+- [x] **INST-01**: System dynamically searches for validated comparison instruments via Perplexity Academic based on user's construct definition
+- [x] **INST-02**: System replaces hardcoded org psych nearest neighbor constructs with literature-grounded search results
+- [x] **INST-03**: System uses hybrid approach for neighbor constructs (hardcoded defaults + literature supplements, fallback to defaults if search fails)
 - [ ] **INST-04**: System provides convergent validity evidence by comparing generated items to instruments measuring the same construct
-- [ ] **INST-05**: System enforces copyright safeguards (public-domain allowlist, publisher blocklist, metadata-only storage, never store copyrighted item text)
-- [ ] **INST-06**: System detects potential plagiarism by flagging generated items with cosine similarity > 0.85 to retrieved instrument items
+- [x] **INST-05**: System enforces copyright safeguards (public-domain allowlist, publisher blocklist, metadata-only storage, never store copyrighted item text)
+- [x] **INST-06**: System detects potential plagiarism by flagging generated items with cosine similarity > 0.85 to retrieved instrument items
 
 ### Cross-Construct Comparison
 
@@ -108,12 +108,12 @@ Which phases cover which requirements. Updated after roadmap creation.
 | CORR-06 | Phase 8 | Complete |
 | UI-01 | Phase 8 | Complete |
 | UI-05 | Phase 8 | Complete |
-| INST-01 | Phase 9 | Pending |
-| INST-02 | Phase 9 | Pending |
-| INST-03 | Phase 9 | Pending |
+| INST-01 | Phase 9 | Complete |
+| INST-02 | Phase 9 | Complete |
+| INST-03 | Phase 9 | Complete |
 | INST-04 | Phase 9 | Pending |
-| INST-05 | Phase 9 | Pending |
-| INST-06 | Phase 9 | Pending |
+| INST-05 | Phase 9 | Complete |
+| INST-06 | Phase 9 | Complete |
 | XCON-01 | Phase 9 | Pending |
 | XCON-02 | Phase 9 | Pending |
 | XCON-03 | Phase 9 | Pending |

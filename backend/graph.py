@@ -11,6 +11,7 @@ from typing_extensions import TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
+from backend.agents.sanitizer import sanitize_user_request
 from backend.agents.bias_reviewer import review_bias
 from backend.agents.critic import decide as critic_decide
 from backend.agents.item_writer import write_items
@@ -24,6 +25,7 @@ from backend.schemas import (
     DraftItem,
     EvidenceChunk,
     FinalOutput,
+    IterationSnapshot,
     ItemValidation,
     ReviewComment,
     RevisionPlan,
@@ -139,6 +141,9 @@ class GraphState(TypedDict, total=False):
     validation_attempt: int
     failed_item_indices: List[int]
 
+    # Comment history across iterations
+    iteration_history: List[IterationSnapshot]
+
     # Control
     iteration: int
     stop_reason: str
@@ -161,7 +166,10 @@ def _utc_now() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
 
 
-def _create_abbreviated_request(full_request: UserRequest) -> AbbreviatedRequest:
+def _create_abbreviated_request(
+    full_request: UserRequest,
+    evidence: List[EvidenceChunk] | None = None,
+) -> AbbreviatedRequest:
     """Create abbreviated request for reviewers (cost optimization).
 
     Reviewers don't need: evidence, examples, neighbors, retrieval settings, feedback.
@@ -169,10 +177,20 @@ def _create_abbreviated_request(full_request: UserRequest) -> AbbreviatedRequest
 
     Args:
         full_request: Complete UserRequest with all fields
+        evidence: Optional evidence list to extract cultural context from
 
     Returns:
         AbbreviatedRequest with only essential fields for review
     """
+    # Extract cultural context notes from evidence if available
+    cultural_notes = None
+    if evidence and full_request.cultural_group:
+        cultural_chunks = [
+            e.snippet for e in evidence if e.evidence_type == "cultural_context"
+        ]
+        if cultural_chunks:
+            cultural_notes = " ".join(cultural_chunks)
+
     return AbbreviatedRequest(
         construct_name=full_request.construct_name,
         construct_definition=full_request.construct_definition,
@@ -182,18 +200,23 @@ def _create_abbreviated_request(full_request: UserRequest) -> AbbreviatedRequest
         constraints=full_request.constraints,
         model_provider=full_request.model_provider,
         use_chatgpt_critics=full_request.use_chatgpt_critics,
+        cultural_context_notes=cultural_notes,
     )
 
 
 def init_run(state: GraphState) -> GraphState:
     """Initialize control fields."""
     with step("init_run", state):
+        # Sanitize user inputs before any prompt interpolation
+        sanitize_user_request(state["user_request"])
+
         return {
             "iteration": 0,
             "stop_reason": "",
             "linguistic_comments": [],
             "bias_comments": [],
             "content_comments": [],
+            "iteration_history": [],
             "revision_plan": None,
             "validation_results": [],
             "validation_attempt": 1,
@@ -228,10 +251,53 @@ def retrieve_node(state: GraphState) -> GraphState:
         return {"evidence": evidence}
 
 
+def _check_item_diversity(items: List[DraftItem]) -> None:
+    """Log a warning if generated items are too semantically similar.
+
+    Uses OpenAI text-embedding-3-small (already available) to compute
+    pairwise cosine similarity.  Non-blocking — warning only.
+    """
+    if len(items) < 3:
+        return
+    try:
+        from openai import OpenAI
+        import numpy as np
+        client = OpenAI()
+        texts = [it.item_text for it in items]
+        resp = client.embeddings.create(input=texts, model="text-embedding-3-small")
+        vecs = np.array([d.embedding for d in resp.data])
+        norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+        norms = np.where(norms == 0, 1, norms)
+        normed = vecs / norms
+        sim = normed @ normed.T
+        # Mean of upper-triangular (excluding diagonal)
+        n = len(texts)
+        pairs = []
+        for i in range(n):
+            for j in range(i + 1, n):
+                pairs.append(sim[i, j])
+        mean_sim = float(np.mean(pairs))
+        if mean_sim > 0.80:
+            logger.warning(
+                "ITEM_HOMOGENEITY_WARNING mean_pairwise_similarity=%.3f (threshold=0.80). "
+                "Items may be synonym variations rather than diverse facets.",
+                mean_sim,
+            )
+        else:
+            logger.info("Item diversity check passed: mean_similarity=%.3f", mean_sim)
+    except Exception as e:
+        logger.debug("Item diversity check skipped: %s", e)
+
+
 def item_writer_node(state: GraphState) -> GraphState:
     with step("item_writer_node", state):
         resp, usage = write_items(state["user_request"], state.get("evidence", []))
         token_update = _accumulate_tokens(state, usage)
+
+        # Non-blocking diversity check (warning only)
+        if settings.APP_MODE != "mock":
+            _check_item_diversity(resp.items)
+
         return {
             "draft_items": resp.items,
             **token_update,
@@ -385,8 +451,10 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
     """
     with step("reviewers_fanout_node", state):
         full_request = state["user_request"]
-        # Create abbreviated request (no evidence, examples, or retrieval settings)
-        abbreviated_request = _create_abbreviated_request(full_request)
+        # Create abbreviated request with cultural context from evidence
+        abbreviated_request = _create_abbreviated_request(
+            full_request, evidence=state.get("evidence"),
+        )
         draft_items = state.get("draft_items", [])
         iteration = state.get("iteration", 0)
 
@@ -500,9 +568,20 @@ def meta_editor_node(state: GraphState) -> GraphState:
 
         token_update = _accumulate_tokens(state, usage)
 
+        # Snapshot current comments before clearing so full history is preserved
+        snapshot = IterationSnapshot(
+            iteration=state.get("iteration", 0),
+            linguistic_comments=linguistic_comments,
+            bias_comments=bias_comments,
+            content_comments=content_comments,
+        )
+        history = list(state.get("iteration_history", []))
+        history.append(snapshot)
+
         return {
             "draft_items": resp.revised_items,
             "revision_plan": resp.revision_plan,
+            "iteration_history": history,
             # Clear comments so each iteration reflects current draft only.
             "linguistic_comments": [],
             "bias_comments": [],
@@ -605,10 +684,21 @@ def finalize_node(state: GraphState) -> GraphState:
         )
 
         # Phase 03.1: Extract review feedback from GraphState for complete metadata export
+        # Aggregate comments from all iterations (iteration_history) + final iteration
         user_request = state.get("user_request")
-        linguistic_feedback = state.get("linguistic_comments", [])
-        bias_feedback = state.get("bias_comments", [])
-        content_feedback = state.get("content_comments", [])
+        iteration_history = state.get("iteration_history", [])
+
+        linguistic_feedback = []
+        bias_feedback = []
+        content_feedback = []
+        for snap in iteration_history:
+            linguistic_feedback.extend(snap.linguistic_comments)
+            bias_feedback.extend(snap.bias_comments)
+            content_feedback.extend(snap.content_comments)
+        # Include final iteration's comments (not yet snapshotted)
+        linguistic_feedback.extend(state.get("linguistic_comments", []))
+        bias_feedback.extend(state.get("bias_comments", []))
+        content_feedback.extend(state.get("content_comments", []))
 
         out = FinalOutput(
             final_items=enriched_items,
@@ -617,6 +707,7 @@ def finalize_node(state: GraphState) -> GraphState:
             linguistic_feedback=linguistic_feedback,
             bias_feedback=bias_feedback,
             content_feedback=content_feedback,
+            iteration_history=iteration_history,
         )
         return {"final_output": out}
 
@@ -676,7 +767,8 @@ async def correlation_node(state: GraphState) -> GraphState:
                 cells=cells,
                 mcdonalds_omega=omega_total,
                 mean_inter_item_correlation=omega_result["mean_inter_item_correlation"],
-                internal_consistency_flag=internal_consistency_flag
+                internal_consistency_flag=internal_consistency_flag,
+                guidance=omega_result.get("guidance"),
             )
 
             # Update FinalOutput with correlation_matrix

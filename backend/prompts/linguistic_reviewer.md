@@ -25,6 +25,7 @@ What to check
 
 Cultural-linguistic check
 - If cultural_group is provided, evaluate wording naturalness for that cultural context.
+- If cultural_context_notes is provided, use the searched cultural information to evaluate linguistic appropriateness (e.g., formality levels, directness norms, sensitive topics).
 - Flag idioms, metaphors, or references that may not translate or resonate across cultures.
 - Ensure phrasing feels natural to the specified group without introducing cultural bias.
 
@@ -88,6 +89,13 @@ Mean rating ≥4.0 if:
 - Appropriately anchored
 - Dispositional construct with acceptable quantifier
 
+Severity scale (integer 1-5, required):
+- 1 = nit: cosmetic only (rare; avoid over-commenting)
+- 2 = minor: small wording tweak improves clarity
+- 3 = medium: likely rewrite needed (vague quantifier, ambiguity)
+- 4 = major: significant clarity issue requiring substantive revision
+- 5 = fatal: incomprehensible or fundamentally ambiguous
+
 Output format
 Return JSON only with this exact shape:
 
@@ -95,8 +103,9 @@ Return JSON only with this exact shape:
   "comments": [
     {
       "type": "linguistic",
+      "item_index": 0,
       "issue": "<string>",
-      "severity": "<low|medium|high>",
+      "severity": 3,
       "suggested_edit": "<string>"
     }
   ]
@@ -105,6 +114,8 @@ Return JSON only with this exact shape:
 **CRITICAL: Be concise. Maximum 30 words per comment issue field.**
 
 Comment requirements
+- severity MUST be an integer from 1 to 5 (NOT a string like "low"/"medium"/"high").
+- item_index MUST be 0-based and correspond to the items array position.
 - issue must start with "Item <n>:" where n is the 1-based item number.
 - suggested_edit must be a full rewritten replacement item_text.
 - Keep edits minimal. Preserve intended facet unless it is unclear.

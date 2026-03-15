@@ -57,13 +57,19 @@ def calculate_omega(cells: List, num_items: int) -> Dict[str, Optional[float]]:
 
         mean_r = np.mean(off_diagonal) if off_diagonal else 0.0
 
-        # Determine internal consistency flag based on mean r (CORR-06)
+        # Determine internal consistency flag and guidance based on mean r (CORR-06)
         if mean_r < 0.15:
             flag = "too_low"
+            guidance = "Items may not measure the same construct consistently. Consider revising items for stronger construct alignment."
         elif mean_r > 0.50:
             flag = "too_high"
+            guidance = (
+                "Items may be measuring too narrow a facet (Clark & Watson, 1995 recommend .15-.50 mean inter-item r). "
+                "Diversify item content across different facets of the construct."
+            )
         else:
             flag = "optimal_range"
+            guidance = "Within optimal range for mean inter-item correlation (Clark & Watson, 1995: .15-.50)."
 
         # Calculate McDonald's omega using simplified formula
         # omega = (k * r_bar) / (1 + (k - 1) * r_bar)
@@ -78,6 +84,7 @@ def calculate_omega(cells: List, num_items: int) -> Dict[str, Optional[float]]:
                 "omega_total": None,
                 "mean_inter_item_correlation": float(mean_r),
                 "internal_consistency_flag": "calculation_failed",
+                "guidance": "Omega calculation failed due to negative mean correlation. Items may not form a coherent scale.",
             }
 
         omega_total = (k * r_bar) / (1 + (k - 1) * r_bar)
@@ -91,6 +98,7 @@ def calculate_omega(cells: List, num_items: int) -> Dict[str, Optional[float]]:
             "omega_total": float(omega_total),
             "mean_inter_item_correlation": float(mean_r),
             "internal_consistency_flag": flag,
+            "guidance": guidance,
         }
 
     except Exception as e:
@@ -99,4 +107,5 @@ def calculate_omega(cells: List, num_items: int) -> Dict[str, Optional[float]]:
             "omega_total": None,
             "mean_inter_item_correlation": 0.0,
             "internal_consistency_flag": "calculation_failed",
+            "guidance": f"Omega calculation error: {e}",
         }

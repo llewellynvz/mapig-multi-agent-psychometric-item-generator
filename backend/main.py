@@ -512,7 +512,7 @@ async def run_evaluation(model_provider: str = "claude") -> dict:
         }
     """
     try:
-        comparison = run_baseline_comparison(model_provider)
+        comparison = await run_baseline_comparison(model_provider)
 
         return {
             "current": {

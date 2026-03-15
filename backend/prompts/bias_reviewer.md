@@ -26,6 +26,7 @@ Evaluate items for bias across these dimensions:
 3. Cultural reference bias
    - Assumes knowledge of culture-specific practices, values, contexts
    - If cultural_group is provided, apply region-specific bias criteria: evaluate assumed norms around work, family, social customs, and religion for that group
+   - If cultural_context_notes is provided, use the searched cultural information to inform your bias evaluation for the specified cultural group
    - Example: "I celebrate major holidays with family" (assumes holiday observance)
 
 4. Socioeconomic bias
@@ -68,8 +69,15 @@ If ≥2 types flagged above, examine combined identity effects:
 
 ### Step 3: Generate ReviewComment (only if ≥1 type flagged)
 
-- severity: Use highest individual type severity (low/medium/high scale)
-- **Severity escalation rule**: If intersectional bias flagged, severity automatically "high" (major issue, ≥4 on 1-5 scale)
+Severity scale (integer 1-5, required):
+- 1 = nit: cosmetic bias risk only
+- 2 = minor: small wording tweak removes bias risk
+- 3 = medium: likely rewrite needed to address bias
+- 4 = major: significant bias risk requiring substantive revision
+- 5 = fatal: severe bias that fundamentally compromises the item
+
+- severity: Use highest individual type severity (integer 1-5)
+- **Severity escalation rule**: If intersectional bias flagged, severity automatically 4 or higher (major issue)
 - issue: Describe flagged bias type(s) and intersectional effect if any
 - suggested_edit: Rewrite item addressing all flagged types
 
@@ -96,14 +104,17 @@ Return JSON only with this exact shape:
   "comments": [
     {
       "type": "bias",
+      "item_index": 0,
       "issue": "<string>",
-      "severity": "<low|medium|high>",
+      "severity": 3,
       "suggested_edit": "<string>"
     }
   ]
 }
 
 Comment requirements
+- severity MUST be an integer from 1 to 5 (NOT a string like "low"/"medium"/"high").
+- item_index MUST be 0-based and correspond to the items array position.
 - issue must start with "Item <n>:" where n is the 1-based item number.
 - suggested_edit must be a full rewritten replacement item_text.
 - If the best fix is to drop the item, suggested_edit must propose a replacement item that targets the same facet without the bias risk.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
@@ -7,8 +8,11 @@ from backend.agents.prompt_loader import load_prompt
 from backend.schemas import AbbreviatedRequest, ContentReviewResponse, DraftItem, ReviewComment
 from backend.settings import settings
 
+logger = logging.getLogger("lmaig.content_reviewer")
+
 
 def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteration: int) -> Tuple[ContentReviewResponse, TokenUsage]:
+    logger.info("CONTENT_REVIEWER start items=%d iteration=%d", len(items), iteration)
     if settings.APP_MODE == "mock":
         return ContentReviewResponse(comments=[]), TokenUsage()
 
@@ -31,4 +35,5 @@ def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteratio
     fixed = []
     for c in resp.comments:
         fixed.append(ReviewComment(**{**c.model_dump(), "type": "content"}))
+    logger.info("CONTENT_REVIEWER done comments=%d tokens=%d", len(fixed), usage.total_tokens)
     return ContentReviewResponse(comments=fixed), usage

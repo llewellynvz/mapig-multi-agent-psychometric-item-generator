@@ -62,7 +62,7 @@ class BaselineComparison:
             f"success={self.success})"
         )
 
-def run_baseline_comparison(model_provider: str = "claude") -> BaselineComparison:
+async def run_baseline_comparison(model_provider: str = "claude") -> BaselineComparison:
     """Run A/B comparison: current system (v1.0) vs baseline (pre-v1.0).
 
     Baseline is simulated by running evaluation suite with validation gate disabled.
@@ -81,7 +81,7 @@ def run_baseline_comparison(model_provider: str = "claude") -> BaselineCompariso
 
     # Run current system (with validation gate)
     logger.info("Evaluating current system (v1.0 with validation gate)...")
-    current_metrics = run_evaluation_suite(model_provider)
+    current_metrics = await run_evaluation_suite(model_provider)
 
     # Simulate baseline (pre-v1.0 without validation gate)
     # In production: would disable validation gate in graph config

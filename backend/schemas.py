@@ -140,6 +140,11 @@ class AbbreviatedRequest(BaseModel):
         description="Use ChatGPT for critic agents."
     )
 
+    cultural_context_notes: Optional[str] = Field(
+        default=None,
+        description="Searched cultural context notes for the specified cultural_group. Passed to reviewers for culturally informed feedback.",
+    )
+
 
 class EvidenceChunk(BaseModel):
     """A small evidence unit from an approved source.
@@ -156,7 +161,7 @@ class EvidenceChunk(BaseModel):
     quote: str = Field(..., description="Exact quote or near-quote used as evidence.")
 
     # Task #4: Theoretical model discovery fields
-    evidence_type: Optional[Literal["theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions"]] = Field(
+    evidence_type: Optional[Literal["theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions", "cultural_context"]] = Field(
         default=None,
         description="Type of evidence: theoretical_definition, dimensions, measurement_precedent, or boundary_conditions"
     )
@@ -331,6 +336,7 @@ class CorrelationMatrix(BaseModel):
     mcdonalds_omega: float = Field(..., ge=0.0, le=1.0, description="McDonald's omega total for internal consistency reliability")
     mean_inter_item_correlation: float = Field(..., description="Mean of all pairwise correlations")
     internal_consistency_flag: str = Field(..., description="optimal_range/too_low/too_high based on mean inter-item correlation")
+    guidance: Optional[str] = Field(default=None, description="Actionable guidance based on internal_consistency_flag")
     disclaimer: str = Field(default="Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation.", description="Standard disclaimer for embedding-based estimates")
 
 
@@ -382,6 +388,21 @@ class CrossConstructComparison(BaseModel):
     analysis_summary: str = Field(..., min_length=10, description="Overall discriminant validity assessment across all comparisons")
     construct_pairs: List[ConstructPairAnalysis] = Field(default_factory=list, description="Per-pair discriminant validity analysis")
     disclaimer: str = Field(default="LLM-estimated, not empirically validated", description="Standard disclaimer for LLM estimates")
+
+
+class IterationSnapshot(BaseModel):
+    """Snapshot of reviewer comments from a single iteration.
+
+    Preserves the full comment history so finalization can aggregate
+    feedback across all iterations instead of only the last one.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    iteration: int = Field(..., ge=0, description="0-based iteration number")
+    linguistic_comments: List[ReviewComment] = Field(default_factory=list)
+    bias_comments: List[ReviewComment] = Field(default_factory=list)
+    content_comments: List[ReviewComment] = Field(default_factory=list)
 
 
 class AuditMetadata(BaseModel):
@@ -445,6 +466,11 @@ class FinalOutput(BaseModel):
     content_feedback: List[ReviewComment] = Field(
         default_factory=list,
         description="All content reviewer comments across iterations. Includes item_index, issue, severity, and suggested_edit."
+    )
+
+    iteration_history: List[IterationSnapshot] = Field(
+        default_factory=list,
+        description="Full reviewer comment history from each iteration, preserving per-iteration snapshots."
     )
 
     # Phase 7: v2.0 analytics fields

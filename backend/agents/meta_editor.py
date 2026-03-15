@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
@@ -14,6 +15,8 @@ from backend.schemas import (
 )
 from backend.settings import settings
 
+logger = logging.getLogger("lmaig.meta_editor")
+
 
 def revise_items(
     request: UserRequest,
@@ -25,6 +28,11 @@ def revise_items(
 ) -> Tuple[MetaEditorResponse, TokenUsage]:
 
     """Apply reviewer feedback and produce revised items + a revision plan."""
+    total_comments = len(linguistic_comments) + len(bias_comments) + len(content_comments)
+    logger.info(
+        "META_EDITOR start items=%d iteration=%d comments=%d",
+        len(items), iteration, total_comments,
+    )
     if settings.APP_MODE == "mock":
 
         # Deterministic revision: diversify stems.

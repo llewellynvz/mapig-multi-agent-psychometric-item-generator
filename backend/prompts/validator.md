@@ -159,3 +159,8 @@ Output Requirements
 - The accept field must match the >= 7.0 threshold
 - The item_index must match the input item index
 - The attempt must match the input attempt number
+
+Text Preservation Rule
+- item_text MUST be the EXACT text from input. Copy character-for-character.
+- Do NOT paraphrase, rephrase, or substitute the item text with similar items from known instruments.
+- If you return a different item_text than what was provided, the validation will be overridden.

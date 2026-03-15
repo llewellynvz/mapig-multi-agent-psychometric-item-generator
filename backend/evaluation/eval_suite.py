@@ -1,5 +1,4 @@
 import logging
-import asyncio
 from backend.evaluation.benchmark_loader import load_benchmark_scales
 from backend.evaluation.item_comparison import compare_to_published_item
 from backend.evaluation.metrics_aggregator import aggregate_comparison_results, EvaluationMetrics
@@ -10,7 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 logger = logging.getLogger(__name__)
 
-def run_evaluation_suite(model_provider: str = "claude") -> EvaluationMetrics:
+async def run_evaluation_suite(model_provider: str = "claude") -> EvaluationMetrics:
     """Run full evaluation suite: generate items, compare to benchmarks, aggregate metrics.
 
     Workflow:
@@ -62,9 +61,8 @@ def run_evaluation_suite(model_provider: str = "claude") -> EvaluationMetrics:
         )
 
         try:
-            # Run MAPIG generation
-            # Pattern from backend/main.py: graph.invoke returns state dict with final_output
-            result_state = graph.invoke(
+            # Run MAPIG generation (async — graph contains async nodes)
+            result_state = await graph.ainvoke(
                 {"user_request": request},
                 config={"configurable": {"thread_id": f"eval-{scale.domain}"}}
             )
@@ -102,10 +100,3 @@ def run_evaluation_suite(model_provider: str = "claude") -> EvaluationMetrics:
     logger.info(f"Evaluation complete: {metrics}")
 
     return metrics
-
-async def run_evaluation_suite_async(model_provider: str = "claude") -> EvaluationMetrics:
-    """Async version of evaluation suite for parallel processing.
-
-    Future optimization: run comparisons in parallel using asyncio.gather.
-    """
-    return run_evaluation_suite(model_provider)

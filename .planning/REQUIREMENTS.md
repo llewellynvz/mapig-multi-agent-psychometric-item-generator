@@ -39,13 +39,13 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 - [x] **UI-03**: User can view comparison display card showing matched validated instruments with source citations
 - [x] **UI-04**: User can view cross-construct comparison table with discriminant validity assessments
 - [x] **UI-05**: User can export correlation matrices in CSV and JSON formats with labeled rows/columns
-- [ ] **UI-06**: All new UI components match existing shadcn/ui design patterns and Radix primitives
+- [x] **UI-06**: All new UI components match existing shadcn/ui design patterns and Radix primitives
 
 ### GPT-5.2 Reasoning Models
 
 - [ ] **GPT-01**: System supports GPT-5.2 reasoning model with configurable reasoning effort (none/low/medium/high/xhigh)
 - [x] **GPT-02**: System defaults to high reasoning effort for GPT-5.2 analytics tasks
-- [ ] **GPT-03**: User can toggle GPT-5.2 for analytics via UI with cost warning modal (4-6x multiplier displayed)
+- [x] **GPT-03**: User can toggle GPT-5.2 for analytics via UI with cost warning modal (4-6x multiplier displayed)
 - [x] **GPT-04**: System enforces budget caps per run and aborts if reasoning token cost exceeds threshold
 - [x] **GPT-05**: System provides post-run audit breakdown showing reasoning tokens vs output tokens separately
 
@@ -123,12 +123,12 @@ Which phases cover which requirements. Updated after roadmap creation.
 | UI-04 | Phase 9 | Complete |
 | GPT-01 | Phase 10 | Pending |
 | GPT-02 | Phase 10 | Complete |
-| GPT-03 | Phase 10 | Pending |
+| GPT-03 | Phase 10 | Complete |
 | GPT-04 | Phase 10 | Complete |
 | GPT-05 | Phase 10 | Complete |
 | INFRA-03 | Phase 10 | Complete |
 | INFRA-04 | Phase 10 | Complete |
-| UI-06 | Phase 10 | Pending |
+| UI-06 | Phase 10 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 28 total

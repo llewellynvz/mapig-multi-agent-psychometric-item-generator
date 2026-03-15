@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: Phase 10 (GPT-5.2 Integration & Analytics Optimization)
-Plan: 1 of 2 complete (10-01 ✅)
-Status: In Progress
-Last activity: 2026-03-15 — Phase 10 Plan 01 complete (parallel analytics Send API with budget enforcement)
+Plan: 2 of 2 complete (10-01 ✅, 10-02 ✅)
+Status: Complete
+Last activity: 2026-03-15 — Phase 10 Plan 02 complete (GPT-5.2 analytics toggle UI and cost display)
 
-Progress: [██████████] 100% (4/4 phases in progress, 9/9 total plans complete)
+Progress: [██████████] 100% (4/4 phases complete, 10/10 total plans complete)
 
 ## Performance Metrics
 
@@ -77,8 +77,9 @@ Progress: [██████████] 100% (4/4 phases in progress, 9/9 tot
 | Plan | Tasks | Duration | Files | Commits |
 |------|-------|----------|-------|---------|
 | 10-01 | 2 tasks | 6m 28s | 5 files | 2 commits |
+| 10-02 | 2 tasks | 2m 15s | 4 files | 2 commits |
 
-**Phase 10 Total:** 1 plan, 2 tasks, 5 files modified, 2 commits, ~7 minutes
+**Phase 10 Total:** 2 plans, 4 tasks, 9 files modified, 4 commits, ~9 minutes
 
 ## Accumulated Context
 
@@ -124,6 +125,13 @@ Key decisions carrying forward:
 - Use LangGraph Send API for parallel analytics instead of asyncio.gather — cleaner integration with graph topology, state merging handled by framework
 - GPT-5.2 reasoning tokens billed at same rate as output tokens ($14/1M) — simplified pricing model matches OpenAI documentation
 - Soft abort on budget exceeded (log warning, preserve results) — provides visibility without blocking pipeline, allows graceful degradation
+
+**10-02 (GPT-5.2 Analytics Toggle UI):**
+- use_gpt52_analytics defaults to false (opt-in, not opt-out) for cost safety
+- Toast warning shows estimated $1.50-$3.00 additional cost per run (4-6x multiplier messaging)
+- GPT-5.2 toggle placed after critic toggle for logical grouping
+- Analytics budget exceeded warning shown inline in cost breakdown (not blocking modal)
+- Cost panel visibility condition changed from opus_cost check to total_cost > 0 (handles GPT-5.2-only scenarios)
 
 **09-01 (Instrument Search and Plagiarism Detection):**
 - Use Perplexity Academic search with domain filtering for instrument discovery
@@ -201,9 +209,9 @@ Research suggested 6 phases but coarse granularity setting (config.json) require
 
 ## Session Continuity
 
-Last session: 2026-03-15T11:07:33.000Z
-Stopped at: Phase 10 Plan 01 complete
-Resume: Phase 10 Plan 01 complete (parallel analytics Send API) - ready for Plan 02 (GPT-5.2 reasoning models for analytics tasks)
+Last session: 2026-03-15T12:20:39.000Z
+Stopped at: Phase 10 Plan 02 complete
+Resume: Phase 10 complete (GPT-5.2 integration and analytics optimization) - v2.0 Psychometric Rigor milestone complete
 
 **Phase 9 Summary (complete):**
 - ✅ Plan 01: Instrument Search & Plagiarism Detection (Perplexity Academic search, hardcoded defaults, sentence-transformers plagiarism detection, Wave 0 stubs)
@@ -211,10 +219,10 @@ Resume: Phase 10 Plan 01 complete (parallel analytics Send API) - ready for Plan
 - ✅ Plan 03: Comparison UI (ComparisonPanel, InstrumentCard, PlagiarismBadge, convergent_validity_score field)
 - Status: Phase 9 complete (3/3 plans complete)
 
-**Phase 10 Summary (in progress):**
+**Phase 10 Summary (complete):**
 - ✅ Plan 01: Parallel Analytics Send API (LangGraph Send API fan-out, GPT-5.2 toggle, budget cap enforcement, cost tracking)
-- 🔲 Plan 02: TBD (GPT-5.2 reasoning models for analytics tasks)
-- Status: Phase 10 in progress (1/2 plans complete)
+- ✅ Plan 02: GPT-5.2 Analytics Toggle UI (InstrumentSetupForm toggle, toast warning, cost breakdown in audit panel)
+- Status: Phase 10 complete (2/2 plans complete)
 
 **Roadmap summary:**
 - 4 phases (7-10) covering 28 requirements
@@ -224,6 +232,7 @@ Resume: Phase 10 Plan 01 complete (parallel analytics Send API) - ready for Plan
 - **Phase 7 complete ✅** — Foundation infrastructure ready
 - **Phase 8 complete ✅** — Correlation analysis fully implemented and verified
 - **Phase 9 complete ✅** — Dynamic instrument comparison and cross-construct analysis ready
+- **Phase 10 complete ✅** — GPT-5.2 integration and parallel analytics optimization complete
 
 ---
 *State initialized: 2026-03-14*

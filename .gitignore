@@ -81,3 +81,11 @@ fix-directory-structure.ps1
 # unused config
 Dockerfile
 run_dev.sh
+
+# local dev / evaluation files
+EVAL_PROMPT.md
+nul
+payload.json
+test_payload.json
+test_api.py
+test_pipeline.py

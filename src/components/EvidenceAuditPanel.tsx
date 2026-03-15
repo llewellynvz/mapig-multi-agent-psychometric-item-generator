@@ -141,7 +141,7 @@ function SourceSection({ title, count, icon, defaultOpen = false, children }: So
 }
 
 export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
-  const [isOpen, setIsOpen] = React.useState(true);
+  const [isOpen, setIsOpen] = React.useState(false);
   const webSources = audit.approved_sources.filter(isHttpSource);
   const localSources = audit.approved_sources.filter((source) => !isHttpSource(source));
 

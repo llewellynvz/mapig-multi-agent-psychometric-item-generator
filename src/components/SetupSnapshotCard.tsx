@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowLeft, Sliders } from "lucide-react";
+import { PrimaryButton } from "@/components/ui/action-buttons";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
@@ -8,9 +10,10 @@ import type { InstrumentSetupFormValues } from "@/lib/schemas";
 export interface SetupSnapshotCardProps {
   values: InstrumentSetupFormValues | null;
   horizontal?: boolean;
+  onEditSetup?: () => void;
 }
 
-export function SetupSnapshotCard({ values, horizontal = false }: SetupSnapshotCardProps) {
+export function SetupSnapshotCard({ values, horizontal = false, onEditSetup }: SetupSnapshotCardProps) {
   if (!values) {
     return (
       <SurfaceCard className="border-lime-300/70">
@@ -30,7 +33,18 @@ export function SetupSnapshotCard({ values, horizontal = false }: SetupSnapshotC
     return (
       <SurfaceCard className="border-lime-300/70">
         <CardHeader className="border-b border-border/60 py-2.5 px-4">
-          <CardTitle className="text-sm">Instrument Setup</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+              <Sliders className="h-5 w-5 text-white" />
+              Instrument Setup
+            </CardTitle>
+            {onEditSetup && (
+              <PrimaryButton type="button" size="sm" onClick={onEditSetup}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Edit Setup
+              </PrimaryButton>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="py-3 px-4">
           <div className="grid gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-6 text-sm">

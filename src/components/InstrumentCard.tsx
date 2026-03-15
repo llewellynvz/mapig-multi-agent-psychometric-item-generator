@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 import type { ComparisonInstrument } from "@/lib/types";
 
 export interface InstrumentCardProps {
@@ -47,6 +47,25 @@ function parseAuthorYear(citation: string): string {
   return citation;
 }
 
+/**
+ * Extract a paper URL (DOI or direct link) from a citation string
+ */
+function extractPaperUrl(citation: string): string | null {
+  // Try DOI URL pattern
+  const doiUrlMatch = citation.match(/(?:https?:\/\/)?(?:dx\.)?doi\.org\/([^\s,)]+)/i);
+  if (doiUrlMatch) return `https://doi.org/${doiUrlMatch[1]}`;
+
+  // Try raw DOI reference (10.xxxx/...)
+  const rawDoi = citation.match(/\b(10\.\d{4,}\/[^\s,)]+)/);
+  if (rawDoi) return `https://doi.org/${rawDoi[1]}`;
+
+  // Try any URL
+  const urlMatch = citation.match(/(https?:\/\/[^\s,)]+)/);
+  if (urlMatch) return urlMatch[1];
+
+  return null;
+}
+
 export function InstrumentCard({
   instrument,
   label,
@@ -57,6 +76,7 @@ export function InstrumentCard({
 }: InstrumentCardProps) {
   const authorYear = parseAuthorYear(instrument.source_citation);
   const hasScore = score !== undefined;
+  const paperUrl = extractPaperUrl(instrument.source_citation);
 
   return (
     <div
@@ -69,35 +89,54 @@ export function InstrumentCard({
         {label}
       </span>
 
-      {/* Instrument info */}
-      <div className="mt-3 space-y-2">
-        <div>
-          <h4 className="text-base font-semibold text-slate-50 leading-tight">
-            {instrument.name}
-          </h4>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-sm text-muted-foreground">{authorYear}</span>
-            {hasScore && (
-              <div className="mt-2 rounded-lg border border-border/40 bg-slate-900/30 px-3 py-2 inline-flex items-center gap-2">
-                <span className={`text-xl font-bold tabular-nums ${getScoreColor(score)}`}>
-                  {score.toFixed(2)}
-                </span>
-                <span className={`text-[10px] font-medium uppercase tracking-wider ${getScoreColor(score)}`}>
-                  {scoreLabel ?? "r"} · {getScoreLabel(score)}
-                </span>
-              </div>
-            )}
+      {/* Main content row: info left, score badge right */}
+      <div className="mt-3 flex items-start justify-between gap-4">
+        {/* Left: Instrument info */}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div>
+            <h4 className="text-base font-semibold text-slate-50 leading-tight">
+              {instrument.name}
+            </h4>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-sm text-muted-foreground">{authorYear}</span>
+              {paperUrl && (
+                <a
+                  href={paperUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  Read paper
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
           </div>
+
+          <p className="text-sm text-muted-foreground">
+            <span className="text-slate-50/70">Construct:</span> {instrument.construct}
+          </p>
+
+          {instrument.similarity_rationale && (
+            <p className="text-sm italic text-slate-400 leading-relaxed">
+              {instrument.similarity_rationale}
+            </p>
+          )}
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          <span className="text-slate-50/70">Construct:</span> {instrument.construct}
-        </p>
-
-        {instrument.similarity_rationale && (
-          <p className="text-sm italic text-slate-400 leading-relaxed">
-            {instrument.similarity_rationale}
-          </p>
+        {/* Right: Square score badge */}
+        {hasScore && (
+          <div className="flex shrink-0 flex-col items-center justify-center rounded-xl border border-border/40 bg-slate-900/30 w-24 h-24">
+            <span className={`text-2xl font-bold tabular-nums leading-none ${getScoreColor(score)}`}>
+              {score.toFixed(2)}
+            </span>
+            <span className="mt-1 text-[9px] font-medium text-muted-foreground">
+              r = {score.toFixed(2)}
+            </span>
+            <span className={`mt-0.5 text-[9px] font-medium uppercase tracking-wider ${getScoreColor(score)}`}>
+              {getScoreLabel(score)}
+            </span>
+          </div>
         )}
       </div>
 

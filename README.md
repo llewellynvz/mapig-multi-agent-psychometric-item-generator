@@ -6,6 +6,12 @@ MAPIG is a multi-agent platform for designing and generating psychometrically so
 
 ![MAPIG architecture](./public/mapig_arc.png)
 
+## Video Tutorial
+
+[![MAPIG Tutorial](https://img.youtube.com/vi/E7Hq1bwF5sk/maxresdefault.jpg)](https://youtu.be/E7Hq1bwF5sk?si=FKhQORlNa61qjNcP)
+
+Watch the full walkthrough tutorial showing how to use MAPIG to generate psychometric items.
+
 ## Overview
 
 MAPIG is a multi-agent workflow for drafting and refining psychometric items with explicit auditability.
@@ -26,6 +32,9 @@ MAPIG generates candidate items and review artifacts. It supports expert judgmen
 - Human feedback loop: rerun using prior items + reviewer feedback
 - Evidence trail: grouped, clickable web sources and local curated references
 - Audit metadata on every run: `thread_id`, `run_id`, `iteration_count`, `stop_reason`, model info
+- Inter-item correlation heatmap with McDonald's omega and consistency metrics
+- Instrument comparison: convergent/discriminant validity with published scales
+- Score badges showing r-values and strength indicators with links to source papers
 
 ---
 

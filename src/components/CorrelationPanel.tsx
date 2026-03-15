@@ -137,7 +137,7 @@ export function CorrelationPanel({
           className="cursor-pointer border-b border-border/60 hover:bg-surface-2/50 transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             {isExpanded ? (
               <ChevronDown className="h-4 w-4" />
             ) : (

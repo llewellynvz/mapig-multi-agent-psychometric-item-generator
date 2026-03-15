@@ -117,4 +117,66 @@ describe('InstrumentSetupForm - Basic Form Functionality', () => {
       }
     });
   });
+
+  it('GPT-5.2 toggle renders with default "Standard" label', () => {
+    const mockOnSubmit = vi.fn();
+    render(<InstrumentSetupForm onSubmit={mockOnSubmit} />);
+
+    // Verify GPT-5.2 analytics toggle is present
+    expect(screen.getByLabelText(/Analytics Model/i)).toBeDefined();
+
+    // Default should show "Standard"
+    expect(screen.getByText(/Standard/i)).toBeDefined();
+    expect(screen.getByText(/Claude Sonnet for analytics/i)).toBeDefined();
+  });
+
+  it('GPT-5.2 toggle changes label when enabled', async () => {
+    const mockOnSubmit = vi.fn();
+    render(<InstrumentSetupForm onSubmit={mockOnSubmit} />);
+
+    const user = userEvent.setup();
+
+    // Find the GPT-5.2 analytics switch
+    const analyticsSwitch = screen.getByLabelText(/Analytics Model/i);
+
+    // Click to enable
+    await user.click(analyticsSwitch);
+
+    // Label should change to "GPT-5.2"
+    await waitFor(() => {
+      expect(screen.getByText(/GPT-5\.2/i)).toBeDefined();
+      expect(screen.getByText(/Reasoning models for higher accuracy analytics/i)).toBeDefined();
+    });
+  });
+
+  it('GPT-5.2 toggle updates form state to use_gpt52_analytics: true', async () => {
+    const mockOnSubmit = vi.fn();
+    render(<InstrumentSetupForm onSubmit={mockOnSubmit} isPending={false} />);
+
+    const user = userEvent.setup();
+
+    // Fill required fields
+    const constructNameInput = screen.getByLabelText(/Construct name/i);
+    const constructDefInput = screen.getByLabelText(/Construct definition/i);
+    const targetPopInput = screen.getByLabelText(/Target population/i);
+
+    await user.type(constructNameInput, 'Test Construct');
+    await user.type(constructDefInput, 'Definition here for testing');
+    await user.type(targetPopInput, 'Adults');
+
+    // Enable GPT-5.2 analytics
+    const analyticsSwitch = screen.getByLabelText(/Analytics Model/i);
+    await user.click(analyticsSwitch);
+
+    // Submit form
+    const submitButton = screen.getByRole('button', { name: /Generate items/i });
+    await user.click(submitButton);
+
+    // Verify form submission includes use_gpt52_analytics: true
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalled();
+      const submitData = mockOnSubmit.mock.calls[0][0];
+      expect(submitData.use_gpt52_analytics).toBe(true);
+    });
+  });
 });

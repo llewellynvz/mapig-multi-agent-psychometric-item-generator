@@ -237,11 +237,11 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
         </InsetPanel>
 
         {/* Cost Breakdown (if available) */}
-        {audit.opus_cost != null && audit.total_cost != null && (
+        {(audit.total_cost != null && audit.total_cost > 0) && (
           <InsetPanel className="space-y-2 rounded-2xl p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">API Cost Breakdown</p>
             <div className="space-y-1 text-sm">
-              {audit.opus_cost > 0 && (
+              {audit.opus_cost != null && audit.opus_cost > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Claude Opus (Validation):</span>
                   <span className="font-mono">${audit.opus_cost.toFixed(2)}</span>
@@ -257,6 +257,23 @@ export function EvidenceAuditPanel({ audit }: EvidenceAuditPanelProps) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">OpenAI:</span>
                   <span className="font-mono">${audit.openai_cost.toFixed(2)}</span>
+                </div>
+              )}
+              {audit.gpt52_reasoning_cost != null && audit.gpt52_reasoning_cost > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">GPT-5.2 Reasoning:</span>
+                  <span className="font-mono">${audit.gpt52_reasoning_cost.toFixed(2)}</span>
+                </div>
+              )}
+              {audit.gpt52_output_cost != null && audit.gpt52_output_cost > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">GPT-5.2 Output:</span>
+                  <span className="font-mono">${audit.gpt52_output_cost.toFixed(2)}</span>
+                </div>
+              )}
+              {audit.analytics_budget_exceeded && (
+                <div className="flex items-center gap-2 text-yellow-500 text-xs mt-1">
+                  <span>Analytics partially complete -- budget cap reached</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold pt-2 border-t border-border/40">

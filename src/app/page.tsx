@@ -597,23 +597,12 @@ export default function HomePage() {
 
         {step === "results" && (
           <section className="animate-fade-up space-y-6">
-            {/* Full-width setup snapshot bar */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <SetupSnapshotCard values={submittedSetup} horizontal />
-              </div>
-              <PrimaryButton
-                type="button"
-                onClick={handleStartNew}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Edit setup
-              </PrimaryButton>
-            </div>
+            {/* Full-width setup snapshot bar (Edit button inside card) */}
+            <SetupSnapshotCard values={submittedSetup} horizontal onEditSetup={handleStartNew} />
 
-            {/* 2-column main content: golden ratio */}
-            <div className="grid gap-6 xl:grid-cols-[1.618fr_1fr]">
-              {/* Left: Generated items only */}
+            {/* 2-column main content: 60/40 split */}
+            <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
+              {/* Left (60%): Generated items */}
               <div className="space-y-4">
                 {result ? (
                   <GeneratedItemsTable items={result.final_items} fullOutput={result} />
@@ -628,7 +617,8 @@ export default function HomePage() {
                   </SurfaceCard>
                 )}
               </div>
-              {/* Right: Feedback + Evidence + History */}
+
+              {/* Right (40%): Feedback + Comparison + Evidence + History */}
               <div className="space-y-4">
                 <HumanFeedbackPanel
                   value={humanFeedback}
@@ -636,6 +626,31 @@ export default function HomePage() {
                   onRefine={handleRefineRun}
                   isPending={mutation.isPending}
                 />
+
+                {/* Instrument Comparison (moved from bottom analytics row) */}
+                {result && result.comparison_instruments && result.comparison_instruments.length >= 2 ? (
+                  <ComparisonPanel
+                    convergentInstrument={result.comparison_instruments[0]}
+                    discriminantInstrument={result.comparison_instruments[1]}
+                    convergentScore={result.convergent_validity_score ?? 0.5}
+                    crossConstruct={result.cross_construct_analysis}
+                    defaultExpanded
+                  />
+                ) : (
+                  <SurfaceCard className="border-lime-300/70">
+                    <CardHeader className="border-b border-border/60">
+                      <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                        Instrument Comparison
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                      <p className="text-sm text-muted-foreground">
+                        Requires 3+ items for instrument comparison analytics.
+                      </p>
+                    </CardContent>
+                  </SurfaceCard>
+                )}
+
                 {result ? (
                   <EvidenceAuditPanel audit={result.audit} />
                 ) : (
@@ -648,6 +663,7 @@ export default function HomePage() {
                     </CardContent>
                   </SurfaceCard>
                 )}
+
                 <FeedbackHistoryPanel
                   entries={feedbackHistory}
                   onReuseFeedback={setHumanFeedback}
@@ -656,26 +672,30 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Full-width analytics row */}
-            {result && (
-              <div className="grid gap-6 lg:grid-cols-2">
-                {result.correlation_matrix && (
-                  <CorrelationPanel
-                    matrix={result.correlation_matrix}
-                    itemTexts={result.final_items.map(item => item.item_text)}
-                    constructName={result.final_items[0]?.construct_name}
-                    defaultExpanded
-                  />
-                )}
-                {result.comparison_instruments && result.comparison_instruments.length >= 2 && (
-                  <ComparisonPanel
-                    convergentInstrument={result.comparison_instruments[0]}
-                    discriminantInstrument={result.comparison_instruments[1]}
-                    convergentScore={result.convergent_validity_score ?? 0.5}
-                    crossConstruct={result.cross_construct_analysis}
-                    defaultExpanded
-                  />
-                )}
+            {/* Correlation row — centered, 60% width on xl */}
+            {result && result.correlation_matrix ? (
+              <div className="mx-auto w-full xl:w-[60%]">
+                <CorrelationPanel
+                  matrix={result.correlation_matrix}
+                  itemTexts={result.final_items.map(item => item.item_text)}
+                  constructName={result.final_items[0]?.construct_name}
+                  defaultExpanded
+                />
+              </div>
+            ) : (
+              <div className="mx-auto w-full xl:w-[60%]">
+                <SurfaceCard className="border-lime-300/70">
+                  <CardHeader className="border-b border-border/60">
+                    <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                      Correlation Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <p className="text-sm text-muted-foreground">
+                      Requires 3+ items for correlation analysis.
+                    </p>
+                  </CardContent>
+                </SurfaceCard>
               </div>
             )}
           </section>

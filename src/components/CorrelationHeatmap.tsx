@@ -57,8 +57,8 @@ export function CorrelationHeatmap({
   const itemCount = itemTexts.length;
 
   // Responsive sizing: scale down for large item sets
-  const containerWidth = 900; // Max width
-  const cellSize = Math.max(44, Math.min(64, containerWidth / itemCount));
+  const containerWidth = 1000; // Max width
+  const cellSize = Math.max(52, Math.min(80, containerWidth / itemCount));
   const margin = { top: 80, right: 20, bottom: 20, left: 80 };
   const width = cellSize * itemCount + margin.left + margin.right;
   const height = cellSize * itemCount + margin.top + margin.bottom;
@@ -73,7 +73,7 @@ export function CorrelationHeatmap({
   const heatmapData = buildHeatmapData(matrix.cells, itemCount);
 
   return (
-    <div className="correlation-heatmap-container">
+    <div className="correlation-heatmap-container overflow-x-auto">
       <div className="flex justify-center">
       <svg width={width} height={height}>
         <Group left={margin.left} top={margin.top}>
@@ -143,12 +143,12 @@ export function CorrelationHeatmap({
       </div>
 
       {/* Color legend */}
-      <div className="mt-4 flex items-center justify-center gap-3">
-        <span className="text-xs font-medium text-muted-foreground">0.0</span>
-        <div className="flex h-3 w-56 rounded-full overflow-hidden" style={{
+      <div className="mx-auto mt-4 flex items-center justify-center gap-3" style={{ maxWidth: `${width}px` }}>
+        <span className="shrink-0 text-xs font-medium text-muted-foreground">0.0</span>
+        <div className="flex h-3 flex-1 rounded-full overflow-hidden" style={{
           background: 'linear-gradient(to right, #e8f5f7, #4db8c9, #006d7c)'
         }} />
-        <span className="text-xs font-medium text-[#006d7c]">1.0</span>
+        <span className="shrink-0 text-xs font-medium text-[#006d7c]">1.0</span>
       </div>
       <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
         Light = weak correlation, Dark = strong correlation

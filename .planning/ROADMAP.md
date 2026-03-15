@@ -143,7 +143,11 @@ Plans:
   6. Analytics failures handled gracefully by populating null values in FinalOutput allowing item generation to complete successfully
   7. All new UI components match existing shadcn/ui design patterns and Radix primitives without introducing design system conflicts
 
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Backend: parallel Send API analytics, GPT-5.2 toggle propagation, budget caps, cost tracking
+- [ ] 10-02-PLAN.md — Frontend: GPT-5.2 analytics toggle, cost warning toast, audit panel GPT-5.2 cost rows
 
 ## Progress
 
@@ -162,8 +166,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.1 → 4 → 5 → 6 → 7 �
 | 7. Foundation & Infrastructure | v2.0 | 2/2 | Complete | 2026-03-14 |
 | 8. Synthetic Correlation Analysis | v2.0 | 3/3 | Complete | 2026-03-14 |
 | 9. Dynamic Instrument Comparison | v2.0 | 2/3 | In Progress | - |
-| 10. GPT-5.2 Integration & Analytics Optimization | v2.0 | 0/? | Not started | - |
+| 10. GPT-5.2 Integration & Analytics Optimization | v2.0 | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-08*
-*Last updated: 2026-03-14 (Phase 9 Plan 02 complete - validity scoring and graph wiring)*
+*Last updated: 2026-03-15 (Phase 10 planned - 2 plans for GPT-5.2 integration and analytics optimization)*

@@ -101,21 +101,25 @@ def _rule_based_fallback(
     if iteration >= settings.MAX_ITERATIONS:
         return "stop_max_iterations", f"Reached MAX_ITERATIONS before all medium+ issues were resolved. {threshold_ctx}"
 
-    # Step 2: Check severity 5 blockers
+    # Step 2: Force revision in strict/thorough mode on severity >= 3
+    if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
+        return "revise", f"Medium+ issues in {thresholds['mode']} mode (max severity {max_sev}). {threshold_ctx}"
+
+    # Step 3: Check severity 5 blockers
     if max_sev >= 5:
         return "revise", f"Blocking issue(s) detected (max severity {max_sev}). {threshold_ctx}"
 
-    # Step 3: Check bias blocker threshold (adaptive)
+    # Step 4: Check bias blocker threshold (adaptive)
     bias_max_sev = _max_severity(bias_comments)
     if bias_max_sev >= thresholds['bias_blocker']:
         return "revise", f"Bias issues ≥{thresholds['bias_blocker']}. {threshold_ctx}"
 
-    # Step 4: Check content blocker threshold (adaptive)
+    # Step 5: Check content blocker threshold (adaptive)
     content_max_sev = _max_severity(content_comments)
     if content_max_sev >= thresholds['content_blocker']:
         return "revise", f"Content issues ≥{thresholds['content_blocker']}. {threshold_ctx}"
 
-    # Step 5: Check convergence (adaptive thresholds)
+    # Step 6: Check convergence (adaptive thresholds)
     if med_plus >= 1 and max_sev > thresholds['accept_max_severity']:
         return "revise", f"Medium+ issues detected (count {med_plus}, max severity {max_sev}). {threshold_ctx}"
 
@@ -162,17 +166,19 @@ def decide(
         max_sev = _max_severity(all_comments)
         med_plus = _count_medium_plus(all_comments)
 
-        # Clear accept: All feedback below acceptance threshold
-        if max_sev <= thresholds['accept_max_severity'] and med_plus <= thresholds['accept_medium_plus_count']:
-            return "accept", f"All feedback within threshold (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
+        # Force revision first: In strict/thorough mode, severity>=3 must be revised
+        # This MUST come before the accept check to prevent severity-3 issues from
+        # being silently accepted when they happen to match threshold boundaries.
+        if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
+            return "revise", f"Medium+ issues detected in {thresholds['mode']} mode (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
 
         # Clear reject: Issues exceed threshold — force revision
         if max_sev >= 4:
             return "revise", f"High-severity issues detected (max: {max_sev}). Revision required. {threshold_ctx} [rule-based, 0 tokens]"
 
-        # In strict/thorough mode, also force revision on severity=3 to ensure thorough cleanup
-        if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
-            return "revise", f"Medium+ issues detected in {thresholds['mode']} mode (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
+        # Clear accept: All feedback below acceptance threshold
+        if max_sev <= thresholds['accept_max_severity'] and med_plus <= thresholds['accept_medium_plus_count']:
+            return "accept", f"All feedback within threshold (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
 
         # Borderline case: Fall through to LLM for nuanced judgment
 

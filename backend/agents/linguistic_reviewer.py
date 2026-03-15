@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
@@ -7,11 +8,14 @@ from backend.agents.prompt_loader import load_prompt
 from backend.schemas import AbbreviatedRequest, DraftItem, LinguisticReviewResponse, ReviewComment
 from backend.settings import settings
 
+logger = logging.getLogger("lmaig.linguistic_reviewer")
+
 
 def review_linguistic(
     request: AbbreviatedRequest, items: List[DraftItem], iteration: int
 ) -> Tuple[LinguisticReviewResponse, TokenUsage]:
     """Linguistic review of items."""
+    logger.info("LINGUISTIC_REVIEWER start items=%d iteration=%d", len(items), iteration)
     if settings.APP_MODE == "mock":
         # Deterministic: force one revision loop by emitting a single medium-severity issue on iteration 0.
         if iteration == 0 and items:
@@ -49,4 +53,5 @@ def review_linguistic(
     # Safety: enforce comment type at runtime.
     for c in resp.comments:
         c.type = "linguistic"
+    logger.info("LINGUISTIC_REVIEWER done comments=%d tokens=%d", len(resp.comments), usage.total_tokens)
     return resp, usage

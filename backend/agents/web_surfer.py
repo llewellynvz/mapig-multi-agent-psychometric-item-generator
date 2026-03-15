@@ -102,7 +102,7 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
                 parsed = json.loads(json_str)
 
                 # Process evidence chunks with enhanced metadata
-                _valid_evidence_types = {"theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions"}
+                _valid_evidence_types = {"theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions", "cultural_context"}
                 for chunk_data in parsed.get("evidence", []):
                     raw_type = chunk_data.get("evidence_type")
                     evidence.append(
@@ -155,6 +155,25 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
     return evidence
 
 
+def _synthesize_cultural_query(request: UserRequest) -> str:
+    """Build a Perplexity query for cultural norms and sensitivities."""
+    parts = [
+        f'Describe cultural norms, values, and measurement sensitivities for "{request.cultural_group}".',
+        f'Context: We are developing a psychometric scale measuring "{request.construct_name}" '
+        f'for {request.target_population}.',
+        "",
+        "Focus on:",
+        "(1) Cultural values and communication styles relevant to self-report surveys",
+        "(2) Topics or concepts that may be sensitive or taboo",
+        "(3) Language considerations (directness, formality, idioms to avoid)",
+        "(4) Work culture norms if applicable",
+        "(5) Religious or social customs that affect how people respond to survey items",
+        "",
+        "Keep response factual and evidence-based. Cite academic sources where possible.",
+    ]
+    return "\n".join(parts)
+
+
 def surf(request: UserRequest) -> RetrievalResponse:
     """Use Perplexity academic search to retrieve evidence chunks."""
     if not settings.PERPLEXITY_API_KEY:
@@ -205,5 +224,44 @@ def surf(request: UserRequest) -> RetrievalResponse:
     # Task #4: Process LLM response for structured evidence
     evidence = _process_perplexity_response(data)
     log.info("PERPLEXITY_SEARCH done evidence=%d", len(evidence))
+
+    # Cultural context search (if cultural_group is set)
+    if request.cultural_group:
+        try:
+            cultural_query = _synthesize_cultural_query(request)
+            cultural_payload = {
+                "model": settings.PERPLEXITY_MODEL,
+                "messages": [
+                    {"role": "system", "content": "You are a cultural psychology expert. Provide evidence-based cultural context for psychometric item development."},
+                    {"role": "user", "content": cultural_query},
+                ],
+                "temperature": 0,
+                "web_search_options": {
+                    "search_mode": settings.PERPLEXITY_SEARCH_MODE,
+                    "num_search_results": 5,
+                    "search_domain_filter": domains,
+                },
+            }
+            with httpx.Client(timeout=60) as client:
+                cultural_resp = client.post(url, headers=headers, json=cultural_payload)
+                cultural_resp.raise_for_status()
+                cultural_data = cultural_resp.json()
+
+            # Extract cultural context as evidence chunks
+            cultural_content = cultural_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if cultural_content:
+                evidence.append(
+                    EvidenceChunk(
+                        source_id=f"cultural:{_source_id(request.cultural_group)}",
+                        title=f"Cultural context: {request.cultural_group}",
+                        snippet=cultural_content[:240] + ("…" if len(cultural_content) > 240 else ""),
+                        url_or_docref="perplexity:cultural_search",
+                        quote=cultural_content[:500],
+                        evidence_type="cultural_context",
+                    )
+                )
+                log.info("PERPLEXITY_CULTURAL_SEARCH done cultural_group=%s", request.cultural_group)
+        except Exception as e:
+            log.warning("PERPLEXITY_CULTURAL_SEARCH failed: %s", e)
 
     return RetrievalResponse(evidence=evidence)

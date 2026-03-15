@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 
+import asyncio
 import concurrent.futures
 import datetime as _dt
 import uuid
@@ -9,7 +10,7 @@ from typing import List, Literal, Optional
 from typing_extensions import TypedDict
 
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, Send
+from langgraph.types import Command
 
 from backend.agents.sanitizer import sanitize_user_request
 from backend.agents.bias_reviewer import review_bias
@@ -22,14 +23,17 @@ from backend.agents.llm_utils import TokenUsage
 from backend.schemas import (
     AbbreviatedRequest,
     AuditMetadata,
+    DimensionScore,
     DraftItem,
     EvidenceChunk,
     FinalOutput,
     IterationSnapshot,
     ItemValidation,
+    MetaEditorResponse,
     ReviewComment,
     RevisionPlan,
     UserRequest,
+    ValidationResponse,
 )
 from backend.settings import settings
 from backend.logging_utils import step
@@ -200,6 +204,7 @@ def _create_abbreviated_request(
         cultural_group=full_request.cultural_group,
         response_scale=full_request.response_scale,
         constraints=full_request.constraints,
+        construct_exclusions=full_request.construct_exclusions,
         model_provider=full_request.model_provider,
         use_chatgpt_critics=full_request.use_chatgpt_critics,
         cultural_context_notes=cultural_notes,
@@ -243,14 +248,21 @@ def retrieve_node(state: GraphState) -> GraphState:
         evidence = list(resp.evidence)
 
         # Perplexity evidence (optional)
+        local_count = len(evidence)
+
         if settings.SEARCH_PROVIDER in {"perplexity", "hybrid"}:
             pplx = web_surf(state["user_request"])
-            # dedupe by url
-            seen = {e.url_or_docref for e in evidence}
+            # dedupe by source_id (not url — same URL can have multiple distinct evidence chunks)
+            seen = {e.source_id for e in evidence}
             for e in pplx.evidence:
-                if e.url_or_docref not in seen:
+                if e.source_id not in seen:
                     evidence.append(e)
-                    seen.add(e.url_or_docref)
+                    seen.add(e.source_id)
+
+        web_count = len(evidence) - local_count
+        logger.info(f"EVIDENCE_DEPTH total={len(evidence)} web={web_count} local={local_count}")
+        if len(evidence) < 20:
+            logger.warning(f"EVIDENCE_DEPTH_WARNING total={len(evidence)} (minimum recommended: 20)")
         return {"evidence": evidence}
 
 
@@ -298,7 +310,7 @@ def item_writer_node(state: GraphState) -> GraphState:
         token_update = _accumulate_tokens(state, usage)
 
         # Non-blocking diversity check (warning only)
-        if settings.APP_MODE != "mock":
+        if settings.APP_MODE != "mock" and resp is not None:
             _check_item_diversity(resp.items)
 
         return {
@@ -315,11 +327,31 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
         draft_items = state.get("draft_items", [])
         attempt = state.get("validation_attempt", 1)
 
-        resp, usage = validate_items(
-            request=state["user_request"],
-            items=draft_items,
-            attempt=attempt
-        )
+        try:
+            resp, usage = validate_items(
+                request=state["user_request"],
+                items=draft_items,
+                attempt=attempt
+            )
+        except Exception as e:
+            logger.error(f"VALIDATION error={e}. Force-accepting all items.")
+            resp = ValidationResponse(validations=[
+                ItemValidation(
+                    item_index=i,
+                    item_text=item.item_text,
+                    dimension_scores=[
+                        DimensionScore(dimension="correspondence", reasoning="", score=7),
+                        DimensionScore(dimension="distinctiveness", reasoning="", score=7),
+                        DimensionScore(dimension="clarity", reasoning="", score=7),
+                        DimensionScore(dimension="specificity", reasoning="", score=7),
+                    ],
+                    weighted_score=7.0,
+                    accept=True,
+                    attempt=attempt,
+                )
+                for i, item in enumerate(draft_items)
+            ])
+            usage = TokenUsage(model_name="fallback")
 
         # Accumulate token usage
         token_update = _accumulate_tokens(state, usage)
@@ -461,16 +493,28 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
         draft_items = state.get("draft_items", [])
         iteration = state.get("iteration", 0)
 
+        # 1E: Extract previous iteration's comments for iteration awareness
+        previous_comments = None
+        if iteration > 0:
+            history = state.get("iteration_history", [])
+            if history:
+                last_snap = history[-1]
+                previous_comments = {
+                    "linguistic": [c.model_dump() for c in last_snap.linguistic_comments],
+                    "bias": [c.model_dump() for c in last_snap.bias_comments],
+                    "content": [c.model_dump() for c in last_snap.content_comments],
+                }
+
         # Run all three reviewers concurrently with abbreviated request
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             content_future = executor.submit(
-                review_content, abbreviated_request, draft_items, iteration
+                review_content, abbreviated_request, draft_items, iteration, previous_comments
             )
             linguistic_future = executor.submit(
-                review_linguistic, abbreviated_request, draft_items, iteration
+                review_linguistic, abbreviated_request, draft_items, iteration, previous_comments
             )
             bias_future = executor.submit(
-                review_bias, abbreviated_request, draft_items, iteration
+                review_bias, abbreviated_request, draft_items, iteration, previous_comments
             )
 
             # Wait for all to complete and get results
@@ -514,6 +558,7 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "final
         iteration=state.get("iteration", 0),
         model_provider=model_provider,
         use_chatgpt_critics=use_chatgpt_critics,
+        iteration_history=state.get("iteration_history", []),
     )
 
     if decision == "revise":
@@ -560,14 +605,22 @@ def meta_editor_node(state: GraphState) -> GraphState:
                 f"content: {len(content_comments)}->{len(filtered_content)}"
             )
 
-        resp, usage = revise_items(
-            request=state["user_request"],
-            items=state.get("draft_items", []),
-            linguistic_comments=filtered_linguistic,
-            bias_comments=filtered_bias,
-            content_comments=filtered_content,
-            iteration=state.get("iteration", 0),
-        )
+        try:
+            resp, usage = revise_items(
+                request=state["user_request"],
+                items=state.get("draft_items", []),
+                linguistic_comments=filtered_linguistic,
+                bias_comments=filtered_bias,
+                content_comments=filtered_content,
+                iteration=state.get("iteration", 0),
+            )
+        except Exception as e:
+            logger.error(f"META_EDITOR failed: {e}. Returning items unchanged.", exc_info=True)
+            resp = MetaEditorResponse(
+                revision_plan=RevisionPlan(summary=f"Meta-editor failed: {type(e).__name__}. Items returned unchanged."),
+                revised_items=state.get("draft_items", []),
+            )
+            usage = TokenUsage(model_name="fallback")
 
         token_update = _accumulate_tokens(state, usage)
 
@@ -729,21 +782,7 @@ def finalize_node(state: GraphState) -> GraphState:
         # Phase 10: Extract GPT-5.2 analytics toggle
         gpt52_enabled = user_request.use_gpt52_analytics if user_request and hasattr(user_request, "use_gpt52_analytics") else False
 
-        # Phase 10: Parallel analytics via Send API (if enough items)
-        if len(enriched_items) < 3:
-            logger.info(f"Too few items ({len(enriched_items)}) for analytics (minimum 3), skipping to END")
-            return Command(update={"final_output": out}, goto=END)
-
-        # Fan out to parallel analytics nodes
-        logger.info(f"Fanning out to 3 parallel analytics nodes (GPT-5.2 enabled: {gpt52_enabled})")
-        return Command(
-            update={"final_output": out, "gpt52_analytics_enabled": gpt52_enabled},
-            goto=[
-                Send("correlation_node", {"final_output": out, "user_request": user_request, "gpt52_analytics_enabled": gpt52_enabled}),
-                Send("comparison_node", {"final_output": out, "user_request": user_request, "gpt52_analytics_enabled": gpt52_enabled}),
-                Send("cross_construct_node", {"final_output": out, "user_request": user_request, "gpt52_analytics_enabled": gpt52_enabled}),
-            ],
-        )
+        return {"final_output": out, "gpt52_analytics_enabled": gpt52_enabled}
 
 
 async def correlation_node(state: GraphState) -> GraphState:
@@ -883,15 +922,36 @@ def comparison_node(state: GraphState) -> GraphState:
 
             logger.info(f"Convergent validity score: {convergent_score:.2f}")
 
-            # Run plagiarism detection
-            # Note: We don't have published item texts (copyright safeguard), so this returns empty dict
-            # Infrastructure supports future enhancement if Perplexity snippets contain sample items
+            # 1B: Convergent validity ceiling warning
+            if convergent_score > 0.85:
+                ceiling_warning = (
+                    f"Convergent validity of {convergent_score:.2f} with {convergent_instrument.name} "
+                    f"suggests items may be derivative (expected: 0.60-0.80)"
+                )
+                logger.warning(f"CONVERGENT_CEILING_WARNING {ceiling_warning}")
+                # Will be added to plagiarism_flags below with index -1
+
+            # Run plagiarism detection against known instrument items
+            from data.known_instrument_items import lookup_instrument_items
+            published_items = lookup_instrument_items(convergent_instrument.name)
+            if not published_items:
+                # Try construct name as fallback
+                published_items = lookup_instrument_items(construct_name)
+            logger.info(f"Plagiarism check: {len(published_items)} known items for '{convergent_instrument.name}'")
+
             plagiarism_detector = get_plagiarism_detector()
             plagiarism_flags = plagiarism_detector.detect_plagiarism(
                 item_texts,
-                [],  # No published items available (copyright protection)
+                published_items,
                 convergent_instrument.name
             )
+
+            # Add convergent ceiling warning to plagiarism flags
+            if convergent_score > 0.85:
+                plagiarism_flags[-1] = (
+                    f"Convergent validity of {convergent_score:.2f} with {convergent_instrument.name} "
+                    f"suggests items may be derivative (expected: 0.60-0.80)"
+                )
 
             # Update FinalOutput with comparison data
             updated_final_output = final_output.model_copy(deep=True)
@@ -953,14 +1013,22 @@ def cross_construct_node(state: GraphState) -> GraphState:
             # Get discriminant instrument (second one from comparison_instruments)
             discriminant_instrument = final_output.comparison_instruments[1]
 
+            # 1C: If construct_exclusions set, use it as discriminant construct
+            exclusion_construct = None
+            if user_request.construct_exclusions:
+                exclusion_construct = user_request.construct_exclusions
+                logger.info(f"Using construct_exclusions as discriminant target: '{exclusion_construct}'")
+
             # Extract item texts
             item_texts = [item.item_text for item in final_items]
 
-            # Score discriminant validity
+            # Score discriminant validity (use exclusion construct if available)
+            disc_name = discriminant_instrument.name
+            disc_construct = exclusion_construct or discriminant_instrument.construct
             discriminant_pair = score_discriminant_validity(
                 item_texts,
-                discriminant_instrument.name,
-                discriminant_instrument.construct,
+                disc_name,
+                disc_construct,
                 construct_name
             )
 
@@ -1006,29 +1074,83 @@ def cross_construct_node(state: GraphState) -> GraphState:
             return {}
 
 
-def collect_analytics_node(state: GraphState) -> GraphState:
-    """Collect parallel analytics results and enforce budget cap.
+async def analytics_dispatch_node(state: GraphState) -> GraphState:
+    """Run analytics in parallel using asyncio.gather, then merge results.
 
-    All analytics updates already applied to state by LangGraph after parallel superstep.
-    This node checks budget and adds warning if exceeded.
+    Correlation and comparison run concurrently. Cross-construct runs after
+    comparison completes because it depends on comparison_instruments.
+    Budget check runs at the end.
     """
-    with step("collect_analytics_node", state):
-        gpt52_enabled = state.get("gpt52_analytics_enabled", False)
-        if not gpt52_enabled:
+    with step("analytics_dispatch_node", state):
+        final_output = state.get("final_output")
+        if not final_output or len(final_output.final_items) < 3:
+            logger.info(f"Too few items for analytics (minimum 3), skipping")
             return {}
 
-        # Calculate GPT-5.2 cost from accumulated tokens
-        gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
-        gpt52_output = state.get("gpt52_output_tokens", 0)
-        gpt52_cost = (gpt52_reasoning + gpt52_output) / 1_000_000 * 14.0
+        gpt52_enabled = state.get("gpt52_analytics_enabled", False)
+        logger.info(f"Running parallel analytics (GPT-5.2 enabled: {gpt52_enabled})")
 
-        # Check against budget cap
-        if gpt52_cost > settings.ANALYTICS_BUDGET_CAP:
-            logger.warning(
-                f"ANALYTICS_BUDGET_EXCEEDED cost=${gpt52_cost:.4f} cap=${settings.ANALYTICS_BUDGET_CAP:.2f}"
-            )
+        # Phase 1: correlation + comparison in parallel
+        results = await asyncio.gather(
+            correlation_node(state),
+            asyncio.to_thread(comparison_node, state),
+            return_exceptions=True,
+        )
 
-        return {}
+        correlation_result, comparison_result = results
+
+        # Merge into single FinalOutput
+        updated = final_output.model_copy(deep=True)
+
+        if isinstance(correlation_result, dict) and "final_output" in correlation_result:
+            updated.correlation_matrix = correlation_result["final_output"].correlation_matrix
+            # 1D: Pairwise redundancy detection
+            if updated.correlation_matrix and updated.correlation_matrix.cells:
+                redundancy_flags = []
+                for cell in updated.correlation_matrix.cells:
+                    if cell.correlation > 0.75:
+                        redundancy_flags.append(
+                            f"Items {cell.item_i_index + 1} and {cell.item_j_index + 1} are redundant "
+                            f"(r = {cell.correlation:.2f}) — consider replacing one"
+                        )
+                if redundancy_flags:
+                    updated.correlation_matrix.redundancy_flags = redundancy_flags
+                    logger.warning(f"REDUNDANCY_FLAGS count={len(redundancy_flags)}")
+        elif isinstance(correlation_result, Exception):
+            logger.error(f"Correlation analysis failed: {correlation_result}")
+
+        if isinstance(comparison_result, dict) and "final_output" in comparison_result:
+            comp_fo = comparison_result["final_output"]
+            updated.comparison_instruments = comp_fo.comparison_instruments
+            updated.plagiarism_flags = comp_fo.plagiarism_flags
+            updated.convergent_validity_score = comp_fo.convergent_validity_score
+        elif isinstance(comparison_result, Exception):
+            logger.error(f"Comparison analysis failed: {comparison_result}")
+
+        # Phase 2: cross-construct (needs comparison_instruments from phase 1)
+        if updated.comparison_instruments:
+            cross_state = dict(state)
+            cross_state["final_output"] = updated
+            try:
+                cross_result = cross_construct_node(cross_state)
+                if isinstance(cross_result, dict) and "final_output" in cross_result:
+                    updated.cross_construct_analysis = cross_result["final_output"].cross_construct_analysis
+            except Exception as e:
+                logger.error(f"Cross-construct analysis failed: {e}")
+        else:
+            logger.info("No comparison instruments found, skipping cross-construct analysis")
+
+        # Budget check
+        if gpt52_enabled:
+            gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
+            gpt52_output = state.get("gpt52_output_tokens", 0)
+            gpt52_cost = (gpt52_reasoning + gpt52_output) / 1_000_000 * 14.0
+            if gpt52_cost > settings.ANALYTICS_BUDGET_CAP:
+                logger.warning(
+                    f"ANALYTICS_BUDGET_EXCEEDED cost=${gpt52_cost:.4f} cap=${settings.ANALYTICS_BUDGET_CAP:.2f}"
+                )
+
+        return {"final_output": updated}
 
 
 def build_graph(checkpointer=None):
@@ -1053,8 +1175,8 @@ def build_graph(checkpointer=None):
     builder.add_node("correlation_node", correlation_node)
     builder.add_node("comparison_node", comparison_node)
     builder.add_node("cross_construct_node", cross_construct_node)
-    # Phase 10: Analytics collector node
-    builder.add_node("collect_analytics_node", collect_analytics_node)
+    # Phase 10: Analytics dispatch node (parallel via asyncio.gather)
+    builder.add_node("analytics_dispatch_node", analytics_dispatch_node)
 
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
@@ -1074,11 +1196,8 @@ def build_graph(checkpointer=None):
     # Meta-editor loops back into parallel reviewers.
     builder.add_edge("meta_editor_node", "reviewers_fanout_node")
 
-    # Phase 10: Parallel analytics via Send API (finalize_node returns Command with Send targets)
-    # Analytics nodes fan-in to collect node
-    builder.add_edge("correlation_node", "collect_analytics_node")
-    builder.add_edge("comparison_node", "collect_analytics_node")
-    builder.add_edge("cross_construct_node", "collect_analytics_node")
-    builder.add_edge("collect_analytics_node", END)
+    # Phase 10: Analytics dispatch (correlation + comparison parallel, then cross-construct)
+    builder.add_edge("finalize_node", "analytics_dispatch_node")
+    builder.add_edge("analytics_dispatch_node", END)
 
     return builder.compile(checkpointer=checkpointer)

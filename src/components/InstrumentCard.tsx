@@ -14,15 +14,15 @@ export interface InstrumentCardProps {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 0.70) return "text-emerald-400";
-  if (score >= 0.50) return "text-amber-400";
-  return "text-red-400";
+  if (score >= 0.70) return "text-[#a7d12b]";
+  if (score >= 0.50) return "text-[#a7d12b]/70";
+  return "text-[#a7d12b]/50";
 }
 
 function getScoreTopStripeColor(score: number): string {
-  if (score >= 0.70) return "border-t-emerald-500/60";
-  if (score >= 0.50) return "border-t-amber-500/60";
-  return "border-t-red-500/60";
+  if (score >= 0.70) return "border-t-[#a7d12b]/60";
+  if (score >= 0.50) return "border-t-[#a7d12b]/40";
+  return "border-t-[#a7d12b]/30";
 }
 
 function getScoreLabel(score: number): string {
@@ -72,27 +72,26 @@ export function InstrumentCard({
       {/* Instrument info */}
       <div className="mt-3 space-y-2">
         <div>
-          <h4 className="text-base font-semibold text-foreground leading-tight">
+          <h4 className="text-base font-semibold text-slate-50 leading-tight">
             {instrument.name}
           </h4>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-sm text-muted-foreground">{authorYear}</span>
             {hasScore && (
-              <>
-                <span className="text-muted-foreground/50">·</span>
-                <span className={`text-sm font-semibold tabular-nums ${getScoreColor(score)}`}>
-                  {scoreLabel ?? "r"} = {score.toFixed(2)}
+              <div className="mt-2 rounded-lg border border-border/40 bg-slate-900/30 px-3 py-2 inline-flex items-center gap-2">
+                <span className={`text-xl font-bold tabular-nums ${getScoreColor(score)}`}>
+                  {score.toFixed(2)}
                 </span>
-                <span className={`text-[10px] font-medium uppercase ${getScoreColor(score)}`}>
-                  {getScoreLabel(score)}
+                <span className={`text-[10px] font-medium uppercase tracking-wider ${getScoreColor(score)}`}>
+                  {scoreLabel ?? "r"} · {getScoreLabel(score)}
                 </span>
-              </>
+              </div>
             )}
           </div>
         </div>
 
         <p className="text-sm text-muted-foreground">
-          <span className="text-foreground/70">Construct:</span> {instrument.construct}
+          <span className="text-slate-50/70">Construct:</span> {instrument.construct}
         </p>
 
         {instrument.similarity_rationale && (
@@ -111,9 +110,9 @@ export function InstrumentCard({
 
       {/* Warning */}
       {showWarning && warningText && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-          <span className="text-xs font-medium text-amber-300">{warningText}</span>
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-accent/10 border border-accent/20 px-3 py-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <span className="text-xs font-medium text-accent">{warningText}</span>
         </div>
       )}
     </div>

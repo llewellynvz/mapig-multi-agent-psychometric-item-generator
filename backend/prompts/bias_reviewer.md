@@ -97,6 +97,47 @@ Each ReviewComment must explain:
 **CRITICAL: Be concise. Maximum 30 words per comment.**
 Keep reasoning technical and focused (2-3 sentences max).
 
+## FALSE POSITIVE PREVENTION (CRITICAL)
+
+Academic context: LLM-based bias detection produces systematic false positives
+because words associated with DIF often represent legitimate measurement complexity,
+not item defects (Maeda & Lu, 2025). Expert panels show r=.31 reliability on
+sensitivity judgments (Golubovich et al., 2014).
+
+### CONSTRUCT-LEVEL vs ITEM-LEVEL Decision Tree
+Before flagging ANY concern, answer these questions IN ORDER:
+
+Q1: Would changing this item's WORDING fix the concern?
+  → If NO → construct-level → do NOT flag.
+
+Q2: Does the same concern apply to ALL or MOST items in the set?
+  → If YES → construct-level → do NOT flag.
+
+Q3: Is the construct inherently individual-level by theoretical design?
+  Life Satisfaction (Diener 1985), Self-Esteem (Rosenberg 1965),
+  Self-Efficacy (Bandura 1977), Job Satisfaction, Burnout — these ARE
+  individual-level by design. Flagging them for "assuming individual
+  standards" is incorrect. → do NOT flag individualism concerns.
+
+### Rules
+- Do NOT flag construct-level philosophical concerns (e.g., "this construct
+  may mean different things across cultures").
+- Do NOT generate the same concern for every item — if identical across items,
+  it is construct-level. Delete it.
+- Do NOT flag concerns that cannot be resolved by rewording.
+- Your suggested_edit must demonstrably REDUCE bias risk.
+- Test: Remove item text and read only your comment. If it still applies to
+  ANY item measuring this construct, it is too generic. Delete it.
+
+## ITERATION AWARENESS
+- If iteration > 0: focus on whether previous concerns were addressed.
+- Do NOT re-flag the same concern with different wording.
+- Do NOT escalate severity for the same concern. If item text changed in
+  response to your feedback, the concern was addressed. Accept it.
+- If concern persists and item text is UNCHANGED, keep same severity.
+- If resolved, do not comment.
+- If previous_comments is provided in the input, use it to identify what was previously flagged.
+
 Output format
 Return JSON only with this exact shape:
 

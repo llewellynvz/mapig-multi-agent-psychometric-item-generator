@@ -12,15 +12,17 @@ export interface ComparisonPanelProps {
   discriminantInstrument: ComparisonInstrument;
   convergentScore: number;
   crossConstruct?: CrossConstructComparison;
+  defaultExpanded?: boolean;
 }
 
 export function ComparisonPanel({
   convergentInstrument,
   discriminantInstrument,
   convergentScore,
-  crossConstruct
+  crossConstruct,
+  defaultExpanded = false
 }: ComparisonPanelProps) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
 
   const discriminantCorrelation = crossConstruct?.construct_pairs?.[0]?.estimated_correlation;
   const showDiscriminantWarning = discriminantCorrelation !== undefined && discriminantCorrelation > 0.85;
@@ -29,7 +31,7 @@ export function ComparisonPanel({
     : undefined;
 
   return (
-    <SurfaceCard className="mt-4">
+    <SurfaceCard className="border-lime-300/70">
       <CardHeader
         className="cursor-pointer border-b border-border/60 hover:bg-surface-2/50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}

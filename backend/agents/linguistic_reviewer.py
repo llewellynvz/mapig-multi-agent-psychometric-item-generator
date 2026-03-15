@@ -12,7 +12,7 @@ logger = logging.getLogger("lmaig.linguistic_reviewer")
 
 
 def review_linguistic(
-    request: AbbreviatedRequest, items: List[DraftItem], iteration: int
+    request: AbbreviatedRequest, items: List[DraftItem], iteration: int, previous_comments: dict | None = None
 ) -> Tuple[LinguisticReviewResponse, TokenUsage]:
     """Linguistic review of items."""
     logger.info("LINGUISTIC_REVIEWER start items=%d iteration=%d", len(items), iteration)
@@ -36,7 +36,10 @@ def review_linguistic(
     payload = {
         "user_request": request.model_dump(),
         "items": [it.model_dump() for it in items],
+        "iteration": iteration,
     }
+    if previous_comments and "linguistic" in previous_comments:
+        payload["previous_comments"] = previous_comments["linguistic"]
     messages = [
         ("system", system_prompt),
         ("human", f"Review these items for linguistic quality.\n\nINPUT:\n{payload}"),

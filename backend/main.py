@@ -62,6 +62,26 @@ from langgraph.checkpoint.memory import MemorySaver
 
 RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
+# Human-readable display names for pipeline nodes (sent via SSE events)
+_NODE_DISPLAY_NAMES: Dict[str, str] = {
+    "init_run": "Setting up pipeline",
+    "retrieve_node": "Searching academic sources",
+    "item_writer_node": "Drafting survey items",
+    "validation_node": "Validating item quality",
+    "regenerate_items_node": "Improving failed items",
+    "reviewers_fanout_node": "Running expert review panel",
+    "content_review_node": "Reviewing construct alignment",
+    "linguistic_review_node": "Reviewing language clarity",
+    "bias_review_node": "Reviewing bias and fairness",
+    "critic_node": "Evaluating review outcomes",
+    "meta_editor_node": "Applying reviewer feedback",
+    "finalize_node": "Finalizing results",
+    "correlation_node": "Estimating inter-item correlations",
+    "comparison_node": "Comparing with published instruments",
+    "cross_construct_node": "Analyzing cross-construct validity",
+    "analytics_dispatch_node": "Running analytics suite",
+}
+
 
 def _utc_now_iso() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
@@ -102,6 +122,15 @@ def _set_run_status(thread_id: str, run_id: str, **updates: Any) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+
+    # Suppress known harmless Pydantic serialization warnings from OpenAI SDK
+    # (documented in CLAUDE.md as cosmetic — data parses correctly)
+    import warnings
+    warnings.filterwarnings(
+        "ignore",
+        message=".*PydanticSerializationUnexpectedValue.*",
+        category=UserWarning,
+    )
 
     # Use in-memory checkpointer for serverless deployment
     # Checkpoints are ephemeral (lost on cold start) but functional during single run
@@ -218,7 +247,7 @@ async def generate_items(
     )
 
     try:
-        result_state = app.state.graph.invoke(initial_state, config=config)
+        result_state = await app.state.graph.ainvoke(initial_state, config=config)
     except Exception as exc:
         _set_run_status(
             thread_id,
@@ -329,8 +358,8 @@ async def generate_items_stream(
                 pass
             # #endregion
 
-            # Track seen nodes per iteration
-            seen_in_iteration = {}  # {iteration: set of nodes}
+            # Track seen nodes globally: (node_name, iteration) tuples
+            seen_nodes = set()
             last_iteration = -1
             latest_final_output = None
 
@@ -355,15 +384,16 @@ async def generate_items_stream(
                     pass
                 # #endregion
                 for node_name, node_state in event.items():
+                    if node_state is None:
+                        continue
                     current_iteration = node_state.get("iteration", 0)
-                    
-                    # Initialize iteration tracking
-                    if current_iteration not in seen_in_iteration:
-                        seen_in_iteration[current_iteration] = set()
-                    
+
                     # Emit node start event (once per node per iteration)
-                    if node_name not in seen_in_iteration[current_iteration]:
-                        node_display_name = node_name.replace("_node", "").replace("_", " ").title()
+                    if (node_name, current_iteration) not in seen_nodes:
+                        node_display_name = _NODE_DISPLAY_NAMES.get(
+                            node_name,
+                            node_name.replace("_node", "").replace("_", " ").title(),
+                        )
                         _set_run_status(
                             thread_id,
                             run_id,
@@ -374,7 +404,7 @@ async def generate_items_stream(
                             error=None,
                         )
                         yield f"data: {json.dumps({'type': 'node_start', 'node': node_name, 'display_name': node_display_name, 'iteration': current_iteration})}\n\n"
-                        seen_in_iteration[current_iteration].add(node_name)
+                        seen_nodes.add((node_name, current_iteration))
 
                         # Add friendly messages for validation nodes
                         if node_name == "validation_node":

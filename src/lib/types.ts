@@ -11,6 +11,7 @@ export interface UserRequest {
   constraints?: string[];
   cultural_group?: string;
   construct_exclusions?: string;
+  language?: string;
   native_construct?: string;
   example_item?: string;
   approved_domains?: string[];
@@ -93,6 +94,7 @@ export interface CorrelationMatrix {
   mcdonalds_omega: number;
   mean_inter_item_correlation: number;
   internal_consistency_flag: string;
+  redundancy_flags?: string[];
   disclaimer: string;
 }
 

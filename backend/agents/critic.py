@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from typing import List, Literal, Tuple
+import logging
+from typing import List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.agents.llm_utils import invoke_structured
 from backend.agents.prompt_loader import load_prompt
-from backend.schemas import ReviewComment
+from backend.schemas import IterationSnapshot, ReviewComment
 from backend.settings import settings
+
+logger = logging.getLogger("lmaig.critic")
 
 Decision = Literal["accept", "revise", "stop_max_iterations", "needs_human"]
 
@@ -77,13 +80,105 @@ def _format_threshold_context(iteration: int, max_iterations: int, mode: str) ->
     return f"Iteration {iteration}/{max_iterations}: threshold mode {mode}"
 
 
+def _jaccard_word_similarity(a: str, b: str) -> float:
+    """Word-level Jaccard similarity between two strings."""
+    words_a = set(a.strip().lower().split())
+    words_b = set(b.strip().lower().split())
+    if not words_a or not words_b:
+        return 0.0
+    intersection = words_a & words_b
+    union = words_a | words_b
+    return len(intersection) / len(union) if union else 0.0
+
+
+def _comments_similarity(comments_a: List[ReviewComment], comments_b: List[ReviewComment]) -> float:
+    """Mean pairwise Jaccard similarity between two sets of comments.
+
+    Pairs each comment in A with its best-matching comment in B,
+    then returns the mean of best-match similarities.
+    """
+    if not comments_a or not comments_b:
+        return 0.0
+
+    issues_a = [c.issue.strip().lower() for c in comments_a]
+    issues_b = [c.issue.strip().lower() for c in comments_b]
+
+    best_matches = []
+    for a in issues_a:
+        best = max(_jaccard_word_similarity(a, b) for b in issues_b)
+        best_matches.append(best)
+
+    return sum(best_matches) / len(best_matches) if best_matches else 0.0
+
+
+def _detect_stagnation(
+    current_comments: List[ReviewComment],
+    iteration_history: Optional[List[IterationSnapshot]],
+    iteration: int,
+) -> bool:
+    """Detect if reviewer comments are stagnant (paraphrased repetition).
+
+    Uses Jaccard word-level similarity (threshold 0.7) instead of MD5 hash
+    to catch paraphrased repetition (e.g., "satisfactory" → "good").
+    Triggers at iteration >= 1 (one round earlier than before).
+    """
+    if iteration < 1 or not iteration_history:
+        return False
+    # Get previous iteration's combined comments
+    prev_snap = iteration_history[-1]
+    prev_comments = (
+        list(prev_snap.linguistic_comments)
+        + list(prev_snap.bias_comments)
+        + list(prev_snap.content_comments)
+    )
+    if not prev_comments:
+        return False
+    similarity = _comments_similarity(current_comments, prev_comments)
+    if similarity >= 0.7:
+        logger.info("STAGNATION_DETECTED similarity=%.2f iteration=%d", similarity, iteration)
+        return True
+    return False
+
+
+def _downgrade_construct_level_bias(bias_comments: List[ReviewComment]) -> List[ReviewComment]:
+    """Downgrade bias comments to severity 1 if ALL are construct-level.
+
+    If all bias comments have mean pairwise Jaccard similarity > 0.6,
+    they represent construct-level concerns (not item-level) and should
+    be downgraded to severity 1 (not actionable).
+    """
+    if len(bias_comments) < 2:
+        return bias_comments
+
+    issues = [c.issue.strip().lower() for c in bias_comments]
+    similarities = []
+    for i in range(len(issues)):
+        for j in range(i + 1, len(issues)):
+            similarities.append(_jaccard_word_similarity(issues[i], issues[j]))
+
+    mean_sim = sum(similarities) / len(similarities) if similarities else 0.0
+
+    if mean_sim > 0.6:
+        logger.info(
+            "CONSTRUCT_LEVEL_BIAS_DOWNGRADE mean_jaccard=%.2f comments=%d — downgrading to severity 1",
+            mean_sim, len(bias_comments),
+        )
+        for c in bias_comments:
+            c.severity = 1
+    return bias_comments
+
+
 def _rule_based_fallback(
     linguistic_comments: List[ReviewComment],
     bias_comments: List[ReviewComment],
     content_comments: List[ReviewComment],
     iteration: int,
+    iteration_history: Optional[List[IterationSnapshot]] = None,
 ) -> Tuple[Decision, str]:
     """Fallback if LLM critic fails."""
+    # Downgrade construct-level bias before threshold checks
+    bias_comments = _downgrade_construct_level_bias(list(bias_comments))
+
     all_comments = list(linguistic_comments) + list(bias_comments) + list(content_comments)
 
     # Get adaptive thresholds
@@ -100,6 +195,10 @@ def _rule_based_fallback(
     # Step 1: Check max iterations
     if iteration >= settings.MAX_ITERATIONS:
         return "stop_max_iterations", f"Reached MAX_ITERATIONS before all medium+ issues were resolved. {threshold_ctx}"
+
+    # Step 1b: Stagnation detection (identical comments across iterations)
+    if _detect_stagnation(all_comments, iteration_history, iteration):
+        return "accept", f"Stagnation detected: identical issues across iterations — accepting current quality. {threshold_ctx}"
 
     # Step 2: Force revision in strict/thorough mode on severity >= 3
     if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
@@ -133,6 +232,7 @@ def decide(
     iteration: int,
     model_provider: str = "claude",
     use_chatgpt_critics: bool = False,
+    iteration_history: Optional[List[IterationSnapshot]] = None,
 ) -> Tuple[Decision, str]:
     """
     LLM-based critic with adaptive thresholds and rule-based optimization.
@@ -153,13 +253,20 @@ def decide(
 
     # Mock mode should not call external LLMs.
     if settings.APP_MODE == "mock":
-        return _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration)
+        return _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration, iteration_history)
+
+    # Downgrade construct-level bias before threshold checks
+    bias_comments = _downgrade_construct_level_bias(list(bias_comments))
 
     all_comments = list(linguistic_comments) + list(bias_comments) + list(content_comments)
 
     # If nothing to review, accept immediately (saves tokens and reduces variability).
     if not all_comments:
         return "accept", f"No review issues detected. {threshold_ctx}"
+
+    # 1F: Stagnation detection — identical comments despite revision
+    if _detect_stagnation(all_comments, iteration_history, iteration):
+        return "accept", f"Stagnation detected: identical issues across iterations — accepting current quality. {threshold_ctx} [rule-based, 0 tokens]"
 
     # Rule-based optimization: Handle clear cases without LLM invocation
     if settings.RULE_BASED_CRITIC_ENABLED:
@@ -172,9 +279,9 @@ def decide(
         if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
             return "revise", f"Medium+ issues detected in {thresholds['mode']} mode (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
 
-        # Clear reject: Issues exceed threshold — force revision
-        if max_sev >= 4:
-            return "revise", f"High-severity issues detected (max: {max_sev}). Revision required. {threshold_ctx} [rule-based, 0 tokens]"
+        # Clear reject: Issues exceed current adaptive threshold — force revision
+        if max_sev > thresholds['accept_max_severity']:
+            return "revise", f"High-severity issues detected (max: {max_sev}, threshold: {thresholds['accept_max_severity']}). Revision required. {threshold_ctx} [rule-based, 0 tokens]"
 
         # Clear accept: All feedback below acceptance threshold
         if max_sev <= thresholds['accept_max_severity'] and med_plus <= thresholds['accept_medium_plus_count']:
@@ -214,5 +321,5 @@ def decide(
         return resp.decision, reason_with_mode
     except Exception as e:
         # If the LLM misbehaves, fall back to deterministic logic so the system keeps running.
-        d, r = _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration)
+        d, r = _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration, iteration_history)
         return d, f"{r} (LLM critic failed; fallback used: {type(e).__name__})"

@@ -223,6 +223,115 @@ def surf(request: UserRequest) -> RetrievalResponse:
 
     # Task #4: Process LLM response for structured evidence
     evidence = _process_perplexity_response(data)
+
+    # 3A: Supplement from search_results if structured parsing yielded < 20 chunks
+    if len(evidence) < 20:
+        search_results = data.get("search_results") or []
+        seen_urls = {e.url_or_docref for e in evidence}
+        for sr in search_results:
+            if len(evidence) >= 20:
+                break
+            u = (sr.get("url") or "").strip()
+            if not u or u in seen_urls:
+                continue
+            title = (sr.get("title") or "Web result").strip()
+            snippet = (sr.get("snippet") or "").strip()
+            if not snippet:
+                continue
+            evidence.append(
+                EvidenceChunk(
+                    source_id=_source_id(u),
+                    title=title,
+                    snippet=snippet[:240] + ("…" if len(snippet) > 240 else ""),
+                    url_or_docref=u,
+                    quote=snippet[:500],
+                )
+            )
+            seen_urls.add(u)
+        if len(evidence) < 20:
+            log.warning("EVIDENCE_DEPTH_WARNING evidence=%d after supplementing (minimum recommended: 20)", len(evidence))
+
+    # Retry loop: broaden search if below minimum evidence threshold
+    retry_count = 0
+    while len(evidence) < settings.EVIDENCE_MIN_CHUNKS and retry_count < settings.EVIDENCE_MAX_RETRIES:
+        retry_count += 1
+        log.info("EVIDENCE_RETRY attempt=%d current=%d target=%d", retry_count, len(evidence), settings.EVIDENCE_MIN_CHUNKS)
+
+        # Broadened query: drop specific theoretical terms, use generic measurement language
+        broad_query_parts = [
+            f'Find academic research on measuring "{request.construct_name}".',
+            f"Definition: {request.construct_definition}",
+            f"Target population: {request.target_population}",
+            "",
+            "Search broadly for:",
+            "(1) Scale development and validation studies",
+            "(2) Psychometric properties and factor analysis",
+            "(3) Cross-cultural adaptation and translation",
+            "(4) Systematic reviews or meta-analyses",
+            "(5) Related measurement frameworks",
+        ]
+        if retry_count >= 2:
+            broad_query_parts.append("(6) Handbook chapters, test reviews, and measurement compendia")
+
+        broad_query = "\n".join(broad_query_parts)
+
+        retry_payload = {
+            "model": settings.PERPLEXITY_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": broad_query},
+            ],
+            "temperature": 0,
+            "web_search_options": {
+                "search_mode": settings.PERPLEXITY_SEARCH_MODE,
+                "num_search_results": settings.PERPLEXITY_MAX_RESULTS,
+                "search_domain_filter": domains,
+            },
+        }
+
+        try:
+            with httpx.Client(timeout=60) as client:
+                retry_resp = client.post(url, headers=headers, json=retry_payload)
+                retry_resp.raise_for_status()
+                retry_data = retry_resp.json()
+
+            retry_evidence = _process_perplexity_response(retry_data)
+
+            # Deduplicate by URL
+            seen_urls = {e.url_or_docref for e in evidence}
+            for chunk in retry_evidence:
+                if chunk.url_or_docref not in seen_urls:
+                    evidence.append(chunk)
+                    seen_urls.add(chunk.url_or_docref)
+
+            # Also supplement from search_results
+            for sr in retry_data.get("search_results") or []:
+                u = (sr.get("url") or "").strip()
+                if not u or u in seen_urls:
+                    continue
+                title = (sr.get("title") or "Web result").strip()
+                snippet = (sr.get("snippet") or "").strip()
+                if not snippet:
+                    continue
+                evidence.append(
+                    EvidenceChunk(
+                        source_id=_source_id(u),
+                        title=title,
+                        snippet=snippet[:240] + ("…" if len(snippet) > 240 else ""),
+                        url_or_docref=u,
+                        quote=snippet[:500],
+                    )
+                )
+                seen_urls.add(u)
+
+            log.info("EVIDENCE_RETRY done attempt=%d evidence=%d", retry_count, len(evidence))
+        except Exception as e:
+            log.warning("EVIDENCE_RETRY failed attempt=%d: %s", retry_count, e)
+            break
+
+    if len(evidence) < settings.EVIDENCE_MIN_CHUNKS:
+        log.warning("EVIDENCE_DEPTH_BELOW_MINIMUM evidence=%d minimum=%d", len(evidence), settings.EVIDENCE_MIN_CHUNKS)
+
     log.info("PERPLEXITY_SEARCH done evidence=%d", len(evidence))
 
     # Cultural context search (if cultural_group is set)

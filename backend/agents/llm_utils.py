@@ -168,13 +168,25 @@ def invoke_structured_with_usage(
             parsed = result["parsed"]
             raw_message = result["raw"]
             usage = _extract_token_usage(raw_message, model_name)
+            if parsed is None:
+                # LangChain sets parsed=None when schema validation fails silently.
+                # Fall through to JSON fallback by raising.
+                raise ValueError("with_structured_output returned parsed=None")
             return (parsed, usage)
         else:
             # Fallback: no raw message available
+            if result is None:
+                raise ValueError("with_structured_output returned None")
             return (result, TokenUsage(model_name=model_name))
 
-    except Exception:
+    except Exception as e:
         # Fallback: validate returned text as JSON
+        import logging
+        _logger = logging.getLogger("lmaig")
+        _logger.warning(
+            "STRUCTURED_OUTPUT_FALLBACK agent=%s schema=%s error=%s",
+            agent_name or "unknown", schema.__name__, e,
+        )
         ai_msg = llm.invoke(messages)
         usage = _extract_token_usage(ai_msg, model_name)
 

@@ -31,7 +31,8 @@ Return JSON only with this exact shape:
     "edits": [
       {
         "item_index": <int>,
-        "change": "<string>",
+        "before": "<original item text>",
+        "after": "<revised item text>",
         "reason": "<string>"
       }
     ]
@@ -109,11 +110,29 @@ If imbalance remains: note it as a concern
 - Avoid negative stems and reverse-coded phrasing.
 - Avoid abstract inference-heavy phrasing.
 
+## Construct Validity Guardrails (CRITICAL)
+
+NEVER apply a bias reviewer suggestion that changes the construct being measured.
+
+Decision test:
+1. What construct does the original item measure?
+2. What construct does the suggested_edit measure?
+3. If different → REJECT the edit. Keep original wording.
+
+Examples of REJECTED edits:
+- "I am satisfied with my life" → "My community is satisfied with our
+  collective wellbeing" — REJECT (changes Life Satisfaction to Community Satisfaction)
+- "I take charge of my career" → "My organization supports my career"
+  — REJECT (changes Self-Efficacy to Organizational Support)
+
+If a bias concern cannot be addressed without changing the construct,
+note it in revision_plan.summary and keep the original item.
+
 Revision plan requirements
 - summary should state what was fixed and what remains risky.
 - summary must include facet balance after revision (see Facet Coverage Enforcement Step 6).
 - edits must use item_index as 0-based indices into the input items array.
-- change must describe what you changed in plain language.
+- before/after must show the original and revised item text.
 - reason must reference the reviewer issue.
 - **CRITICAL: Be concise. Maximum 40 words per edit reason.**
 

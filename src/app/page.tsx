@@ -12,6 +12,8 @@ import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
 import { InstrumentSetupForm } from "@/components/InstrumentSetupForm";
 import { ProgressIndicator, type CompletedNode, type ProgressState } from "@/components/ProgressIndicator";
 import { SetupSnapshotCard } from "@/components/SetupSnapshotCard";
+import { CorrelationPanel } from "@/components/CorrelationPanel";
+import { ComparisonPanel } from "@/components/ComparisonPanel";
 import { Stepper } from "@/components/Stepper";
 import { PrimaryButton } from "@/components/ui/action-buttons";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,15 +144,19 @@ export default function HomePage() {
             // Push the previous current node into completed list
             setProgress((prev) => {
               if (prev.currentNode) {
-                setCompletedNodes((nodes) => [
-                  ...nodes,
-                  {
-                    node: prev.currentNode!,
-                    displayName: prev.displayName || prev.currentNode!,
-                    iteration: prev.iteration,
-                    timestamp: Date.now(),
-                  },
-                ]);
+                const completedEntry = {
+                  node: prev.currentNode,
+                  displayName: prev.displayName || prev.currentNode,
+                  iteration: prev.iteration,
+                  timestamp: Date.now(),
+                };
+                setCompletedNodes((nodes) => {
+                  // Dedup: check ALL entries, not just last
+                  if (nodes.some(n => n.node === completedEntry.node && n.iteration === completedEntry.iteration)) {
+                    return nodes;
+                  }
+                  return [...nodes, completedEntry];
+                });
               }
               return {
                 ...prev,
@@ -311,7 +317,7 @@ export default function HomePage() {
     setLastResponseJson(null);
     setLastRequestJson(null);
     resetProgress();
-    // Stay on current step (don't navigate like handleStartNew does)
+    setStep("setup");
   }, [resetProgress]);
 
   React.useEffect(() => {
@@ -457,7 +463,18 @@ export default function HomePage() {
         }
       } catch (error) {
         const err = error as GenerateError;
-        if (err.status !== 404) {
+        if (err.status === 404) {
+          // Server restarted — in-memory registry lost this thread.
+          // Clear stale running state so user returns to setup.
+          setActiveRun((prev) =>
+            prev ? { ...prev, status: "error", updatedAt: new Date().toISOString() } : prev
+          );
+          setStep("setup");
+          setProgress((prev) => ({
+            ...prev,
+            status: "idle",
+          }));
+        } else {
           setProgress((prev) => ({
             ...prev,
             status: "error",
@@ -579,57 +596,88 @@ export default function HomePage() {
         )}
 
         {step === "results" && (
-          <section className="animate-fade-up grid gap-6 xl:grid-cols-3">
-            <div className="space-y-4">
-              <SetupSnapshotCard values={submittedSetup} />
+          <section className="animate-fade-up space-y-6">
+            {/* Full-width setup snapshot bar */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <SetupSnapshotCard values={submittedSetup} horizontal />
+              </div>
               <PrimaryButton
                 type="button"
-                className="w-full"
                 onClick={handleStartNew}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Edit setup
               </PrimaryButton>
             </div>
-            <div className="space-y-4">
-              <HumanFeedbackPanel
-                value={humanFeedback}
-                onChange={setHumanFeedback}
-                onRefine={handleRefineRun}
-                isPending={mutation.isPending}
-              />
-              <FeedbackHistoryPanel
-                entries={feedbackHistory}
-                onReuseFeedback={setHumanFeedback}
-                onClearHistory={() => setFeedbackHistory([])}
-              />
-              {result ? (
-                <EvidenceAuditPanel audit={result.audit} />
-              ) : (
-                <SurfaceCard>
-                  <CardHeader className="border-b border-border/60">
-                    <CardTitle className="text-base md:text-lg">Evidence and Audit</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-5">
-                    <p className="text-sm text-muted-foreground">Run generation to load evidence and audit details.</p>
-                  </CardContent>
-                </SurfaceCard>
-              )}
+
+            {/* 2-column main content: golden ratio */}
+            <div className="grid gap-6 xl:grid-cols-[1.618fr_1fr]">
+              {/* Left: Generated items only */}
+              <div className="space-y-4">
+                {result ? (
+                  <GeneratedItemsTable items={result.final_items} fullOutput={result} />
+                ) : (
+                  <SurfaceCard>
+                    <CardHeader className="border-b border-border/60">
+                      <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                      <p className="text-sm text-muted-foreground">No generated items yet.</p>
+                    </CardContent>
+                  </SurfaceCard>
+                )}
+              </div>
+              {/* Right: Feedback + Evidence + History */}
+              <div className="space-y-4">
+                <HumanFeedbackPanel
+                  value={humanFeedback}
+                  onChange={setHumanFeedback}
+                  onRefine={handleRefineRun}
+                  isPending={mutation.isPending}
+                />
+                {result ? (
+                  <EvidenceAuditPanel audit={result.audit} />
+                ) : (
+                  <SurfaceCard>
+                    <CardHeader className="border-b border-border/60">
+                      <CardTitle className="text-base md:text-lg">Evidence and Audit</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                      <p className="text-sm text-muted-foreground">Run generation to load evidence and audit details.</p>
+                    </CardContent>
+                  </SurfaceCard>
+                )}
+                <FeedbackHistoryPanel
+                  entries={feedbackHistory}
+                  onReuseFeedback={setHumanFeedback}
+                  onClearHistory={() => setFeedbackHistory([])}
+                />
+              </div>
             </div>
-            <div className="space-y-4">
-              {result ? (
-                <GeneratedItemsTable items={result.final_items} fullOutput={result} />
-              ) : (
-                <SurfaceCard>
-                  <CardHeader className="border-b border-border/60">
-                    <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-5">
-                    <p className="text-sm text-muted-foreground">No generated items yet.</p>
-                  </CardContent>
-                </SurfaceCard>
-              )}
-            </div>
+
+            {/* Full-width analytics row */}
+            {result && (
+              <div className="grid gap-6 lg:grid-cols-2">
+                {result.correlation_matrix && (
+                  <CorrelationPanel
+                    matrix={result.correlation_matrix}
+                    itemTexts={result.final_items.map(item => item.item_text)}
+                    constructName={result.final_items[0]?.construct_name}
+                    defaultExpanded
+                  />
+                )}
+                {result.comparison_instruments && result.comparison_instruments.length >= 2 && (
+                  <ComparisonPanel
+                    convergentInstrument={result.comparison_instruments[0]}
+                    discriminantInstrument={result.comparison_instruments[1]}
+                    convergentScore={result.convergent_validity_score ?? 0.5}
+                    crossConstruct={result.cross_construct_analysis}
+                    defaultExpanded
+                  />
+                )}
+              </div>
+            )}
           </section>
         )}
 

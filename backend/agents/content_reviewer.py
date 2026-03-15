@@ -11,13 +11,15 @@ from backend.settings import settings
 logger = logging.getLogger("lmaig.content_reviewer")
 
 
-def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteration: int) -> Tuple[ContentReviewResponse, TokenUsage]:
+def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteration: int, previous_comments: dict | None = None) -> Tuple[ContentReviewResponse, TokenUsage]:
     logger.info("CONTENT_REVIEWER start items=%d iteration=%d", len(items), iteration)
     if settings.APP_MODE == "mock":
         return ContentReviewResponse(comments=[]), TokenUsage()
 
     system_prompt = load_prompt("content_reviewer.md")
     payload = {"user_request": request.model_dump(), "items": [i.model_dump() for i in items], "iteration": iteration}
+    if previous_comments and "content" in previous_comments:
+        payload["previous_comments"] = previous_comments["content"]
 
     messages = [
         ("system", system_prompt),

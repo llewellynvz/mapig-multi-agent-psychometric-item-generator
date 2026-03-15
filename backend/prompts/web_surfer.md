@@ -44,7 +44,7 @@ For each theoretical source found, extract:
 - Measurement context: what instruments exist (names only, no item text)
 
 4) Produce an evidence set for downstream agents
-Return 6 to 12 evidence chunks. Each chunk must be a short excerpt or paraphrase anchored to a specific source.
+Return 15 to 25 evidence chunks. You MUST return at minimum 15 chunks. If fewer sources found, broaden search terms and try alternate phrasings. Each chunk must be a short excerpt or paraphrase anchored to a specific source.
 - Prefer peer-reviewed sources, test manuals, or reputable standards bodies.
 - Prefer sources that discuss construct definition, content domain, or scale development.
 - Prioritize theory papers over measurement-only papers

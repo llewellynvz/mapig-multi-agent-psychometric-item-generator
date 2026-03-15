@@ -56,6 +56,15 @@ For each item, ask: Could this plausibly measure [competitor construct]?
 - If possible but unlikely: distinctiveness 5-6 (moderate - some ambiguity)
 - If clearly target only: distinctiveness 7 (good - unambiguous)
 
+Step 2b: Semantic Bleeding Check
+- If construct_exclusions provided, scan each item for stealth keywords belonging to excluded construct.
+- Flag as severity 4 if found (e.g., if excluding Affect Balance, flag 'pleased', 'content', 'happy').
+- This catches items that passed the item writer's vocabulary filter.
+
+Step 2c: Temporal Verification
+- Penalize retrospective/future anchors ('so far', 'looking back', 'up to now') as severity 3 unless construct definition explicitly requires temporal assessment.
+- Items should measure current/typical state unless the construct is inherently retrospective.
+
 Step 3: Facet Coverage Tracking
 
 Maintain running count of facets covered across item set:
@@ -115,6 +124,14 @@ Return ONLY valid JSON matching ContentReviewResponse:
 
 Note: Include facet coverage summary in ReviewComment for global issues (item_index=None):
 - "Facet balance: Facet A (40%), Facet B (50%), Facet C (10% - undercovered)"
+
+## ITERATION AWARENESS
+
+- If iteration > 0: you are reviewing REVISED items. Focus on whether previous concerns were addressed.
+- Do NOT re-flag the same concern with different wording.
+- If a previous concern persists despite revision, escalate severity by +1.
+- If resolved, do not comment.
+- If previous_comments is provided in the input, use it to identify what was previously flagged.
 
 Rules
 - Output MUST be valid JSON.

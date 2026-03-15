@@ -18,6 +18,7 @@ import {
   type InstrumentSetupFormValues,
   defaultInstrumentSetup,
   RESPONSE_SCALE_PRESETS,
+  LANGUAGE_PRESETS,
   DEFAULT_CONSTRAINTS,
   DEFAULT_APPROVED_DOMAINS,
 } from "@/lib/schemas";
@@ -179,6 +180,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
       constraints: Array.isArray(saved.constraints) ? saved.constraints : [...DEFAULT_CONSTRAINTS],
       cultural_group: saved.cultural_group ?? "",
       construct_exclusions: saved.construct_exclusions ?? "",
+      language: saved.language ?? "English",
       native_construct: saved.native_construct ?? "",
       example_item: saved.example_item ?? "",
       approved_domains: Array.isArray(saved.approved_domains) ? saved.approved_domains : [...DEFAULT_APPROVED_DOMAINS],
@@ -292,36 +294,63 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="response_scale">Response scale</Label>
-              <select
-                id="response_scale"
-                className="flex h-10 w-full items-center justify-between rounded-2xl border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={isPresetResponseScale ? responseScale : "__custom__"}
-                onChange={(e) => form.setValue("response_scale", e.target.value === "__custom__" ? "" : e.target.value)}
-              >
-                <option value="" disabled>
-                  Select scale
-                </option>
-                {RESPONSE_SCALE_PRESETS.map((preset) => (
-                  <option key={preset} value={preset}>
-                    {preset}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="response_scale">Response scale</Label>
+                <select
+                  id="response_scale"
+                  className="flex h-10 w-full items-center justify-between rounded-2xl border px-3 py-2 text-sm ring-offset-background focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    borderColor: 'rgba(167, 209, 43, 0.32)',
+                    color: 'var(--color-text)',
+                  }}
+                  value={isPresetResponseScale ? responseScale : "__custom__"}
+                  onChange={(e) => form.setValue("response_scale", e.target.value === "__custom__" ? "" : e.target.value)}
+                >
+                  <option value="" disabled style={{ background: '#123f4a', color: '#f8fbfc' }}>
+                    Select scale
                   </option>
-                ))}
-                <option value="__custom__">Custom (enter below)</option>
-              </select>
-              {!isPresetResponseScale && (
-                <Input
-                  placeholder="Enter custom response scale"
-                  value={responseScale}
-                  onChange={(e) => form.setValue("response_scale", e.target.value)}
-                />
-              )}
-              {form.formState.errors.response_scale && (
-                <p className="text-sm font-medium text-accent">
-                  {form.formState.errors.response_scale.message}
-                </p>
-              )}
+                  {RESPONSE_SCALE_PRESETS.map((preset) => (
+                    <option key={preset} value={preset} style={{ background: '#123f4a', color: '#f8fbfc' }}>
+                      {preset}
+                    </option>
+                  ))}
+                  <option value="__custom__" style={{ background: '#123f4a', color: '#f8fbfc' }}>Custom (enter below)</option>
+                </select>
+                {!isPresetResponseScale && (
+                  <Input
+                    placeholder="Enter custom response scale"
+                    value={responseScale}
+                    onChange={(e) => form.setValue("response_scale", e.target.value)}
+                  />
+                )}
+                {form.formState.errors.response_scale && (
+                  <p className="text-sm font-medium text-accent">
+                    {form.formState.errors.response_scale.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="language">Language</Label>
+                <select
+                  id="language"
+                  className="flex h-10 w-full items-center justify-between rounded-2xl border px-3 py-2 text-sm ring-offset-background focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    borderColor: 'rgba(167, 209, 43, 0.32)',
+                    color: 'var(--color-text)',
+                  }}
+                  value={form.watch("language")}
+                  onChange={(e) => form.setValue("language", e.target.value)}
+                >
+                  {LANGUAGE_PRESETS.map((lang) => (
+                    <option key={lang} value={lang} style={{ background: '#123f4a', color: '#f8fbfc' }}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="space-y-2">

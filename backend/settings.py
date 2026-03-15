@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai/v2"
     PERPLEXITY_MODEL: str = "sonar-pro"
     PERPLEXITY_SEARCH_MODE: str = "academic"  # academic | web
-    PERPLEXITY_MAX_RESULTS: int = 25
+    PERPLEXITY_MAX_RESULTS: int = 40
     PERPLEXITY_DOMAIN_FILTER: str = ""
     def perplexity_domains(self) -> list[str]:
         """Return allowlisted domains for Perplexity search."""
@@ -69,6 +69,10 @@ class Settings(BaseSettings):
         if not raw:
             return []
         return [d.strip() for d in raw.split(",") if d.strip()]
+
+    # Evidence depth
+    EVIDENCE_MIN_CHUNKS: int = 20
+    EVIDENCE_MAX_RETRIES: int = 2
 
     # Orchestrator tuning
     ITEM_COUNT: int = 10
@@ -84,7 +88,7 @@ class Settings(BaseSettings):
 
     # Phase 9: Instrument comparison and plagiarism detection
     PUBLISHER_BLOCKLIST: str = "pearson.com,parinc.com,mhs.com,wpspublish.com,hogrefe.com,proedinc.com,mindgarden.com"
-    PLAGIARISM_SIMILARITY_THRESHOLD: float = 0.85
+    PLAGIARISM_SIMILARITY_THRESHOLD: float = 0.75
 
     # Phase 10: GPT-5.2 analytics budget cap
     ANALYTICS_BUDGET_CAP: float = 2.00  # Maximum USD per analytics run (correlation + comparison + cross-construct)

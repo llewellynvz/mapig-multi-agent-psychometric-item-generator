@@ -59,6 +59,13 @@ Step 3: Verify semantic diversity — items must NOT be synonym substitutions of
 Step 4: Document the assigned facet in each item's rationale (e.g., "Targets [facet name] dimension").
 VIOLATION: If all items target the same facet or are synonym variations, the entire set FAILS validation.
 
+ORIGINALITY REQUIREMENT (mandatory):
+- You are writing NEW items, not paraphrasing existing instruments.
+- FORBIDDEN: word substitutions of SWLS, PWI, LSIA, Rosenberg, PHQ-9 items (e.g., changing "excellent" to "good", "satisfied" to "content").
+- Items must differ from published instruments in both wording AND syntactic structure.
+- Self-check: if any item is recognizably derivative of a published scale, rewrite it from scratch using a different angle on the facet.
+- Test: Could a psychometrician identify which published scale this item came from? If yes, it fails originality.
+
 FORBIDDEN:
 - Copying example_item wording or structure
 - Generating items without evidence grounding
@@ -75,6 +82,12 @@ Section A: Construct fidelity and domain coverage
 - Use evidence to identify facets. Ensure coverage across facets, but keep each item unidimensional.
 - Avoid construct contamination from close neighbors. If boundaries are unclear, use conservative wording and note the risk in rationale.
 
+STRICT BOUNDARY ENFORCEMENT:
+- If construct_exclusions is provided, BAN all vocabulary specific to the excluded construct.
+- Example: if excluding Affect Balance/emotions, ban: pleased, content, happy, joyful, cheerful, delighted, sad.
+- This is a stealth vocabulary filter — items must not contain these words even in cognitive contexts.
+- Test: Would a naive reader categorize this item under the excluded construct? If yes, rewrite.
+
 10 Core Psychometric Principles:
 1. Unidimensionality: Each item measures single facet; avoid double-barreled content
 2. Construct correspondence: Content directly reflects definition boundaries
@@ -82,9 +95,9 @@ Section A: Construct fidelity and domain coverage
 4. Reading level control: Target 6th-8th general, 5th-6th clinical, 10th-12th specialized (see examples below)
 5. Semantic diversity: Vary facets not synonyms (see examples below)
 6. Concrete language: Short, simple, concrete sentences
-7. Temporal clarity: Anchor vague quantifiers or avoid them
+7. Temporal clarity: Anchor vague quantifiers or avoid them. Avoid retrospective summation ('turned out', 'so far', 'looking back') unless construct explicitly requires trajectory. Keep items focused on CURRENT or TYPICAL state evaluation.
 8. Positive keying only: No reverse-scored items
-9. Cultural neutrality: Avoid idioms, culture-specific references
+9. Cultural neutrality: Avoid idioms, culture-specific references. If target_population involves multi-lingual regions (e.g., South Africa), prioritize plain language translatable across local languages (isiZulu, Sesotho, Afrikaans). Avoid phrasal verbs ('give up', 'look forward to') — use single-word equivalents. Avoid abstract metaphors.
 10. Accessibility: No assumptions about work, family, citizenship, resources
 
 Section B: Wording and comprehension

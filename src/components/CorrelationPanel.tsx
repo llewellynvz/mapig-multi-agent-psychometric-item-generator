@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SurfaceCard } from "@/components/ui/surface-card";
-import { SecondaryButton } from "@/components/ui/action-buttons";
+import { PrimaryButton } from "@/components/ui/action-buttons";
 import { CorrelationHeatmap } from "./CorrelationHeatmap";
 import { CorrelationSummaryCard } from "./CorrelationSummaryCard";
 import { CorrelationTooltip } from "./CorrelationTooltip";
@@ -21,14 +21,16 @@ export interface CorrelationPanelProps {
   matrix: CorrelationMatrix;
   itemTexts: string[];
   constructName?: string;
+  defaultExpanded?: boolean;
 }
 
 export function CorrelationPanel({
   matrix,
   itemTexts,
-  constructName = 'items'
+  constructName = 'items',
+  defaultExpanded = false
 }: CorrelationPanelProps) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
   const [tooltipState, setTooltipState] = React.useState<{
     visible: boolean;
     x: number;
@@ -42,6 +44,7 @@ export function CorrelationPanel({
   });
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const [selectedCell, setSelectedCell] = React.useState<CorrelationCell | null>(null);
+  const [exportFormat, setExportFormat] = React.useState<'csv' | 'json'>('csv');
 
   // Find cell by indices
   const findCell = (i: number, j: number): CorrelationCell | null => {
@@ -128,7 +131,7 @@ export function CorrelationPanel({
 
   return (
     <div onMouseLeave={handleMouseLeave}>
-      <SurfaceCard className="mt-4">
+      <SurfaceCard className="border-lime-300/70">
         {/* Collapsible header */}
         <CardHeader
           className="cursor-pointer border-b border-border/60 hover:bg-surface-2/50 transition-colors"
@@ -160,16 +163,25 @@ export function CorrelationPanel({
             {/* Quality summary card */}
             <CorrelationSummaryCard matrix={matrix} />
 
-            {/* Export buttons */}
-            <div className="mt-4 flex gap-2">
-              <SecondaryButton onClick={handleExportCsv} size="sm">
+            {/* Export controls */}
+            <div className="mt-4 flex items-center gap-2">
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value as 'csv' | 'json')}
+                className="flex h-9 items-center rounded-2xl border px-3 py-1.5 text-sm ring-offset-background focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  borderColor: 'rgba(167, 209, 43, 0.32)',
+                  color: 'var(--color-text)',
+                }}
+              >
+                <option value="csv" style={{ background: '#123f4a', color: '#f8fbfc' }}>CSV</option>
+                <option value="json" style={{ background: '#123f4a', color: '#f8fbfc' }}>JSON</option>
+              </select>
+              <PrimaryButton onClick={exportFormat === 'csv' ? handleExportCsv : handleExportJson} size="sm">
                 <Download className="mr-2 h-4 w-4" />
-                Export CSV
-              </SecondaryButton>
-              <SecondaryButton onClick={handleExportJson} size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export JSON
-              </SecondaryButton>
+                Download
+              </PrimaryButton>
             </div>
           </CardContent>
         )}

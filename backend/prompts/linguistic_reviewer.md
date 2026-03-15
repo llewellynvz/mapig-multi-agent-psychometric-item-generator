@@ -78,6 +78,18 @@ Severity:
 - 4 if used in situation-specific item
 - 2 (minor) if used appropriately in dispositional item
 
+Category 4: Temporal limiters
+Quantifiers: "so far", "up to now", "at this point in my life", "looking back", "turned out"
+
+Detection: Item contains retrospective or trajectory framing
+Fix: Remove temporal anchor or replace with present-tense evaluation
+
+Examples:
+- "So far I have gotten what I want" -> "I have what I want in life"
+- "Looking back, I am satisfied" -> "I am satisfied with my life"
+
+Severity: 3 (medium) - introduces unwanted retrospective bias
+
 Scoring Rule
 
 Mean rating <4.0 if:
@@ -89,12 +101,29 @@ Mean rating ≥4.0 if:
 - Appropriately anchored
 - Dispositional construct with acceptable quantifier
 
+Mean rating <4.0 if:
+- Category 4 temporal limiter present (unless construct explicitly requires retrospection)
+
 Severity scale (integer 1-5, required):
 - 1 = nit: cosmetic only (rare; avoid over-commenting)
 - 2 = minor: small wording tweak improves clarity
 - 3 = medium: likely rewrite needed (vague quantifier, ambiguity)
 - 4 = major: significant clarity issue requiring substantive revision
 - 5 = fatal: incomprehensible or fundamentally ambiguous
+
+## TRANSLATION READINESS
+
+- Flag phrasal verbs ('give up', 'look forward to', 'put up with') as severity 3 — meaning changes in direct translation.
+- Flag abstract metaphors as severity 2 for multi-lingual populations (isiZulu, Sesotho, Afrikaans).
+- Prefer single-word equivalents over phrasal verbs (e.g., 'abandon' over 'give up', 'anticipate' over 'look forward to').
+
+## ITERATION AWARENESS
+
+- If iteration > 0: you are reviewing REVISED items. Focus on whether previous concerns were addressed.
+- Do NOT re-flag the same concern with different wording.
+- If a previous concern persists despite revision, escalate severity by +1.
+- If resolved, do not comment.
+- If previous_comments is provided in the input, use it to identify what was previously flagged.
 
 Output format
 Return JSON only with this exact shape:

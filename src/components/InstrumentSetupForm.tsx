@@ -12,6 +12,7 @@ import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/TagInput";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/use-toast";
 import {
   instrumentSetupSchema,
   type InstrumentSetupFormValues,
@@ -157,6 +158,7 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
   threadIdInput = "",
   onThreadIdChange,
 }, ref) {
+  const { toast } = useToast();
   const form = useForm<InstrumentSetupFormValues>({
     resolver: zodResolver(instrumentSetupSchema),
     defaultValues: defaultInstrumentSetup,
@@ -188,6 +190,18 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
       setErrorsFromDetail(form.setError, detail);
     },
   }));
+
+  const handleGPT52Toggle = (checked: boolean) => {
+    form.setValue("use_gpt52_analytics", checked);
+    if (checked) {
+      toast({
+        title: "GPT-5.2 Analytics Enabled",
+        description: "Reasoning models use 4-6x more tokens than standard models. Estimated additional cost: ~$1.50-$3.00 per run.",
+        variant: "default",
+        duration: 5000,
+      });
+    }
+  };
 
   const submitValues = React.useCallback((values: InstrumentSetupFormValues) => {
     saveToStorage(values);
@@ -346,6 +360,31 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
                   id="use_chatgpt_critics"
                   checked={form.watch("use_chatgpt_critics")}
                   onCheckedChange={(checked) => form.setValue("use_chatgpt_critics", checked)}
+                  className="data-[state=checked]:bg-[#008da1] data-[state=unchecked]:bg-[#b1dd0c]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="use_gpt52_analytics" className="cursor-pointer">Analytics Model</Label>
+                  <p className="text-xs text-muted-foreground mr-6">
+                    {form.watch("use_gpt52_analytics") ? (
+                      <>
+                        <span className="font-medium text-white">GPT-5.2</span> — Reasoning models for higher accuracy analytics (4-6x cost)
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-white">Standard</span> — Claude Sonnet for analytics (lower cost)
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Switch
+                  id="use_gpt52_analytics"
+                  checked={form.watch("use_gpt52_analytics")}
+                  onCheckedChange={handleGPT52Toggle}
                   className="data-[state=checked]:bg-[#008da1] data-[state=unchecked]:bg-[#b1dd0c]"
                 />
               </div>

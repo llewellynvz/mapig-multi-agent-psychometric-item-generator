@@ -172,6 +172,11 @@
     color: var(--color-text-muted);
   }
 
+  .surface-card .text-foreground,
+  .surface-card [class*="text-foreground"] {
+    color: var(--color-text);
+  }
+
   .surface-card input,
   .surface-card textarea,
   .surface-card select,

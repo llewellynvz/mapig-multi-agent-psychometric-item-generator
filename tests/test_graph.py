@@ -196,8 +196,8 @@ def test_finalize_node_enhanced_output():
     # Act: Call finalize_node (returns Command since only 1 item < 3)
     result = finalize_node(state)
 
-    # Assert: FinalOutput populated with enhanced fields (access via Command.update)
-    final_output = result.update["final_output"]
+    # Assert: FinalOutput populated with enhanced fields
+    final_output = result["final_output"]
 
     assert final_output.user_request == user_req
     assert final_output.user_request.construct_name == "Test Construct"
@@ -432,8 +432,8 @@ def test_analytics_nodes_in_graph():
     assert "correlation_node" in graph.nodes, "correlation_node must exist in graph"
     assert "comparison_node" in graph.nodes, "comparison_node must exist in graph"
     assert "cross_construct_node" in graph.nodes, "cross_construct_node must exist in graph"
-    # Phase 10: Verify collect_analytics_node exists
-    assert "collect_analytics_node" in graph.nodes, "collect_analytics_node must exist in graph"
+    # Phase 10: Verify analytics_dispatch_node exists
+    assert "analytics_dispatch_node" in graph.nodes, "analytics_dispatch_node must exist in graph"
 
 
 # Phase 8-01: Correlation Node Integration Tests
@@ -825,11 +825,10 @@ def test_cross_construct_node_graceful_failure():
 # Phase 10-01: Parallel Analytics Send API Tests
 
 
-def test_finalize_returns_command_with_send_targets():
-    """Phase 10-01 Task 2: finalize_node returns Command with Send API fan-out when items >= 3."""
+def test_finalize_returns_dict_with_final_output():
+    """Phase 10: finalize_node returns dict with final_output and gpt52_analytics_enabled."""
     from backend.graph import finalize_node
-    from backend.schemas import UserRequest, DraftItem, AuditMetadata, ItemValidation
-    from langgraph.types import Command
+    from backend.schemas import UserRequest, DraftItem
 
     # Arrange: Create state with 3 items
     user_request = UserRequest(
@@ -865,20 +864,17 @@ def test_finalize_returns_command_with_send_targets():
     # Act
     result = finalize_node(state)
 
-    # Assert: Should return Command with Send targets
-    assert isinstance(result, Command), "finalize_node should return Command when items >= 3"
-    assert hasattr(result, "goto"), "Command should have goto attribute"
-    assert isinstance(result.goto, list), "Command.goto should be a list of Send objects"
-    assert len(result.goto) == 3, "Should fan out to 3 analytics nodes"
-    assert result.update["gpt52_analytics_enabled"] == True, "Should set gpt52_analytics_enabled from user_request"
+    # Assert: Should return plain dict with final_output
+    assert isinstance(result, dict), "finalize_node should return dict"
+    assert "final_output" in result, "Result should contain final_output"
+    assert result["gpt52_analytics_enabled"] == True, "Should set gpt52_analytics_enabled from user_request"
+    assert len(result["final_output"].final_items) == 3, "Should contain 3 items"
 
 
-def test_finalize_skips_analytics_when_too_few_items():
-    """Phase 10-01 Task 2: finalize_node returns Command to END when items < 3."""
+def test_finalize_with_few_items_still_returns_dict():
+    """Phase 10: finalize_node returns dict even with < 3 items (analytics_dispatch handles skip)."""
     from backend.graph import finalize_node
     from backend.schemas import UserRequest, DraftItem
-    from langgraph.types import Command
-    from langgraph.graph import END
 
     # Arrange: Create state with only 2 items
     user_request = UserRequest(
@@ -913,9 +909,10 @@ def test_finalize_skips_analytics_when_too_few_items():
     # Act
     result = finalize_node(state)
 
-    # Assert: Should return Command to END
-    assert isinstance(result, Command), "finalize_node should return Command"
-    assert result.goto == END, "Should route to END when items < 3"
+    # Assert: Should return plain dict
+    assert isinstance(result, dict), "finalize_node should return dict"
+    assert "final_output" in result, "Result should contain final_output"
+    assert len(result["final_output"].final_items) == 2, "Should contain 2 items"
 
 
 def test_finalize_gpt52_cost_fields_in_audit():
@@ -957,7 +954,7 @@ def test_finalize_gpt52_cost_fields_in_audit():
     result = finalize_node(state)
 
     # Assert: Check audit metadata includes GPT-5.2 cost fields
-    final_output = result.update["final_output"]
+    final_output = result["final_output"]
     audit = final_output.audit
 
     assert audit.gpt52_reasoning_cost is not None, "Audit should include gpt52_reasoning_cost"
@@ -967,21 +964,400 @@ def test_finalize_gpt52_cost_fields_in_audit():
     assert audit.analytics_budget_exceeded is False, "$1.40 < $2.00 budget cap"
 
 
-def test_collect_analytics_budget_check():
-    """Phase 10-01 Task 2: collect_analytics_node logs warning when budget exceeded."""
-    from backend.graph import collect_analytics_node
+@pytest.mark.asyncio
+async def test_analytics_dispatch_skips_with_few_items():
+    """Phase 10: analytics_dispatch_node skips when < 3 items."""
+    from backend.graph import analytics_dispatch_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata
 
-    # Arrange: Create state with GPT-5.2 costs exceeding budget ($2.00)
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale", evidence_citations=[]),
+        DraftItem(item_text="Item 2", construct_name="Test", rationale="Rationale", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test", run_id="test", timestamp_utc="2026-03-15T00:00:00Z",
+        iteration_count=0, stop_reason="complete"
+    )
+
     state = {
-        "gpt52_analytics_enabled": True,
-        "gpt52_reasoning_tokens": 100000,  # 100k reasoning @ $14/1M = $1.40
-        "gpt52_output_tokens": 100000,     # 100k output @ $14/1M = $1.40
-        # Total: $2.80 > $2.00 budget cap
+        "final_output": FinalOutput(final_items=items, audit=audit),
+        "gpt52_analytics_enabled": False,
     }
 
-    # Act
-    result = collect_analytics_node(state)
+    result = await analytics_dispatch_node(state)
+    assert result == {}, "Should skip analytics when < 3 items"
 
-    # Assert: Should return empty dict (no state changes)
-    assert result == {}, "collect_analytics_node should return empty dict"
-    # Budget warning logged but not testable without caplog fixture
+
+@pytest.mark.asyncio
+async def test_analytics_dispatch_merges_results():
+    """Phase 10: analytics_dispatch_node merges correlation + comparison + cross-construct."""
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from backend.graph import analytics_dispatch_node
+    from backend.schemas import (
+        DraftItem, FinalOutput, AuditMetadata, UserRequest,
+        CorrelationMatrix, CorrelationCell, ComparisonInstrument,
+        CrossConstructComparison, ConstructPairAnalysis,
+    )
+
+    items = [
+        DraftItem(item_text=f"Item {i}", construct_name="Test", rationale=f"Rationale {i}", evidence_citations=[])
+        for i in range(5)
+    ]
+
+    audit = AuditMetadata(
+        thread_id="test", run_id="test", timestamp_utc="2026-03-15T00:00:00Z",
+        iteration_count=0, stop_reason="complete"
+    )
+
+    user_request = UserRequest(
+        construct_name="Test Construct",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request,
+        "gpt52_analytics_enabled": False,
+    }
+
+    # Mock correlation
+    mock_corr_matrix = CorrelationMatrix(
+        cells=[CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.7, ci_low=0.6, ci_high=0.8)],
+        mcdonalds_omega=0.85,
+        mean_inter_item_correlation=0.7,
+        internal_consistency_flag="optimal_range",
+    )
+    mock_corr_output = final_output.model_copy(deep=True)
+    mock_corr_output.correlation_matrix = mock_corr_matrix
+
+    # Mock comparison
+    mock_convergent = ComparisonInstrument(name="Conv Scale", construct="test", source_citation="Author (2020)")
+    mock_discriminant = ComparisonInstrument(name="Disc Scale", construct="other", source_citation="Author (2021)")
+    mock_comp_output = final_output.model_copy(deep=True)
+    mock_comp_output.comparison_instruments = [mock_convergent, mock_discriminant]
+    mock_comp_output.convergent_validity_score = 0.78
+
+    # Mock cross-construct
+    mock_pair = ConstructPairAnalysis(
+        construct_a="Test Construct", construct_b="other",
+        estimated_correlation=0.4, discriminant_validity_flag="adequate",
+        reasoning="Distinct constructs"
+    )
+    mock_cross = CrossConstructComparison(
+        target_construct="Test Construct",
+        comparison_constructs=["other"],
+        analysis_summary="Adequate discriminant validity between constructs",
+        construct_pairs=[mock_pair],
+    )
+
+    with patch("backend.graph.correlation_node", new_callable=AsyncMock) as mock_corr, \
+         patch("backend.graph.comparison_node") as mock_comp, \
+         patch("backend.graph.cross_construct_node") as mock_cross_node:
+
+        mock_corr.return_value = {"final_output": mock_corr_output}
+        mock_comp.return_value = {"final_output": mock_comp_output}
+
+        # cross_construct_node receives updated state with comparison_instruments
+        mock_cross_output = final_output.model_copy(deep=True)
+        mock_cross_output.cross_construct_analysis = mock_cross
+        mock_cross_node.return_value = {"final_output": mock_cross_output}
+
+        result = await analytics_dispatch_node(state)
+
+    # Assert: All three analyses merged into single final_output
+    assert "final_output" in result
+    merged = result["final_output"]
+    assert merged.correlation_matrix is not None, "correlation_matrix should be merged"
+    assert merged.correlation_matrix.mcdonalds_omega == 0.85
+    assert merged.comparison_instruments is not None, "comparison_instruments should be merged"
+    assert len(merged.comparison_instruments) == 2
+    assert merged.convergent_validity_score == 0.78
+    assert merged.cross_construct_analysis is not None, "cross_construct should run after comparison"
+
+
+# Phase 11: Quality & UI Overhaul Tests
+
+
+def test_plagiarism_flags_known_instruments():
+    """Phase 11 Wave 1A: Plagiarism detection uses known instrument items."""
+    from unittest.mock import patch, MagicMock
+    from backend.graph import comparison_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest, ComparisonInstrument
+
+    items = [
+        DraftItem(item_text="In most ways my life is close to ideal", construct_name="Life Satisfaction", rationale="Rationale", evidence_citations=[]),
+        DraftItem(item_text="I am satisfied with my life", construct_name="Life Satisfaction", rationale="Rationale", evidence_citations=[]),
+        DraftItem(item_text="The conditions of my life are great", construct_name="Life Satisfaction", rationale="Rationale", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(thread_id="test", run_id="test", timestamp_utc="2026-03-15T00:00:00Z", iteration_count=1, stop_reason="complete")
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Life Satisfaction",
+        construct_definition="Cognitive evaluation of overall life quality",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {"final_output": final_output, "user_request": user_request}
+
+    mock_convergent = ComparisonInstrument(name="Satisfaction With Life Scale", construct="life satisfaction", source_citation="Diener et al. (1985)")
+    mock_discriminant = ComparisonInstrument(name="PHQ-9", construct="depression", source_citation="Kroenke et al. (2001)")
+
+    # Mock: plagiarism detector returns flags for items similar to SWLS
+    mock_flags = {0: "Potential similarity to Satisfaction With Life Scale item (r = 0.88)", 1: "Potential similarity to Satisfaction With Life Scale item (r = 0.92)"}
+
+    with patch("backend.agents.instrument_searcher.search_instruments", return_value=(mock_convergent, mock_discriminant)), \
+         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=0.75), \
+         patch("backend.analytics.similarity_calculator.get_plagiarism_detector") as mock_detector:
+
+        mock_detector.return_value.detect_plagiarism.return_value = mock_flags
+
+        result = comparison_node(state)
+
+    assert "final_output" in result
+    assert result["final_output"].plagiarism_flags is not None
+    assert len(result["final_output"].plagiarism_flags) >= 2
+    # Verify known instruments were passed (not empty list)
+    mock_detector.return_value.detect_plagiarism.assert_called_once()
+    call_args = mock_detector.return_value.detect_plagiarism.call_args
+    published_items = call_args[0][1]  # second positional arg
+    assert len(published_items) > 0, "Should pass known instrument items, not empty list"
+
+
+def test_convergent_ceiling_warning():
+    """Phase 11 Wave 1B: Convergent validity > 0.85 triggers ceiling warning."""
+    from unittest.mock import patch, MagicMock
+    from backend.graph import comparison_node
+    from backend.schemas import DraftItem, FinalOutput, AuditMetadata, UserRequest, ComparisonInstrument
+
+    items = [
+        DraftItem(item_text="Item 1", construct_name="Test", rationale="Rationale", evidence_citations=[]),
+    ]
+
+    audit = AuditMetadata(thread_id="test", run_id="test", timestamp_utc="2026-03-15T00:00:00Z", iteration_count=1, stop_reason="complete")
+    final_output = FinalOutput(final_items=items, audit=audit)
+
+    user_request = UserRequest(
+        construct_name="Test",
+        construct_definition="Test definition",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    state = {"final_output": final_output, "user_request": user_request}
+
+    mock_convergent = ComparisonInstrument(name="Test Scale", construct="test", source_citation="Author (2020)")
+    mock_discriminant = ComparisonInstrument(name="Other Scale", construct="other", source_citation="Author (2021)")
+
+    with patch("backend.agents.instrument_searcher.search_instruments", return_value=(mock_convergent, mock_discriminant)), \
+         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=0.86), \
+         patch("backend.analytics.similarity_calculator.get_plagiarism_detector") as mock_detector:
+
+        mock_detector.return_value.detect_plagiarism.return_value = {}
+
+        result = comparison_node(state)
+
+    assert "final_output" in result
+    flags = result["final_output"].plagiarism_flags
+    assert flags is not None
+    assert -1 in flags, "Should have ceiling warning at index -1"
+    assert "derivative" in flags[-1].lower()
+
+
+def test_redundancy_flags_high_r_pairs():
+    """Phase 11 Wave 1D: Redundancy flags generated for r > 0.75."""
+    from backend.schemas import CorrelationMatrix, CorrelationCell
+
+    cells = [
+        CorrelationCell(item_i_index=0, item_j_index=1, correlation=0.80),
+        CorrelationCell(item_i_index=0, item_j_index=2, correlation=0.50),
+        CorrelationCell(item_i_index=1, item_j_index=2, correlation=0.76),
+    ]
+
+    matrix = CorrelationMatrix(
+        cells=cells,
+        mcdonalds_omega=0.85,
+        mean_inter_item_correlation=0.69,
+        internal_consistency_flag="optimal_range",
+    )
+
+    # Simulate what analytics_dispatch_node does
+    redundancy_flags = []
+    for cell in matrix.cells:
+        if cell.correlation > 0.75:
+            redundancy_flags.append(
+                f"Items {cell.item_i_index + 1} and {cell.item_j_index + 1} are redundant "
+                f"(r = {cell.correlation:.2f}) — consider replacing one"
+            )
+
+    assert len(redundancy_flags) == 2, "Should flag 2 pairs (0.80 and 0.76)"
+    assert "Items 1 and 2" in redundancy_flags[0]
+    assert "Items 2 and 3" in redundancy_flags[1]
+
+
+def test_stagnation_detection_accepts():
+    """Phase 11 Wave 1F: Critic detects stagnation and force-accepts."""
+    from backend.agents.critic import decide as critic_decide
+    from backend.schemas import ReviewComment, IterationSnapshot
+
+    # Same comments across iterations = stagnation
+    comment = ReviewComment(type="bias", item_index=0, issue="Item 1: Cultural assumption", severity=3, suggested_edit="Rewrite")
+
+    iteration_history = [
+        IterationSnapshot(iteration=0, linguistic_comments=[], bias_comments=[comment], content_comments=[]),
+        IterationSnapshot(iteration=1, linguistic_comments=[], bias_comments=[comment], content_comments=[]),
+    ]
+
+    # Current iteration (2) has the same comment
+    decision, reason = critic_decide(
+        linguistic_comments=[],
+        bias_comments=[comment],
+        content_comments=[],
+        iteration=2,
+        iteration_history=iteration_history,
+    )
+
+    assert decision == "accept", f"Should accept on stagnation, got: {decision}"
+    assert "stagnation" in reason.lower()
+
+
+def test_construct_exclusions_in_abbreviated_request():
+    """Phase 11 Wave 0A: construct_exclusions propagated to AbbreviatedRequest."""
+    from backend.graph import _create_abbreviated_request
+    from backend.schemas import UserRequest
+
+    request = UserRequest(
+        construct_name="Life Satisfaction",
+        construct_definition="Cognitive evaluation of life",
+        target_population="Adults",
+        response_scale="5-point Likert",
+        construct_exclusions="Not Affect Balance or emotional wellbeing"
+    )
+
+    abbreviated = _create_abbreviated_request(request)
+    assert abbreviated.construct_exclusions == "Not Affect Balance or emotional wellbeing"
+
+
+def test_known_instrument_lookup():
+    """Phase 11 Wave 0B: Known instrument items lookup works."""
+    from data.known_instrument_items import lookup_instrument_items
+
+    # Exact match
+    swls_items = lookup_instrument_items("satisfaction with life scale")
+    assert len(swls_items) == 5
+
+    # Alias match
+    swls_alias = lookup_instrument_items("SWLS")
+    assert len(swls_alias) == 5
+
+    # Partial match
+    partial = lookup_instrument_items("Personal Wellbeing Index")
+    assert len(partial) == 8
+
+    # No match
+    none = lookup_instrument_items("Nonexistent Scale")
+    assert len(none) == 0
+
+
+# Phase 11.5: Bias Quality, Evidence Depth & Stagnation Fixes
+
+
+def test_bias_construct_level_filter():
+    """Phase 11.5 Wave 1B: >60% identical comments → all filtered as construct-level."""
+    from backend.agents.bias_reviewer import _filter_construct_level_comments
+    from backend.schemas import ReviewComment
+
+    # Same issue text across 4 out of 5 items (80% > 60% threshold)
+    comments = [
+        ReviewComment(type="bias", item_index=i, issue="Item assumes individualistic self-concept", severity=3, suggested_edit="Rewrite")
+        for i in range(4)
+    ]
+    result = _filter_construct_level_comments(comments, item_count=5)
+    assert result == [], "All construct-level false positives should be filtered"
+
+
+def test_bias_construct_level_filter_preserves_unique():
+    """Phase 11.5 Wave 1B: Unique per-item comments preserved."""
+    from backend.agents.bias_reviewer import _filter_construct_level_comments
+    from backend.schemas import ReviewComment
+
+    # Different issue texts per item — unique, not construct-level
+    comments = [
+        ReviewComment(type="bias", item_index=0, issue="Item uses idiom 'hit the ground running'", severity=2, suggested_edit="Rewrite"),
+        ReviewComment(type="bias", item_index=1, issue="Assumes access to private workspace", severity=3, suggested_edit="Rewrite"),
+    ]
+    result = _filter_construct_level_comments(comments, item_count=5)
+    assert len(result) == 2, "Unique comments should be preserved"
+
+
+def test_stagnation_jaccard_similarity():
+    """Phase 11.5 Wave 2C: Paraphrased comments detected as stagnant."""
+    from backend.agents.critic import _detect_stagnation
+    from backend.schemas import ReviewComment, IterationSnapshot
+
+    # Previous iteration
+    prev_comment = ReviewComment(type="bias", item_index=0, issue="Item 1: Cultural assumption about individual standards in measurement", severity=3, suggested_edit="Rewrite")
+    history = [
+        IterationSnapshot(iteration=0, linguistic_comments=[], bias_comments=[prev_comment], content_comments=[]),
+    ]
+
+    # Current iteration: paraphrased — most words overlap but phrasing differs
+    current_comment = ReviewComment(type="bias", item_index=0, issue="Item 1: Cultural assumption about individual standards in assessment", severity=3, suggested_edit="Rewrite")
+
+    result = _detect_stagnation([current_comment], history, iteration=1)
+    assert result is True, "Paraphrased repetition should be detected as stagnant"
+
+
+def test_stagnation_triggers_at_iteration_1():
+    """Phase 11.5 Wave 2C: Stagnation detection triggers at iteration >= 1 (was >= 2)."""
+    from backend.agents.critic import _detect_stagnation
+    from backend.schemas import ReviewComment, IterationSnapshot
+
+    comment = ReviewComment(type="bias", item_index=0, issue="Item 1: Same concern", severity=3, suggested_edit="Rewrite")
+    history = [
+        IterationSnapshot(iteration=0, linguistic_comments=[], bias_comments=[comment], content_comments=[]),
+    ]
+
+    # At iteration=1, stagnation should now be detected
+    result = _detect_stagnation([comment], history, iteration=1)
+    assert result is True, "Stagnation should trigger at iteration 1"
+
+    # At iteration=0, should NOT trigger (no history to compare)
+    result_0 = _detect_stagnation([comment], [], iteration=0)
+    assert result_0 is False, "Stagnation should not trigger at iteration 0"
+
+
+def test_critic_downgrades_construct_level_bias():
+    """Phase 11.5 Wave 1D: All-identical bias comments → severity downgraded to 1."""
+    from backend.agents.critic import _downgrade_construct_level_bias
+    from backend.schemas import ReviewComment
+
+    # All bias comments have highly similar issue text (construct-level)
+    comments = [
+        ReviewComment(type="bias", item_index=0, issue="Item 1: assumes individualistic self-concept for target population", severity=3, suggested_edit="Rewrite"),
+        ReviewComment(type="bias", item_index=1, issue="Item 2: assumes individualistic self-concept for target population", severity=3, suggested_edit="Rewrite"),
+        ReviewComment(type="bias", item_index=2, issue="Item 3: assumes individualistic self-concept for target population", severity=4, suggested_edit="Rewrite"),
+    ]
+
+    result = _downgrade_construct_level_bias(comments)
+    for c in result:
+        assert c.severity == 1, f"Comment for item {c.item_index} should be downgraded to severity 1, got {c.severity}"
+
+
+def test_evidence_settings_exist():
+    """Phase 11.5 Wave 0A: New evidence settings present with correct defaults."""
+    from backend.settings import Settings
+
+    s = Settings(APP_MODE="mock")
+    assert s.EVIDENCE_MIN_CHUNKS == 20, "EVIDENCE_MIN_CHUNKS should default to 20"
+    assert s.EVIDENCE_MAX_RETRIES == 2, "EVIDENCE_MAX_RETRIES should default to 2"
+    # PERPLEXITY_MAX_RESULTS code default is 40 (may be overridden by .env)
+    assert hasattr(s, "PERPLEXITY_MAX_RESULTS"), "PERPLEXITY_MAX_RESULTS must exist"
+    assert s.PERPLEXITY_MAX_RESULTS >= 40, "PERPLEXITY_MAX_RESULTS should be at least 40"

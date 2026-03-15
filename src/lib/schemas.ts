@@ -26,6 +26,7 @@ export const instrumentSetupSchema = z.object({
   constraints: z.array(z.string()).default([]),
   cultural_group: z.string().optional(),
   construct_exclusions: z.string().optional(),
+  language: z.string().default("English"),
   native_construct: z.string().optional(),
   example_item: z.string().optional(),
   approved_domains: z.array(z.string()).default([]),
@@ -38,6 +39,29 @@ export const RESPONSE_SCALE_PRESETS = [
   "7-point Likert: Strongly disagree → Strongly agree",
   "Frequency: Never → Always",
   "Agreement: Not at all → Completely",
+] as const;
+
+export const LANGUAGE_PRESETS = [
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Portuguese",
+  "Chinese (Mandarin)",
+  "Japanese",
+  "Korean",
+  "Arabic",
+  "Hindi",
+  "Turkish",
+  "Italian",
+  "Dutch",
+  "Russian",
+  "Polish",
+  "Swedish",
+  "Norwegian",
+  "Danish",
+  "Finnish",
+  "Indonesian",
 ] as const;
 
 export const DEFAULT_CONSTRAINTS = [
@@ -71,6 +95,7 @@ export const defaultInstrumentSetup: InstrumentSetupFormValues = {
   constraints: [...DEFAULT_CONSTRAINTS],
   cultural_group: "",
   construct_exclusions: "",
+  language: "English",
   native_construct: "",
   example_item: "",
   approved_domains: [...DEFAULT_APPROVED_DOMAINS],

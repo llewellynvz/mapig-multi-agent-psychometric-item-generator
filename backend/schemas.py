@@ -69,6 +69,11 @@ class UserRequest(BaseModel):
         description="Optional note describing what nearby constructs this is NOT and where overlap should be avoided.",
     )
 
+    language: Optional[str] = Field(
+        default=None,
+        description="Target language for generated items (e.g. 'Spanish', 'French'). If not set, items are generated in English.",
+    )
+
     human_feedback: Optional[str] = Field(
         default=None,
         description="Optional human feedback to guide a refinement rerun.",
@@ -144,6 +149,11 @@ class AbbreviatedRequest(BaseModel):
     use_chatgpt_critics: bool = Field(
         default=False,
         description="Use ChatGPT for critic agents."
+    )
+
+    construct_exclusions: Optional[str] = Field(
+        default=None,
+        description="Optional note describing what nearby constructs this is NOT and where overlap should be avoided.",
     )
 
     cultural_context_notes: Optional[str] = Field(
@@ -263,6 +273,10 @@ class RevisionPlan(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    summary: str = Field(
+        default="",
+        description="What was fixed and what remains risky, including facet balance.",
+    )
     edits: List[RevisionEdit] = Field(default_factory=list)
 
 
@@ -343,6 +357,7 @@ class CorrelationMatrix(BaseModel):
     mean_inter_item_correlation: float = Field(..., description="Mean of all pairwise correlations")
     internal_consistency_flag: str = Field(..., description="optimal_range/too_low/too_high based on mean inter-item correlation")
     guidance: Optional[str] = Field(default=None, description="Actionable guidance based on internal_consistency_flag")
+    redundancy_flags: Optional[List[str]] = Field(default=None, description="Warnings for item pairs with r > 0.75, suggesting redundancy")
     disclaimer: str = Field(default="Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation.", description="Standard disclaimer for embedding-based estimates")
 
 

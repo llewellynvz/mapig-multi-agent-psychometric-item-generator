@@ -161,8 +161,11 @@ def validate_items(
         ]
 
         # Invoke with structured output, capturing raw response for token tracking
-        # Note: strict=False to allow minLength=0 for reasoning field (empty for passing dimensions)
-        runnable = model.with_structured_output(ValidationResponse, strict=False, include_raw=True)
+        # Use try-except pattern (same as llm_utils.py) for cross-provider compatibility
+        try:
+            runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
+        except TypeError:
+            runnable = model.with_structured_output(ValidationResponse, include_raw=True)
         response = runnable.invoke(messages)
 
         # Extract result and token usage

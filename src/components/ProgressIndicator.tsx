@@ -29,21 +29,22 @@ interface ProgressIndicatorProps {
 }
 
 const NODE_DISPLAY_NAMES: Record<string, string> = {
-  init_run: "Initialize",
-  retrieve_node: "Retrieve Evidence",
-  item_writer_node: "Generate Items",
-  content_review_node: "Content Review",
-  linguistic_review_node: "Linguistic Review",
-  bias_review_node: "Bias Review",
-  critic_node: "Quality Check",
-  meta_editor_node: "Revise Items",
-  finalize_node: "Finalize",
-  validation_node: "Validate Items",
-  regenerate_items_node: "Regenerate Items",
-  correlation_node: "Estimating Correlations",
-  comparison_node: "Comparing Instruments",
-  cross_construct_node: "Cross-Construct Analysis",
-  reviewers_fanout_node: "Reviewing Items",
+  init_run: "Setting up pipeline",
+  retrieve_node: "Searching academic sources",
+  item_writer_node: "Drafting survey items",
+  validation_node: "Validating item quality",
+  regenerate_items_node: "Improving failed items",
+  reviewers_fanout_node: "Running expert review panel",
+  content_review_node: "Reviewing construct alignment",
+  linguistic_review_node: "Reviewing language clarity",
+  bias_review_node: "Reviewing bias and fairness",
+  critic_node: "Evaluating review outcomes",
+  meta_editor_node: "Applying reviewer feedback",
+  finalize_node: "Finalizing results",
+  correlation_node: "Estimating inter-item correlations",
+  comparison_node: "Comparing with published instruments",
+  cross_construct_node: "Analyzing cross-construct validity",
+  analytics_dispatch_node: "Running analytics suite",
 };
 
 /* ── Stage-aware progress bar ── */
@@ -163,16 +164,16 @@ export function ProgressIndicator({
       {(completedNodes.length > 0 || (progress.status === "running" && progress.currentNode)) && (
         <div className="border-t border-white/5 px-6 py-4">
           <div className="max-h-52 overflow-y-auto pr-1">
-            <div className="relative pl-6">
+            <div className="relative pl-10">
               {/* Vertical connecting line */}
               <div className="absolute left-[7px] top-1 bottom-1 w-px bg-white/10" />
 
               {completedNodes.map((node, idx) => (
                 <div
                   key={`${node.node}-${idx}`}
-                  className="relative flex items-center gap-3 pb-3 last:pb-0"
+                  className="relative flex items-center pb-3 last:pb-0"
                 >
-                  <div className="absolute left-[-17px] flex h-4 w-4 items-center justify-center rounded-full bg-accent/20">
+                  <div className="absolute left-[-33px] flex h-4 w-4 items-center justify-center rounded-full bg-accent/20">
                     <Check className="h-2.5 w-2.5 text-accent" />
                   </div>
                   <span className="text-sm text-muted-foreground">{node.displayName}</span>
@@ -180,8 +181,8 @@ export function ProgressIndicator({
               ))}
 
               {progress.status === "running" && progress.currentNode && (
-                <div className="relative flex items-center gap-3 pb-0">
-                  <div className="absolute left-[-17px] flex h-4 w-4 items-center justify-center rounded-full bg-sky-500/20">
+                <div className="relative flex items-center pb-0">
+                  <div className="absolute left-[-33px] flex h-4 w-4 items-center justify-center rounded-full bg-sky-500/20">
                     <Loader2 className="h-2.5 w-2.5 animate-spin text-sky-400" />
                   </div>
                   <span className="text-sm font-medium text-foreground">{displayName}</span>

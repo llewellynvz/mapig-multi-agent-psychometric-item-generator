@@ -13,8 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 import type { FinalItem, FinalOutput, ItemValidation } from "@/lib/types";
 import { exportToCsv, exportToJson, exportToMarkdown, generateFilename } from "@/lib/export";
 import { QualityChecksPanel } from "./QualityChecksPanel";
-import { CorrelationPanel } from "./CorrelationPanel";
-import { ComparisonPanel } from "./ComparisonPanel";
 import { PlagiarismBadge } from "./PlagiarismBadge";
 
 function ValidationScoreDisplay({
@@ -242,21 +240,6 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
           ))}
         </div>
         <QualityChecksPanel items={displayItems} />
-        {fullOutput?.correlation_matrix && (
-          <CorrelationPanel
-            matrix={fullOutput.correlation_matrix}
-            itemTexts={displayItems.map(item => item.item_text)}
-            constructName={fullOutput.final_items[0]?.construct_name}
-          />
-        )}
-        {fullOutput?.comparison_instruments && fullOutput.comparison_instruments.length >= 2 && (
-          <ComparisonPanel
-            convergentInstrument={fullOutput.comparison_instruments[0]}
-            discriminantInstrument={fullOutput.comparison_instruments[1]}
-            convergentScore={fullOutput.convergent_validity_score ?? 0.5}
-            crossConstruct={fullOutput.cross_construct_analysis}
-          />
-        )}
         {fullOutput?.audit?.validation_attempts && fullOutput.audit.validation_attempts > 0 && (
           <InsetPanel className="rounded-2xl p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

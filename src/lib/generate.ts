@@ -181,6 +181,7 @@ export function formToRequest(values: {
   constraints: string[];
   cultural_group?: string;
   construct_exclusions?: string;
+  language?: string;
   native_construct?: string;
   example_item?: string;
   approved_domains: string[];
@@ -203,6 +204,7 @@ export function formToRequest(values: {
   };
   if (values.cultural_group?.trim()) req.cultural_group = values.cultural_group.trim();
   if (values.construct_exclusions?.trim()) req.construct_exclusions = values.construct_exclusions.trim();
+  if (values.language?.trim() && values.language.trim() !== "English") req.language = values.language.trim();
   if (values.native_construct?.trim()) req.native_construct = values.native_construct.trim();
   if (values.example_item?.trim()) req.example_item = values.example_item.trim();
   if (values.human_feedback?.trim()) req.human_feedback = values.human_feedback.trim();

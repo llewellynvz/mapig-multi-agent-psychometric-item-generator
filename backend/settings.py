@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     PUBLISHER_BLOCKLIST: str = "pearson.com,parinc.com,mhs.com,wpspublish.com,hogrefe.com,proedinc.com,mindgarden.com"
     PLAGIARISM_SIMILARITY_THRESHOLD: float = 0.85
 
+    # Phase 10: GPT-5.2 analytics budget cap
+    ANALYTICS_BUDGET_CAP: float = 2.00  # Maximum USD per analytics run (correlation + comparison + cross-construct)
+
     def publisher_blocklist_domains(self) -> list[str]:
         """Return blocked publisher domains for copyright protection."""
         raw = (self.PUBLISHER_BLOCKLIST or "").strip()

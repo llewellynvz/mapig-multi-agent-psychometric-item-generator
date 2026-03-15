@@ -100,6 +100,12 @@ class UserRequest(BaseModel):
         description="Use ChatGPT (o1-5.2-flex) for critic agents (validator, reviewers, critic). Item writer always uses Sonnet."
     )
 
+    # Phase 10: GPT-5.2 analytics toggle
+    use_gpt52_analytics: bool = Field(
+        default=False,
+        description="Enable GPT-5.2 reasoning models for analytics tasks (correlation, comparison, cross-construct). Higher accuracy but 4-6x cost multiplier."
+    )
+
 
 class AbbreviatedRequest(BaseModel):
     """Minimal request for agents that don't need full context.
@@ -430,6 +436,11 @@ class AuditMetadata(BaseModel):
     # Smart validation tracking (Strategy C)
     smart_validation_used: Optional[bool] = Field(default=None, description="Whether smart validation (Sonnet→Opus) was used")
     validation_model_used: Optional[str] = Field(default=None, description="Model used for validation (sonnet/opus)")
+
+    # Phase 10: GPT-5.2 cost tracking
+    gpt52_reasoning_cost: Optional[float] = Field(default=None, description="GPT-5.2 reasoning token cost in USD")
+    gpt52_output_cost: Optional[float] = Field(default=None, description="GPT-5.2 output token cost in USD")
+    analytics_budget_exceeded: Optional[bool] = Field(default=None, description="Whether analytics budget cap was exceeded")
 
 
 class FinalOutput(BaseModel):

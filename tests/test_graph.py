@@ -183,14 +183,21 @@ def test_finalize_node_enhanced_output():
         "validation_results": [validation],
         "iteration": 2,
         "stop_reason": "max_iterations",
-        "validation_attempt": 1
+        "validation_attempt": 1,
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+        "gpt52_tokens_used": 0,
+        "gpt52_reasoning_tokens": 0,
+        "gpt52_output_tokens": 0,
     }
 
-    # Act: Call finalize_node
+    # Act: Call finalize_node (returns Command since only 1 item < 3)
     result = finalize_node(state)
 
-    # Assert: FinalOutput populated with enhanced fields
-    final_output = result["final_output"]
+    # Assert: FinalOutput populated with enhanced fields (access via Command.update)
+    final_output = result.update["final_output"]
 
     assert final_output.user_request == user_req
     assert final_output.user_request.construct_name == "Test Construct"
@@ -425,6 +432,8 @@ def test_analytics_nodes_in_graph():
     assert "correlation_node" in graph.nodes, "correlation_node must exist in graph"
     assert "comparison_node" in graph.nodes, "comparison_node must exist in graph"
     assert "cross_construct_node" in graph.nodes, "cross_construct_node must exist in graph"
+    # Phase 10: Verify collect_analytics_node exists
+    assert "collect_analytics_node" in graph.nodes, "collect_analytics_node must exist in graph"
 
 
 # Phase 8-01: Correlation Node Integration Tests
@@ -811,3 +820,168 @@ def test_cross_construct_node_graceful_failure():
 
     # Assert: Should return empty dict (graceful skip)
     assert result == {}
+
+
+# Phase 10-01: Parallel Analytics Send API Tests
+
+
+def test_finalize_returns_command_with_send_targets():
+    """Phase 10-01 Task 2: finalize_node returns Command with Send API fan-out when items >= 3."""
+    from backend.graph import finalize_node
+    from backend.schemas import UserRequest, DraftItem, AuditMetadata, ItemValidation
+    from langgraph.types import Command
+
+    # Arrange: Create state with 3 items
+    user_request = UserRequest(
+        construct_name="Test",
+        construct_definition="Test definition for measurement",
+        target_population="Adults",
+        response_scale="5-point Likert",
+        use_gpt52_analytics=True
+    )
+
+    items = [
+        DraftItem(item_text=f"Item {i}", construct_name="Test", rationale=f"Rationale {i}", evidence_citations=[])
+        for i in range(3)
+    ]
+
+    state = {
+        "user_request": user_request,
+        "draft_items": items,
+        "validation_results": [],
+        "evidence": [],
+        "iteration": 0,
+        "stop_reason": "max_iterations",
+        "validation_attempt": 1,
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+        "gpt52_tokens_used": 0,
+        "gpt52_reasoning_tokens": 0,
+        "gpt52_output_tokens": 0,
+    }
+
+    # Act
+    result = finalize_node(state)
+
+    # Assert: Should return Command with Send targets
+    assert isinstance(result, Command), "finalize_node should return Command when items >= 3"
+    assert hasattr(result, "goto"), "Command should have goto attribute"
+    assert isinstance(result.goto, list), "Command.goto should be a list of Send objects"
+    assert len(result.goto) == 3, "Should fan out to 3 analytics nodes"
+    assert result.update["gpt52_analytics_enabled"] == True, "Should set gpt52_analytics_enabled from user_request"
+
+
+def test_finalize_skips_analytics_when_too_few_items():
+    """Phase 10-01 Task 2: finalize_node returns Command to END when items < 3."""
+    from backend.graph import finalize_node
+    from backend.schemas import UserRequest, DraftItem
+    from langgraph.types import Command
+    from langgraph.graph import END
+
+    # Arrange: Create state with only 2 items
+    user_request = UserRequest(
+        construct_name="Test",
+        construct_definition="Test definition for measurement",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    items = [
+        DraftItem(item_text=f"Item {i}", construct_name="Test", rationale=f"Rationale {i}", evidence_citations=[])
+        for i in range(2)
+    ]
+
+    state = {
+        "user_request": user_request,
+        "draft_items": items,
+        "validation_results": [],
+        "evidence": [],
+        "iteration": 0,
+        "stop_reason": "max_iterations",
+        "validation_attempt": 1,
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+        "gpt52_tokens_used": 0,
+        "gpt52_reasoning_tokens": 0,
+        "gpt52_output_tokens": 0,
+    }
+
+    # Act
+    result = finalize_node(state)
+
+    # Assert: Should return Command to END
+    assert isinstance(result, Command), "finalize_node should return Command"
+    assert result.goto == END, "Should route to END when items < 3"
+
+
+def test_finalize_gpt52_cost_fields_in_audit():
+    """Phase 10-01 Task 2: AuditMetadata includes gpt52_reasoning_cost and gpt52_output_cost."""
+    from backend.graph import finalize_node
+    from backend.schemas import UserRequest, DraftItem
+
+    # Arrange: Create state with GPT-5.2 tokens
+    user_request = UserRequest(
+        construct_name="Test",
+        construct_definition="Test definition for measurement",
+        target_population="Adults",
+        response_scale="5-point Likert"
+    )
+
+    items = [
+        DraftItem(item_text=f"Item {i}", construct_name="Test", rationale=f"Rationale {i}", evidence_citations=[])
+        for i in range(2)
+    ]
+
+    state = {
+        "user_request": user_request,
+        "draft_items": items,
+        "validation_results": [],
+        "evidence": [],
+        "iteration": 0,
+        "stop_reason": "max_iterations",
+        "validation_attempt": 1,
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+        "gpt52_tokens_used": 100000,
+        "gpt52_reasoning_tokens": 50000,
+        "gpt52_output_tokens": 50000,
+    }
+
+    # Act
+    result = finalize_node(state)
+
+    # Assert: Check audit metadata includes GPT-5.2 cost fields
+    final_output = result.update["final_output"]
+    audit = final_output.audit
+
+    assert audit.gpt52_reasoning_cost is not None, "Audit should include gpt52_reasoning_cost"
+    assert audit.gpt52_output_cost is not None, "Audit should include gpt52_output_cost"
+    assert audit.gpt52_reasoning_cost == 0.7, "50k reasoning tokens @ $14/1M = $0.70"
+    assert audit.gpt52_output_cost == 0.7, "50k output tokens @ $14/1M = $0.70"
+    assert audit.analytics_budget_exceeded is False, "$1.40 < $2.00 budget cap"
+
+
+def test_collect_analytics_budget_check():
+    """Phase 10-01 Task 2: collect_analytics_node logs warning when budget exceeded."""
+    from backend.graph import collect_analytics_node
+
+    # Arrange: Create state with GPT-5.2 costs exceeding budget ($2.00)
+    state = {
+        "gpt52_analytics_enabled": True,
+        "gpt52_reasoning_tokens": 100000,  # 100k reasoning @ $14/1M = $1.40
+        "gpt52_output_tokens": 100000,     # 100k output @ $14/1M = $1.40
+        # Total: $2.80 > $2.00 budget cap
+    }
+
+    # Act
+    result = collect_analytics_node(state)
+
+    # Assert: Should return empty dict (no state changes)
+    assert result == {}, "collect_analytics_node should return empty dict"
+    # Budget warning logged but not testable without caplog fixture

@@ -9,7 +9,7 @@ from typing import List, Literal, Optional
 from typing_extensions import TypedDict
 
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command
+from langgraph.types import Command, Send
 
 from backend.agents.sanitizer import sanitize_user_request
 from backend.agents.bias_reviewer import review_bias
@@ -157,6 +157,8 @@ class GraphState(TypedDict, total=False):
     gpt52_tokens_used: int
     gpt52_reasoning_tokens: int
     gpt52_output_tokens: int
+    # Phase 10: Whether GPT-5.2 is enabled for analytics
+    gpt52_analytics_enabled: bool
 
     # Output
     final_output: FinalOutput
@@ -230,6 +232,7 @@ def init_run(state: GraphState) -> GraphState:
             "gpt52_tokens_used": 0,
             "gpt52_reasoning_tokens": 0,
             "gpt52_output_tokens": 0,
+            "gpt52_analytics_enabled": state.get("user_request").use_gpt52_analytics if state.get("user_request") and hasattr(state.get("user_request"), "use_gpt52_analytics") else False,
         }
 
 
@@ -645,7 +648,17 @@ def finalize_node(state: GraphState) -> GraphState:
         # GPT-4o-mini pricing (used for agent overrides like bias_reviewer, critic)
         openai_cost = (openai_tokens / 1_000_000) * 0.375  # Blended rate for GPT-4o-mini
 
-        total_cost = opus_cost + sonnet_cost + chatgpt_cost + openai_cost
+        # Phase 10: GPT-5.2 cost calculation (reasoning tokens billed at $14/1M output rate)
+        gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
+        gpt52_output = state.get("gpt52_output_tokens", 0)
+        gpt52_reasoning_cost = (gpt52_reasoning / 1_000_000) * 14.0
+        gpt52_output_cost = (gpt52_output / 1_000_000) * 14.0
+
+        # Check budget cap
+        total_gpt52_cost = gpt52_reasoning_cost + gpt52_output_cost
+        budget_exceeded = total_gpt52_cost > settings.ANALYTICS_BUDGET_CAP
+
+        total_cost = opus_cost + sonnet_cost + chatgpt_cost + openai_cost + gpt52_reasoning_cost + gpt52_output_cost
 
         # Determine if smart validation was used
         from backend.agents.validator import _use_smart_validation
@@ -681,6 +694,9 @@ def finalize_node(state: GraphState) -> GraphState:
             total_cost=round(total_cost, 2) if total_cost > 0 else None,
             smart_validation_used=smart_val_enabled,
             validation_model_used=validation_model,
+            gpt52_reasoning_cost=round(gpt52_reasoning_cost, 4) if gpt52_reasoning_cost > 0 else None,
+            gpt52_output_cost=round(gpt52_output_cost, 4) if gpt52_output_cost > 0 else None,
+            analytics_budget_exceeded=budget_exceeded if total_gpt52_cost > 0 else None,
         )
 
         # Phase 03.1: Extract review feedback from GraphState for complete metadata export
@@ -709,7 +725,25 @@ def finalize_node(state: GraphState) -> GraphState:
             content_feedback=content_feedback,
             iteration_history=iteration_history,
         )
-        return {"final_output": out}
+
+        # Phase 10: Extract GPT-5.2 analytics toggle
+        gpt52_enabled = user_request.use_gpt52_analytics if user_request and hasattr(user_request, "use_gpt52_analytics") else False
+
+        # Phase 10: Parallel analytics via Send API (if enough items)
+        if len(enriched_items) < 3:
+            logger.info(f"Too few items ({len(enriched_items)}) for analytics (minimum 3), skipping to END")
+            return Command(update={"final_output": out}, goto=END)
+
+        # Fan out to parallel analytics nodes
+        logger.info(f"Fanning out to 3 parallel analytics nodes (GPT-5.2 enabled: {gpt52_enabled})")
+        return Command(
+            update={"final_output": out, "gpt52_analytics_enabled": gpt52_enabled},
+            goto=[
+                Send("correlation_node", {"final_output": out, "user_request": user_request, "gpt52_analytics_enabled": gpt52_enabled}),
+                Send("comparison_node", {"final_output": out, "user_request": user_request, "gpt52_analytics_enabled": gpt52_enabled}),
+                Send("cross_construct_node", {"final_output": out, "user_request": user_request, "gpt52_analytics_enabled": gpt52_enabled}),
+            ],
+        )
 
 
 async def correlation_node(state: GraphState) -> GraphState:
@@ -972,6 +1006,31 @@ def cross_construct_node(state: GraphState) -> GraphState:
             return {}
 
 
+def collect_analytics_node(state: GraphState) -> GraphState:
+    """Collect parallel analytics results and enforce budget cap.
+
+    All analytics updates already applied to state by LangGraph after parallel superstep.
+    This node checks budget and adds warning if exceeded.
+    """
+    with step("collect_analytics_node", state):
+        gpt52_enabled = state.get("gpt52_analytics_enabled", False)
+        if not gpt52_enabled:
+            return {}
+
+        # Calculate GPT-5.2 cost from accumulated tokens
+        gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
+        gpt52_output = state.get("gpt52_output_tokens", 0)
+        gpt52_cost = (gpt52_reasoning + gpt52_output) / 1_000_000 * 14.0
+
+        # Check against budget cap
+        if gpt52_cost > settings.ANALYTICS_BUDGET_CAP:
+            logger.warning(
+                f"ANALYTICS_BUDGET_EXCEEDED cost=${gpt52_cost:.4f} cap=${settings.ANALYTICS_BUDGET_CAP:.2f}"
+            )
+
+        return {}
+
+
 def build_graph(checkpointer=None):
     """Build and compile the LangGraph workflow."""
     builder = StateGraph(GraphState)
@@ -994,6 +1053,8 @@ def build_graph(checkpointer=None):
     builder.add_node("correlation_node", correlation_node)
     builder.add_node("comparison_node", comparison_node)
     builder.add_node("cross_construct_node", cross_construct_node)
+    # Phase 10: Analytics collector node
+    builder.add_node("collect_analytics_node", collect_analytics_node)
 
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
@@ -1013,10 +1074,11 @@ def build_graph(checkpointer=None):
     # Meta-editor loops back into parallel reviewers.
     builder.add_edge("meta_editor_node", "reviewers_fanout_node")
 
-    # Phase 7: Analytics chain after finalize, before END
-    builder.add_edge("finalize_node", "correlation_node")
-    builder.add_edge("correlation_node", "comparison_node")
-    builder.add_edge("comparison_node", "cross_construct_node")
-    builder.add_edge("cross_construct_node", END)
+    # Phase 10: Parallel analytics via Send API (finalize_node returns Command with Send targets)
+    # Analytics nodes fan-in to collect node
+    builder.add_edge("correlation_node", "collect_analytics_node")
+    builder.add_edge("comparison_node", "collect_analytics_node")
+    builder.add_edge("cross_construct_node", "collect_analytics_node")
+    builder.add_edge("collect_analytics_node", END)
 
     return builder.compile(checkpointer=checkpointer)

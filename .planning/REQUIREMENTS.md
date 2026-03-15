@@ -44,17 +44,17 @@ Requirements for v2.0 milestone. Each maps to roadmap phases.
 ### GPT-5.2 Reasoning Models
 
 - [ ] **GPT-01**: System supports GPT-5.2 reasoning model with configurable reasoning effort (none/low/medium/high/xhigh)
-- [ ] **GPT-02**: System defaults to high reasoning effort for GPT-5.2 analytics tasks
+- [x] **GPT-02**: System defaults to high reasoning effort for GPT-5.2 analytics tasks
 - [ ] **GPT-03**: User can toggle GPT-5.2 for analytics via UI with cost warning modal (4-6x multiplier displayed)
-- [ ] **GPT-04**: System enforces budget caps per run and aborts if reasoning token cost exceeds threshold
-- [ ] **GPT-05**: System provides post-run audit breakdown showing reasoning tokens vs output tokens separately
+- [x] **GPT-04**: System enforces budget caps per run and aborts if reasoning token cost exceeds threshold
+- [x] **GPT-05**: System provides post-run audit breakdown showing reasoning tokens vs output tokens separately
 
 ### Infrastructure
 
 - [x] **INFRA-01**: GraphState schema extended with CorrelationMatrix, ComparisonInstrument, and CrossConstructComparison types
 - [x] **INFRA-02**: FinalOutput schema extended with correlation_matrix, comparison_instruments, and cross_construct_analysis fields
-- [ ] **INFRA-03**: Analytics nodes execute post-finalize in parallel using LangGraph Send API (correlation, comparison, cross-construct simultaneously)
-- [ ] **INFRA-04**: Analytics failures handled gracefully (populate null values, item generation completes successfully)
+- [x] **INFRA-03**: Analytics nodes execute post-finalize in parallel using LangGraph Send API (correlation, comparison, cross-construct simultaneously)
+- [x] **INFRA-04**: Analytics failures handled gracefully (populate null values, item generation completes successfully)
 - [x] **INFRA-05**: llm_factory.py supports GPT-5.2 reasoning models with hardcoded high reasoning effort for analytics tasks
 
 ## Future Requirements
@@ -122,12 +122,12 @@ Which phases cover which requirements. Updated after roadmap creation.
 | UI-03 | Phase 9 | Complete |
 | UI-04 | Phase 9 | Complete |
 | GPT-01 | Phase 10 | Pending |
-| GPT-02 | Phase 10 | Pending |
+| GPT-02 | Phase 10 | Complete |
 | GPT-03 | Phase 10 | Pending |
-| GPT-04 | Phase 10 | Pending |
-| GPT-05 | Phase 10 | Pending |
-| INFRA-03 | Phase 10 | Pending |
-| INFRA-04 | Phase 10 | Pending |
+| GPT-04 | Phase 10 | Complete |
+| GPT-05 | Phase 10 | Complete |
+| INFRA-03 | Phase 10 | Complete |
+| INFRA-04 | Phase 10 | Complete |
 | UI-06 | Phase 10 | Pending |
 
 **Coverage:**
@@ -143,4 +143,4 @@ Which phases cover which requirements. Updated after roadmap creation.
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 (traceability mapping complete - 28/28 requirements mapped)*
+*Last updated: 2026-03-15 (Phase 10 Plan 01 complete - GPT-02, GPT-04, GPT-05, INFRA-03, INFRA-04 verified)*

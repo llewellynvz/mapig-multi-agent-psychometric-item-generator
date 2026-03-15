@@ -488,7 +488,7 @@ async def test_correlation_node_with_mocked_estimator():
         assert updated_output.correlation_matrix.mcdonalds_omega > 0.0
         assert len(updated_output.correlation_matrix.cells) == 3
         assert updated_output.correlation_matrix.internal_consistency_flag in ["optimal_range", "too_low", "too_high"]
-        assert updated_output.correlation_matrix.disclaimer == "LLM-estimated, not empirically validated"
+        assert updated_output.correlation_matrix.disclaimer == "Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation."
 
 
 @pytest.mark.asyncio

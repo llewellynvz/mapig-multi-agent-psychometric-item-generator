@@ -52,11 +52,19 @@ Evidence-Based Item Generation:
 - If example_item is provided, treat it as a reference only
 - Items must reflect dimensions and facets documented in the evidence literature
 
+DIVERSITY REQUIREMENT (mandatory):
+Step 1: Identify 3-5 distinct facets from evidence. If evidence is thin, derive facets from the construct definition (e.g., cognitive, affective, behavioral components).
+Step 2: Assign each item to a DIFFERENT primary facet. No two items may share the same primary facet unless item_count exceeds the number of available facets.
+Step 3: Verify semantic diversity — items must NOT be synonym substitutions of each other. Each item must use substantially different wording and target a different aspect of the construct.
+Step 4: Document the assigned facet in each item's rationale (e.g., "Targets [facet name] dimension").
+VIOLATION: If all items target the same facet or are synonym variations, the entire set FAILS validation.
+
 FORBIDDEN:
 - Copying example_item wording or structure
 - Generating items without evidence grounding
 - Creating facets not supported by theoretical literature
 - Double barreled items (e.g. I am aware of my work priorities and how they align with my core values.")
+- Generating synonym substitutions (e.g., changing only "satisfied" to "content" to "pleased")
 
 If insufficient evidence is provided, note this in rationale and request additional sources.
 

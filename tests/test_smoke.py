@@ -1,5 +1,6 @@
 import os
 import datetime as _dt
+import pytest
 
 os.environ["APP_MODE"] = "mock"
 os.environ["SEARCH_PROVIDER"] = "local"  # Avoid Perplexity API calls in smoke test
@@ -10,7 +11,8 @@ from backend.graph import build_graph
 from backend.schemas import UserRequest
 
 
-def test_graph_smoke():
+@pytest.mark.asyncio
+async def test_graph_smoke():
     graph = build_graph(checkpointer=MemorySaver())
 
     req = UserRequest(
@@ -30,7 +32,7 @@ def test_graph_smoke():
     }
 
     config = {"configurable": {"thread_id": "test-thread"}, "recursion_limit": 50}
-    state = graph.invoke(initial_state, config=config)
+    state = await graph.ainvoke(initial_state, config=config)
 
     assert "final_output" in state
     out = state["final_output"]

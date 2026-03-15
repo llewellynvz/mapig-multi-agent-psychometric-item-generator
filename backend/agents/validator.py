@@ -93,6 +93,11 @@ def validate_items(
         return ValidationResponse(validations=validations), TokenUsage()
 
     # Real mode: Smart validation with tiered approach
+    smart = _use_smart_validation()
+    logger.info(
+        "VALIDATOR start items=%d attempt=%d smart_validation=%s",
+        len(items), attempt, smart,
+    )
     try:
         system_prompt = load_prompt("validator.md")
 
@@ -146,7 +151,12 @@ def validate_items(
                 additional_kwargs={"cache_control": {"type": "ephemeral"}}
             ),
             HumanMessage(
-                content=f"Validate these items using the 4-dimension rubric.\n\nINPUT:\n{user_payload}"
+                content=(
+                    "Validate these items using the 4-dimension rubric.\n"
+                    "CRITICAL: For each item, you MUST return the EXACT item_text as provided in the input. "
+                    "Do not paraphrase, substitute, or modify the text in any way.\n\n"
+                    f"INPUT:\n{user_payload}"
+                )
             ),
         ]
 
@@ -187,6 +197,19 @@ def validate_items(
                     f"Validator returned None - no response from LLM. "
                     f"Model: {model_name}, Attempt: {attempt}/3."
                 )
+
+        # Post-validation text integrity check: override LLM-returned item_text
+        # with the actual input text to prevent hallucinated substitutions.
+        for v in result.validations:
+            idx = v.item_index
+            if 0 <= idx < len(items):
+                expected_text = items[idx].item_text
+                if v.item_text != expected_text:
+                    logger.warning(
+                        "VALIDATOR_TEXT_MISMATCH item_index=%d expected=%r got=%r",
+                        idx, expected_text[:80], v.item_text[:80],
+                    )
+                    v.item_text = expected_text
 
         accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(

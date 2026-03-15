@@ -627,7 +627,7 @@ def test_correlation_matrix_validation():
     assert matrix.mcdonalds_omega == 0.85
     assert matrix.mean_inter_item_correlation == 0.72
     assert matrix.internal_consistency_flag == "good"
-    assert matrix.disclaimer == "LLM-estimated, not empirically validated"
+    assert matrix.disclaimer == "Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation."
 
     # Test boundary: mcdonalds_omega at 0.0 and 1.0
     matrix_min = CorrelationMatrix(
@@ -950,7 +950,7 @@ def test_correlation_matrix_mcdonalds_omega_field():
     assert matrix.mcdonalds_omega == 0.85
     assert matrix.mean_inter_item_correlation == 0.72
     assert matrix.internal_consistency_flag == "good"
-    assert matrix.disclaimer == "LLM-estimated, not empirically validated"
+    assert matrix.disclaimer == "Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation."
 
 
 def test_correlation_matrix_omega_threshold_flagging():
@@ -1051,4 +1051,4 @@ def test_correlation_matrix_disclaimer_default():
     )
 
     # Assert: Default disclaimer is set
-    assert matrix.disclaimer == "LLM-estimated, not empirically validated"
+    assert matrix.disclaimer == "Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation."

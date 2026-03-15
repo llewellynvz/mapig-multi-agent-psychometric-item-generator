@@ -18,7 +18,7 @@ def test_structured_checklist():
     - Intersectional bias check as separate step
     - Severity escalation rule for intersectional flags (≥4)
     """
-    prompt_path = Path("app/prompts/bias_reviewer.md")
+    prompt_path = Path("backend/prompts/bias_reviewer.md")
     assert prompt_path.exists(), "bias_reviewer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8")

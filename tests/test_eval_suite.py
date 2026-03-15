@@ -34,22 +34,24 @@ def test_aggregate_empty_list_raises_error():
     with pytest.raises(ValueError, match="Cannot aggregate empty"):
         aggregate_comparison_results([])
 
-def test_eval_suite_runs_in_mock_mode():
+@pytest.mark.asyncio
+async def test_eval_suite_runs_in_mock_mode():
     """Evaluation suite completes in mock mode (APP_MODE=mock is set at top of file)."""
     from backend.evaluation.eval_suite import run_evaluation_suite
 
     # APP_MODE=mock is set at module level, so agents will use mock responses
-    metrics = run_evaluation_suite(model_provider="claude")
+    metrics = await run_evaluation_suite(model_provider="claude")
 
     assert isinstance(metrics, EvaluationMetrics)
     assert metrics.total_comparisons > 0
     assert 1.0 <= metrics.overall_score <= 10.0
 
-def test_baseline_comparison_documents_success_criteria():
+@pytest.mark.asyncio
+async def test_baseline_comparison_documents_success_criteria():
     """Baseline comparison evaluates success criteria."""
     from backend.evaluation.baseline_runner import run_baseline_comparison
 
-    comparison = run_baseline_comparison(model_provider="claude")
+    comparison = await run_baseline_comparison(model_provider="claude")
 
     assert hasattr(comparison, 'overall_improvement')
     assert hasattr(comparison, 'meets_improvement_threshold')

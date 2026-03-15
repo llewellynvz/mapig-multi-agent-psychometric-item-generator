@@ -26,7 +26,7 @@ def test_item_writer_10_principles():
 
     Tests VAL-08 requirement for research-backed item development.
     """
-    prompt_path = Path("app/prompts/item_writer.md")
+    prompt_path = Path("backend/prompts/item_writer.md")
     assert prompt_path.exists(), "item_writer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -59,7 +59,7 @@ def test_item_writer_semantic_diversity():
     - Contains semantic diversity guidance
     - Provides concrete examples (not just definitions)
     """
-    prompt_path = Path("app/prompts/item_writer.md")
+    prompt_path = Path("backend/prompts/item_writer.md")
     assert prompt_path.exists(), "item_writer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8")
@@ -92,7 +92,7 @@ def test_item_writer_reading_levels():
     - All three targets specified with grade ranges
     - Guidance on how to achieve each level
     """
-    prompt_path = Path("app/prompts/item_writer.md")
+    prompt_path = Path("backend/prompts/item_writer.md")
     assert prompt_path.exists(), "item_writer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -124,7 +124,7 @@ def test_item_writer_positive_keying():
     - No instructions for creating reverse-keyed items
     - Rationale provided (research-backed)
     """
-    prompt_path = Path("app/prompts/item_writer.md")
+    prompt_path = Path("backend/prompts/item_writer.md")
     assert prompt_path.exists(), "item_writer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8")
@@ -158,7 +158,7 @@ def test_content_reviewer_criteria():
     - Structured evaluation format (not just general guidance)
     - Examples or templates for each criterion
     """
-    prompt_path = Path("app/prompts/content_reviewer.md")
+    prompt_path = Path("backend/prompts/content_reviewer.md")
     assert prompt_path.exists(), "content_reviewer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -196,7 +196,7 @@ def test_linguistic_reviewer_quantifiers():
     - Clear guidance for each category
     - Examples of acceptable vs. unacceptable usage
     """
-    prompt_path = Path("app/prompts/linguistic_reviewer.md")
+    prompt_path = Path("backend/prompts/linguistic_reviewer.md")
     assert prompt_path.exists(), "linguistic_reviewer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -236,7 +236,7 @@ def test_bias_reviewer_7_types():
     - Examples or detection criteria for each type
     - Severity escalation rule for intersectional bias (≥4)
     """
-    prompt_path = Path("app/prompts/bias_reviewer.md")
+    prompt_path = Path("backend/prompts/bias_reviewer.md")
     assert prompt_path.exists(), "bias_reviewer.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()
@@ -274,7 +274,7 @@ def test_meta_editor_facet_balance():
     - Guidance on when to regenerate for balance
     - Priority ordering for facet selection
     """
-    prompt_path = Path("app/prompts/meta_editor.md")
+    prompt_path = Path("backend/prompts/meta_editor.md")
     assert prompt_path.exists(), "meta_editor.md prompt file must exist"
 
     content = prompt_path.read_text(encoding="utf-8").lower()

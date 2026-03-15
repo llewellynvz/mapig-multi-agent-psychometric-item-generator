@@ -19,6 +19,7 @@ export interface UserRequest {
   previous_items?: string[];
   model_provider?: "claude" | "openai";
   use_chatgpt_critics?: boolean;
+  use_gpt52_analytics?: boolean;
 }
 
 export interface DimensionScore {
@@ -63,6 +64,10 @@ export interface AuditMetadata {
   // Smart validation tracking
   smart_validation_used?: boolean;
   validation_model_used?: string;
+  // GPT-5.2 cost tracking
+  gpt52_reasoning_cost?: number;
+  gpt52_output_cost?: number;
+  analytics_budget_exceeded?: boolean;
 }
 
 export interface ReviewComment {

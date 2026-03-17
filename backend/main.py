@@ -441,16 +441,28 @@ async def generate_items_stream(
 
             # Stream fully consumed — send final output with all analytics data
             if latest_final_output is not None:
+                print(f"[SSE] Serializing final output with analytics...", flush=True)
+                try:
+                    dumped = latest_final_output.model_dump(mode="json")
+                except Exception as ser_err:
+                    print(f"[SSE] model_dump failed: {type(ser_err).__name__}: {ser_err}", flush=True)
+                    raise
+                try:
+                    payload = json.dumps({"type": "complete", "data": dumped})
+                except Exception as json_err:
+                    print(f"[SSE] json.dumps failed: {type(json_err).__name__}: {json_err}", flush=True)
+                    raise
+                print(f"[SSE] Serialization OK, payload_len={len(payload)}", flush=True)
                 _set_run_status(
                     thread_id,
                     run_id,
                     status="complete",
                     current_node="complete",
                     display_name="Complete",
-                    final_output=latest_final_output.model_dump(),
+                    final_output=dumped,
                     error=None,
                 )
-                yield f"data: {json.dumps({'type': 'complete', 'data': latest_final_output.model_dump()})}\n\n"
+                yield f"data: {payload}\n\n"
             else:
                 # Fallback: if stream ended without final_output, invoke synchronously
                 result_state = await asyncio.to_thread(app.state.graph.invoke, initial_state, config)
@@ -486,6 +498,8 @@ async def generate_items_stream(
             import traceback
             error_msg = str(e)
             error_trace = traceback.format_exc()
+            print(f"[SSE] EXCEPTION in event_generator: {type(e).__name__}: {error_msg}", flush=True)
+            print(f"[SSE] Traceback:\n{error_trace}", flush=True)
             _set_run_status(
                 thread_id,
                 run_id,

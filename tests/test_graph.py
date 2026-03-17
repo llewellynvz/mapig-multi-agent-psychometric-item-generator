@@ -642,8 +642,8 @@ def test_comparison_node_with_mocked_search():
         source_citation="Rosenberg (1965)"
     )
 
-    # Mock validity scorer
-    mock_score = 0.75
+    # Mock validity scorer (returns tuple: score, method)
+    mock_score = (0.75, "llm-as-judge")
 
     # Mock plagiarism detector
     mock_plagiarism_flags = {}  # Empty dict (no published items available)
@@ -768,7 +768,7 @@ def test_cross_construct_node_with_mocked_scorer():
         reasoning="Moderate correlation, constructs are distinct"
     )
 
-    with patch("backend.agents.validity_scorer.score_discriminant_validity", return_value=mock_pair_analysis):
+    with patch("backend.agents.validity_scorer.score_discriminant_validity", return_value=(mock_pair_analysis, "llm-as-judge")):
         # Act
         result = cross_construct_node(state)
 
@@ -780,7 +780,7 @@ def test_cross_construct_node_with_mocked_scorer():
         assert "self-esteem" in updated_output.cross_construct_analysis.comparison_constructs
         assert len(updated_output.cross_construct_analysis.construct_pairs) == 1
         assert updated_output.cross_construct_analysis.construct_pairs[0].estimated_correlation == 0.65
-        assert updated_output.cross_construct_analysis.disclaimer == "LLM-estimated, not empirically validated"
+        assert "LLM-estimated" in updated_output.cross_construct_analysis.disclaimer
 
 
 def test_cross_construct_node_graceful_failure():
@@ -1114,7 +1114,7 @@ def test_plagiarism_flags_known_instruments():
     mock_flags = {0: "Potential similarity to Satisfaction With Life Scale item (r = 0.88)", 1: "Potential similarity to Satisfaction With Life Scale item (r = 0.92)"}
 
     with patch("backend.agents.instrument_searcher.search_instruments", return_value=(mock_convergent, mock_discriminant)), \
-         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=0.75), \
+         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=(0.75, "llm-as-judge")), \
          patch("backend.analytics.similarity_calculator.get_plagiarism_detector") as mock_detector:
 
         mock_detector.return_value.detect_plagiarism.return_value = mock_flags
@@ -1157,7 +1157,7 @@ def test_convergent_ceiling_warning():
     mock_discriminant = ComparisonInstrument(name="Other Scale", construct="other", source_citation="Author (2021)")
 
     with patch("backend.agents.instrument_searcher.search_instruments", return_value=(mock_convergent, mock_discriminant)), \
-         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=0.86), \
+         patch("backend.agents.validity_scorer.score_convergent_validity", return_value=(0.86, "llm-as-judge")), \
          patch("backend.analytics.similarity_calculator.get_plagiarism_detector") as mock_detector:
 
         mock_detector.return_value.detect_plagiarism.return_value = {}

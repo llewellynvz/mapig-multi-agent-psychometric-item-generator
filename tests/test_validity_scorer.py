@@ -39,7 +39,7 @@ def test_convergent_validity_returns_averaged_float():
     ]
 
     with patch("backend.agents.validity_scorer.get_gpt52_analytics_model", return_value=mock_model):
-        score = score_convergent_validity(
+        score, method = score_convergent_validity(
             generated_items, instrument_name, instrument_construct, target_construct
         )
 
@@ -47,6 +47,7 @@ def test_convergent_validity_returns_averaged_float():
     assert isinstance(score, float)
     assert 0.0 <= score <= 1.0
     assert score == pytest.approx(0.7, abs=0.01)
+    assert method == "llm-as-judge"
 
 
 # Test 2: Forward and reverse scores are both called (dual-direction verified)
@@ -91,11 +92,12 @@ def test_discriminant_validity_returns_construct_pair_analysis():
     ]
 
     with patch("backend.agents.validity_scorer.get_gpt52_analytics_model", return_value=mock_model):
-        result = score_discriminant_validity(
+        result, method = score_discriminant_validity(
             generated_items, instrument_name, instrument_construct, target_construct
         )
 
     assert isinstance(result, ConstructPairAnalysis)
+    assert method == "llm-as-judge"
     assert result.construct_a == target_construct
     assert result.construct_b == instrument_construct
     assert result.estimated_correlation is not None
@@ -118,7 +120,7 @@ def test_discriminant_flag_concern_for_high_correlation():
     mock_model.with_structured_output.return_value.invoke.return_value = mock_response
 
     with patch("backend.agents.validity_scorer.get_gpt52_analytics_model", return_value=mock_model):
-        result = score_discriminant_validity(
+        result, _ = score_discriminant_validity(
             generated_items, "High Overlap Scale", "nearly-identical", "target"
         )
 
@@ -138,7 +140,7 @@ def test_discriminant_flag_adequate_for_low_correlation():
     mock_model.with_structured_output.return_value.invoke.return_value = mock_response
 
     with patch("backend.agents.validity_scorer.get_gpt52_analytics_model", return_value=mock_model):
-        result = score_discriminant_validity(
+        result, _ = score_discriminant_validity(
             generated_items, "Distinct Scale", "unrelated-construct", "target"
         )
 
@@ -155,12 +157,13 @@ def test_convergent_validity_handles_llm_error_gracefully():
     mock_model.with_structured_output.return_value.invoke.side_effect = Exception("LLM timeout")
 
     with patch("backend.agents.validity_scorer.get_gpt52_analytics_model", return_value=mock_model):
-        score = score_convergent_validity(
+        score, method = score_convergent_validity(
             generated_items, "Test Scale", "test", "test"
         )
 
     # Should return neutral default on error
     assert score == 0.5
+    assert method == "llm-as-judge"
 
 
 def test_discriminant_validity_handles_llm_error_gracefully():
@@ -172,12 +175,13 @@ def test_discriminant_validity_handles_llm_error_gracefully():
     mock_model.with_structured_output.return_value.invoke.side_effect = RuntimeError("Parse failure")
 
     with patch("backend.agents.validity_scorer.get_gpt52_analytics_model", return_value=mock_model):
-        result = score_discriminant_validity(
+        result, method = score_discriminant_validity(
             generated_items, "Test Scale", "test", "target"
         )
 
     # Should return sensible defaults
     assert isinstance(result, ConstructPairAnalysis)
+    assert method == "llm-as-judge"
     assert result.estimated_correlation is not None
     assert result.discriminant_validity_flag == "adequate"
     assert "unavailable" in result.reasoning.lower() or "error" in result.reasoning.lower()

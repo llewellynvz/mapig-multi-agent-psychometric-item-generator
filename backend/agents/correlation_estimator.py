@@ -21,7 +21,10 @@ logger = logging.getLogger("lmaig")
 
 async def embed_items(items: List[str]) -> np.ndarray:
     """Get embeddings for all items in a single API call."""
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    kwargs = {"api_key": settings.OPENAI_API_KEY}
+    if settings.OPENAI_BASE_URL:
+        kwargs["base_url"] = settings.OPENAI_BASE_URL
+    client = AsyncOpenAI(**kwargs)
     response = await client.embeddings.create(
         model="text-embedding-3-small",
         input=items,

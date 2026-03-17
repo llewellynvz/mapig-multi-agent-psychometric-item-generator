@@ -49,7 +49,15 @@ def search_instruments(
         if discriminant is None:
             discriminant = discriminant_default
 
-    log.info("INSTRUMENT_SEARCH done convergent=%s discriminant=%s", convergent.name, discriminant.name)
+    # Phase 2: Try to extract actual items for each instrument
+    convergent = _fetch_instrument_items(convergent)
+    discriminant = _fetch_instrument_items(discriminant)
+
+    log.info(
+        "INSTRUMENT_SEARCH done convergent=%s (items=%s) discriminant=%s (items=%s)",
+        convergent.name, len(convergent.items) if convergent.items else 0,
+        discriminant.name, len(discriminant.items) if discriminant.items else 0,
+    )
     return convergent, discriminant
 
 
@@ -166,6 +174,97 @@ def _search_perplexity_instrument(
     except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError) as e:
         log.warning("PERPLEXITY_INSTRUMENT_SEARCH failed: %s", e)
         return None
+
+
+def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstrument:
+    """Search Perplexity for the actual items/questions of a published instrument.
+
+    Queries Perplexity Academic for the item text of the instrument. If found,
+    returns a copy of the instrument with the `items` field populated.
+
+    Args:
+        instrument: The instrument to fetch items for
+
+    Returns:
+        Updated ComparisonInstrument (with items if found, unchanged otherwise)
+    """
+    if not settings.PERPLEXITY_API_KEY:
+        return instrument
+
+    query = (
+        f"List ALL the exact item texts (questions/statements) from the "
+        f"'{instrument.name}' psychometric instrument that measures {instrument.construct}. "
+        f"Return ONLY the item texts as a JSON array of strings, e.g. "
+        f'["I feel satisfied with my life", "In most ways my life is close to my ideal"]. '
+        f"Include every item. Do not paraphrase — use the exact published wording. "
+        f"If items are behind a paywall or not publicly available, return an empty array []."
+    )
+
+    payload = {
+        "model": settings.PERPLEXITY_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a psychometric instrument specialist. Return instrument items "
+                    "as a JSON array of strings. Only include items whose exact wording is "
+                    "publicly available in peer-reviewed publications or supplementary materials. "
+                    "Do not fabricate or paraphrase items."
+                ),
+            },
+            {"role": "user", "content": query},
+        ],
+        "temperature": 0,
+    }
+
+    domains = settings.perplexity_domains()
+    if domains:
+        payload["web_search_options"] = {
+            "search_mode": settings.PERPLEXITY_SEARCH_MODE,
+            "num_search_results": settings.PERPLEXITY_MAX_RESULTS,
+            "search_domain_filter": domains,
+        }
+
+    url = settings.PERPLEXITY_BASE_URL.rstrip("/") + "/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.PERPLEXITY_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not content:
+            return instrument
+
+        # Extract JSON array from response
+        arr_start = content.find("[")
+        arr_end = content.rfind("]") + 1
+        if arr_start < 0 or arr_end <= arr_start:
+            log.warning("FETCH_ITEMS no JSON array found for %s", instrument.name)
+            return instrument
+
+        items = json.loads(content[arr_start:arr_end])
+
+        # Validate: must be a list of non-empty strings, at least 3 items
+        if (
+            isinstance(items, list)
+            and len(items) >= 3
+            and all(isinstance(it, str) and len(it.strip()) > 5 for it in items)
+        ):
+            log.info("FETCH_ITEMS success instrument=%s items=%d", instrument.name, len(items))
+            return instrument.model_copy(update={"items": [it.strip() for it in items]})
+        else:
+            log.warning("FETCH_ITEMS invalid items for %s (count=%d)", instrument.name, len(items) if isinstance(items, list) else 0)
+            return instrument
+
+    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError) as e:
+        log.warning("FETCH_ITEMS failed for %s: %s", instrument.name, e)
+        return instrument
 
 
 def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, ComparisonInstrument]:

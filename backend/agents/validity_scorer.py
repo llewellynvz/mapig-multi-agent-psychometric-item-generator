@@ -2,11 +2,15 @@
 
 Phase 9 Plan 02: LLM-as-judge convergent and discriminant validity assessment
 using GPT-5.2 with position bias mitigation through dual-direction averaging.
+
+When actual published items are available, uses embedding-based cross-scale
+cosine similarity (mathematically computed). Falls back to LLM-as-judge when
+items are not available.
 """
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
@@ -34,31 +38,44 @@ def score_convergent_validity(
     generated_items: List[str],
     instrument_name: str,
     instrument_construct: str,
-    target_construct: str
-) -> float:
-    """Score convergent validity using dual-direction LLM-as-judge averaging.
+    target_construct: str,
+    published_items: Optional[List[str]] = None,
+) -> tuple[float, str]:
+    """Score convergent validity using embeddings (preferred) or LLM-as-judge fallback.
 
-    Mitigates position bias by evaluating both directions:
-    - Forward: How well do generated items align with the comparison instrument?
-    - Reverse: How well does the comparison instrument align with generated items?
-
-    The two scores are averaged to produce the final convergent validity estimate.
+    When published_items are provided, computes embedding-based cross-scale
+    cosine similarity (centroid_r). Otherwise falls back to dual-direction
+    LLM-as-judge averaging.
 
     Args:
         generated_items: List of generated item texts
-        instrument_name: Name of comparison instrument (e.g., "Rosenberg Self-Esteem Scale")
+        instrument_name: Name of comparison instrument
         instrument_construct: Construct measured by comparison instrument
         target_construct: Construct measured by generated items
+        published_items: Optional actual item texts from the published instrument
 
     Returns:
-        Float score 0.0-1.0 representing convergent validity (averaged across both directions)
-        Returns 0.5 (neutral) on LLM error
-
-    Raises:
-        None - errors are logged and handled gracefully
+        Tuple of (score 0.0-1.0, method 'embedding' or 'llm-as-judge')
     """
+    # Prefer embedding-based scoring when published items are available
+    if published_items and len(published_items) >= 3:
+        try:
+            from backend.agents.correlation_estimator import compute_cross_scale_validity_sync
+            result = compute_cross_scale_validity_sync(generated_items, published_items)
+            score = result["centroid_r"]
+            logger.info(
+                "CONVERGENT_VALIDITY method=embedding score=%.3f centroid_r=%.3f mean_cross_r=%.3f instrument=%s",
+                score, result["centroid_r"], result["mean_cross_r"], instrument_name,
+            )
+            return score, "embedding"
+        except Exception as e:
+            logger.warning(
+                "CONVERGENT_VALIDITY embedding failed for %s: %s — falling back to LLM",
+                instrument_name, e,
+            )
+
+    # Fallback: LLM-as-judge
     try:
-        # Score both directions
         forward = _score_single_direction_convergent(
             generated_items, instrument_name, instrument_construct, target_construct, "forward"
         )
@@ -66,51 +83,74 @@ def score_convergent_validity(
             generated_items, instrument_name, instrument_construct, target_construct, "reverse"
         )
 
-        # Average the two scores
         averaged_score = (forward.score + reverse.score) / 2.0
 
         logger.info(
-            "CONVERGENT_VALIDITY score=%.2f instrument=%s forward=%.2f reverse=%.2f",
+            "CONVERGENT_VALIDITY method=llm-as-judge score=%.2f instrument=%s forward=%.2f reverse=%.2f",
             averaged_score, instrument_name, forward.score, reverse.score
         )
 
-        return averaged_score
+        return averaged_score, "llm-as-judge"
 
     except Exception as e:
         logger.warning(
             "CONVERGENT_VALIDITY error scoring instrument=%s: %s - returning neutral default",
             instrument_name, str(e)
         )
-        return 0.5  # Neutral default on error
+        return 0.5, "llm-as-judge"
 
 
 def score_discriminant_validity(
     generated_items: List[str],
     instrument_name: str,
     instrument_construct: str,
-    target_construct: str
-) -> ConstructPairAnalysis:
-    """Score discriminant validity using dual-direction LLM correlation estimation.
+    target_construct: str,
+    published_items: Optional[List[str]] = None,
+) -> tuple[ConstructPairAnalysis, str]:
+    """Score discriminant validity using embeddings (preferred) or LLM fallback.
 
-    Uses same dual-direction pattern as convergent validity to estimate expected
-    correlation between target construct and comparison construct. High correlation
-    (>0.85) triggers a "concern" flag indicating poor discriminant validity.
+    When published_items are provided, computes embedding-based cross-scale
+    cosine similarity. Low correlation = good discriminant validity. Falls
+    back to LLM-as-judge when items are not available.
 
     Args:
         generated_items: List of generated item texts
         instrument_name: Name of comparison instrument
         instrument_construct: Construct measured by comparison instrument
         target_construct: Construct measured by generated items
+        published_items: Optional actual item texts from the published instrument
 
     Returns:
-        ConstructPairAnalysis with averaged correlation estimate and validity flag
-        Returns sensible defaults on LLM error
-
-    Raises:
-        None - errors are logged and handled gracefully
+        Tuple of (ConstructPairAnalysis, method 'embedding' or 'llm-as-judge')
     """
+    # Prefer embedding-based scoring when published items are available
+    if published_items and len(published_items) >= 3:
+        try:
+            from backend.agents.correlation_estimator import compute_cross_scale_validity_sync
+            result = compute_cross_scale_validity_sync(generated_items, published_items)
+            corr = result["centroid_r"]
+            flag = "concern" if abs(corr) > 0.85 else "adequate"
+
+            logger.info(
+                "DISCRIMINANT_VALIDITY method=embedding correlation=%.3f flag=%s constructs=%s vs %s",
+                corr, flag, target_construct, instrument_construct,
+            )
+
+            return ConstructPairAnalysis(
+                construct_a=target_construct,
+                construct_b=instrument_construct,
+                estimated_correlation=corr,
+                discriminant_validity_flag=flag,
+                reasoning=f"Embedding-based: centroid_r={result['centroid_r']:.3f}, mean_item_r={result['mean_cross_r']:.3f}",
+            ), "embedding"
+        except Exception as e:
+            logger.warning(
+                "DISCRIMINANT_VALIDITY embedding failed for %s vs %s: %s — falling back to LLM",
+                target_construct, instrument_construct, e,
+            )
+
+    # Fallback: LLM-as-judge
     try:
-        # Score both directions
         forward = _score_single_direction_discriminant(
             target_construct, instrument_construct, "forward"
         )
@@ -118,17 +158,15 @@ def score_discriminant_validity(
             instrument_construct, target_construct, "reverse"
         )
 
-        # Average the correlation estimates
         averaged_correlation = (forward.estimated_correlation + reverse.estimated_correlation) / 2.0
 
-        # Determine validity flag based on correlation threshold (XCON-03)
         if abs(averaged_correlation) > 0.85:
-            flag = "concern"  # High overlap warning
+            flag = "concern"
         else:
             flag = "adequate"
 
         logger.info(
-            "DISCRIMINANT_VALIDITY correlation=%.2f flag=%s constructs=%s vs %s",
+            "DISCRIMINANT_VALIDITY method=llm-as-judge correlation=%.2f flag=%s constructs=%s vs %s",
             averaged_correlation, flag, target_construct, instrument_construct
         )
 
@@ -138,7 +176,7 @@ def score_discriminant_validity(
             estimated_correlation=averaged_correlation,
             discriminant_validity_flag=flag,
             reasoning=f"Forward: {forward.reasoning[:100]}... | Reverse: {reverse.reasoning[:100]}..."
-        )
+        ), "llm-as-judge"
 
     except Exception as e:
         logger.warning(
@@ -148,10 +186,10 @@ def score_discriminant_validity(
         return ConstructPairAnalysis(
             construct_a=target_construct,
             construct_b=instrument_construct,
-            estimated_correlation=0.3,  # Low default (adequate discriminant validity)
+            estimated_correlation=0.3,
             discriminant_validity_flag="adequate",
             reasoning="Scoring unavailable due to LLM error"
-        )
+        ), "llm-as-judge"
 
 
 def _score_single_direction_convergent(

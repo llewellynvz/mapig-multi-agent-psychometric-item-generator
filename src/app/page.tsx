@@ -602,7 +602,7 @@ export default function HomePage() {
 
             {/* 2-column main content: 60/40 split */}
             <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
-              {/* Left (60%): Generated items */}
+              {/* Left (60%): Generated items + Correlation */}
               <div className="space-y-4">
                 {result ? (
                   <GeneratedItemsTable items={result.final_items} fullOutput={result} />
@@ -613,6 +613,29 @@ export default function HomePage() {
                     </CardHeader>
                     <CardContent className="pt-5">
                       <p className="text-sm text-muted-foreground">No generated items yet.</p>
+                    </CardContent>
+                  </SurfaceCard>
+                )}
+
+                {/* Correlation Analysis — directly under items */}
+                {result && result.correlation_matrix ? (
+                  <CorrelationPanel
+                    matrix={result.correlation_matrix}
+                    itemTexts={result.final_items.map(item => item.item_text)}
+                    constructName={result.final_items[0]?.construct_name}
+                    defaultExpanded
+                  />
+                ) : (
+                  <SurfaceCard className="border-lime-300/70">
+                    <CardHeader className="border-b border-border/60">
+                      <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                        Correlation Analysis
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                      <p className="text-sm text-muted-foreground">
+                        Requires 3+ items for correlation analysis.
+                      </p>
                     </CardContent>
                   </SurfaceCard>
                 )}
@@ -672,32 +695,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Correlation row — centered, 60% width on xl */}
-            {result && result.correlation_matrix ? (
-              <div className="mx-auto w-full xl:w-[60%]">
-                <CorrelationPanel
-                  matrix={result.correlation_matrix}
-                  itemTexts={result.final_items.map(item => item.item_text)}
-                  constructName={result.final_items[0]?.construct_name}
-                  defaultExpanded
-                />
-              </div>
-            ) : (
-              <div className="mx-auto w-full xl:w-[60%]">
-                <SurfaceCard className="border-lime-300/70">
-                  <CardHeader className="border-b border-border/60">
-                    <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                      Correlation Analysis
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-5">
-                    <p className="text-sm text-muted-foreground">
-                      Requires 3+ items for correlation analysis.
-                    </p>
-                  </CardContent>
-                </SurfaceCard>
-              </div>
-            )}
           </section>
         )}
 

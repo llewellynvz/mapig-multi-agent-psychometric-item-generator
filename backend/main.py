@@ -307,6 +307,10 @@ async def generate_items_stream(
                 detail="OPENAI_API_KEY not configured. Add to .env or Vercel environment variables."
             )
 
+    # Analytics always need OpenAI for embeddings (correlation + plagiarism detection)
+    if not settings.OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY not configured — analytics (correlation, comparison) will be skipped")
+
     thread_id = x_thread_id or str(uuid.uuid4())
     run_id = str(uuid.uuid4())
     timestamp_utc = _dt.datetime.now(tz=_dt.timezone.utc).isoformat()

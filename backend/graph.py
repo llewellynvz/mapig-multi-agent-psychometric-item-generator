@@ -915,15 +915,19 @@ def comparison_node(state: GraphState) -> GraphState:
             # Extract item texts for validity scoring
             item_texts = [item.item_text for item in final_items]
 
-            # Score convergent validity
-            convergent_score = score_convergent_validity(
+            # Score convergent validity (embedding-based when items available, LLM fallback)
+            convergent_score, convergent_method = score_convergent_validity(
                 item_texts,
                 convergent_instrument.name,
                 convergent_instrument.construct,
-                construct_name
+                construct_name,
+                published_items=convergent_instrument.items,
+            )
+            convergent_instrument = convergent_instrument.model_copy(
+                update={"validity_method": convergent_method}
             )
 
-            logger.info(f"Convergent validity score: {convergent_score:.2f}")
+            logger.info(f"Convergent validity score: {convergent_score:.2f} (method={convergent_method})")
 
             # 1B: Convergent validity ceiling warning
             if convergent_score > 0.85:
@@ -1025,19 +1029,20 @@ def cross_construct_node(state: GraphState) -> GraphState:
             # Extract item texts
             item_texts = [item.item_text for item in final_items]
 
-            # Score discriminant validity (use exclusion construct if available)
+            # Score discriminant validity (embedding-based when items available, LLM fallback)
             disc_name = discriminant_instrument.name
             disc_construct = exclusion_construct or discriminant_instrument.construct
-            discriminant_pair = score_discriminant_validity(
+            discriminant_pair, disc_method = score_discriminant_validity(
                 item_texts,
                 disc_name,
                 disc_construct,
-                construct_name
+                construct_name,
+                published_items=discriminant_instrument.items,
             )
 
             logger.info(
                 f"Discriminant validity: correlation={discriminant_pair.estimated_correlation:.2f}, "
-                f"flag={discriminant_pair.discriminant_validity_flag}"
+                f"flag={discriminant_pair.discriminant_validity_flag} (method={disc_method})"
             )
 
             # Build analysis summary
@@ -1055,12 +1060,17 @@ def cross_construct_node(state: GraphState) -> GraphState:
                 )
 
             # Build CrossConstructComparison
+            disc_disclaimer = (
+                "Embedding-based cosine similarity (Hommel & Arslan, 2024)"
+                if disc_method == "embedding"
+                else "LLM-estimated (no published items available), not empirically validated"
+            )
             cross_construct_analysis = CrossConstructComparison(
                 target_construct=construct_name,
                 comparison_constructs=[discriminant_instrument.construct],
                 analysis_summary=summary,
                 construct_pairs=[discriminant_pair],
-                disclaimer="LLM-estimated, not empirically validated"
+                disclaimer=disc_disclaimer,
             )
 
             # Update FinalOutput

@@ -377,6 +377,8 @@ class ComparisonInstrument(BaseModel):
     sample_items_count: Optional[int] = Field(default=None, ge=0, description="Number of items in the instrument")
     psychometric_properties: Optional[str] = Field(default=None, description="Reported reliability/validity summary")
     similarity_rationale: Optional[str] = Field(default=None, description="Why this instrument is relevant for comparison")
+    items: Optional[List[str]] = Field(default=None, description="Actual item texts from the published instrument (for embedding-based validity)")
+    validity_method: Optional[str] = Field(default=None, description="Method used for validity scoring: 'embedding' or 'llm-as-judge'")
 
 
 class ConstructPairAnalysis(BaseModel):

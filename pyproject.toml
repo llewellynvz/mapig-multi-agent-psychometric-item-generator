@@ -17,6 +17,7 @@ dependencies = [
     "pydantic==2.12.5",
     "pydantic-settings==2.12.0",
     "httpx==0.28.1",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +44,7 @@ uvicorn = { version = "==0.40.0", extras = ["standard"] }
 pydantic = "==2.12.5"
 pydantic-settings = "==2.12.0"
 httpx = "==0.28.1"
+numpy = ">=1.26.0"
 # sentence-transformers removed — PyTorch (~2 GB) exceeds Vercel 500 MB limit
 # Plagiarism detection now uses OpenAI text-embedding-3-small (same as correlation estimator)
 

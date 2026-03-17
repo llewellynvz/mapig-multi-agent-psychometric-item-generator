@@ -277,10 +277,10 @@ def _check_item_diversity(items: List[DraftItem]) -> None:
     try:
         from openai import OpenAI
         import numpy as np
-        kwargs = {"api_key": settings.OPENAI_API_KEY}
-        if settings.OPENAI_BASE_URL:
-            kwargs["base_url"] = settings.OPENAI_BASE_URL
-        client = OpenAI(**kwargs)
+        client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
+        )
         texts = [it.item_text for it in items]
         resp = client.embeddings.create(input=texts, model="text-embedding-3-small")
         vecs = np.array([d.embedding for d in resp.data])
@@ -1101,6 +1101,11 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
         )
 
         correlation_result, comparison_result = results
+        logger.info(
+            "ANALYTICS_RESULTS correlation=%s comparison=%s",
+            "ok" if isinstance(correlation_result, dict) else type(correlation_result).__name__,
+            "ok" if isinstance(comparison_result, dict) else type(comparison_result).__name__,
+        )
 
         # Merge into single FinalOutput
         updated = final_output.model_copy(deep=True)

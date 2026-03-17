@@ -277,7 +277,10 @@ def _check_item_diversity(items: List[DraftItem]) -> None:
     try:
         from openai import OpenAI
         import numpy as np
-        client = OpenAI()
+        kwargs = {"api_key": settings.OPENAI_API_KEY}
+        if settings.OPENAI_BASE_URL:
+            kwargs["base_url"] = settings.OPENAI_BASE_URL
+        client = OpenAI(**kwargs)
         texts = [it.item_text for it in items]
         resp = client.embeddings.create(input=texts, model="text-embedding-3-small")
         vecs = np.array([d.embedding for d in resp.data])

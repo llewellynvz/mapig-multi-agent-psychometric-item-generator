@@ -53,7 +53,10 @@ class PlagiarismDetector:
             len(generated_items), len(published_items),
         )
 
-        client = OpenAI()
+        kwargs = {"api_key": settings.OPENAI_API_KEY}
+        if settings.OPENAI_BASE_URL:
+            kwargs["base_url"] = settings.OPENAI_BASE_URL
+        client = OpenAI(**kwargs)
 
         # Embed all items in a single batch
         all_texts = generated_items + published_items

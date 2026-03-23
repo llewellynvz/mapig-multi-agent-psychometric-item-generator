@@ -28,13 +28,13 @@ class Settings(BaseSettings):
     # OpenAI (used only in APP_MODE=openai)
     OPENAI_API_KEY: Optional[str] = Field(default=None)
     OPENAI_MODEL: str = "gpt-4o"  # Default GPT-4o for general use
-    CHATGPT_CRITIC_MODEL: str = "gpt-4o"  # GPT 5.2 (gpt-4o) for critic agents when toggle enabled
+    CHATGPT_CRITIC_MODEL: str = "gpt-5.2"  # GPT-5.2 for critic agents when toggle enabled
     OPENAI_BASE_URL: Optional[str] = Field(default=None)
 
     # Hybrid model strategy (cost optimization)
     # Some agents can use cheaper OpenAI models instead of Claude
     AGENT_MODEL_OVERRIDES_ENABLED: bool = True  # Enable per-agent model selection
-    OPENAI_CHEAP_MODEL: str = "gpt-4o-mini"  # Cheaper model for peripheral agents (~60% cheaper than Sonnet)
+    OPENAI_CHEAP_MODEL: str = "gpt-5.4-mini"  # Latest mini model for peripheral agents (replaces gpt-4o-mini)
 
     # Smart validation (cost optimization)
     # Use Sonnet for first validation attempt, only Opus if items fail

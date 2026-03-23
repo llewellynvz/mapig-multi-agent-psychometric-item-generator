@@ -67,6 +67,7 @@ RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 _NODE_DISPLAY_NAMES: Dict[str, str] = {
     "init_run": "Setting up pipeline",
     "retrieve_node": "Searching academic sources",
+    "facet_mapper_node": "Mapping construct facets",
     "item_writer_node": "Drafting survey items",
     "validation_node": "Validating item quality",
     "regenerate_items_node": "Improving failed items",

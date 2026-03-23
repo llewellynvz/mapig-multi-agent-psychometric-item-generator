@@ -26,6 +26,7 @@ from backend.schemas import (
     DimensionScore,
     DraftItem,
     EvidenceChunk,
+    FacetMapperResponse,
     FinalOutput,
     IterationSnapshot,
     ItemValidation,
@@ -136,6 +137,7 @@ class GraphState(TypedDict, total=False):
 
     # Working artifacts
     evidence: List[EvidenceChunk]
+    facet_mapping: Optional[FacetMapperResponse]
     draft_items: List[DraftItem]
     linguistic_comments: List[ReviewComment]
     bias_comments: List[ReviewComment]
@@ -307,9 +309,27 @@ def _check_item_diversity(items: List[DraftItem]) -> None:
         logger.debug("Item diversity check skipped: %s", e)
 
 
+def facet_mapper_node(state: GraphState) -> GraphState:
+    """Map construct facets from evidence before item generation."""
+    with step("facet_mapper_node", state):
+        from backend.agents.facet_mapper import map_facets
+
+        resp, usage = map_facets(state["user_request"], state.get("evidence", []))
+        token_update = _accumulate_tokens(state, usage)
+
+        return {
+            "facet_mapping": resp,
+            **token_update,
+        }
+
+
 def item_writer_node(state: GraphState) -> GraphState:
     with step("item_writer_node", state):
-        resp, usage = write_items(state["user_request"], state.get("evidence", []))
+        resp, usage = write_items(
+            state["user_request"],
+            state.get("evidence", []),
+            facet_mapping=state.get("facet_mapping"),
+        )
         token_update = _accumulate_tokens(state, usage)
 
         # Non-blocking diversity check (warning only)
@@ -1196,9 +1216,12 @@ def build_graph(checkpointer=None):
     # Phase 10: Analytics dispatch node (parallel via asyncio.gather)
     builder.add_node("analytics_dispatch_node", analytics_dispatch_node)
 
+    builder.add_node("facet_mapper_node", facet_mapper_node)
+
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
-    builder.add_edge("retrieve_node", "item_writer_node")
+    builder.add_edge("retrieve_node", "facet_mapper_node")
+    builder.add_edge("facet_mapper_node", "item_writer_node")
 
     # Validation gate BEFORE reviewers
     # validation_node returns Command object for conditional routing

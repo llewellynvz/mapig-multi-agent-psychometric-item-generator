@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import List, Tuple
 
 from backend.agents.llm_factory import get_chat_model_for_agent
@@ -162,11 +163,13 @@ def validate_items(
 
         # Invoke with structured output, capturing raw response for token tracking
         # Use try-except pattern (same as llm_utils.py) for cross-provider compatibility
-        try:
-            runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
-        except TypeError:
-            runnable = model.with_structured_output(ValidationResponse, include_raw=True)
-        response = runnable.invoke(messages)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+            try:
+                runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
+            except TypeError:
+                runnable = model.with_structured_output(ValidationResponse, include_raw=True)
+            response = runnable.invoke(messages)
 
         # Extract result and token usage
         if isinstance(response, dict) and "parsed" in response and "raw" in response:

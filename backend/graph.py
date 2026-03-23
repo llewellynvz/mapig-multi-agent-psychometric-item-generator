@@ -350,14 +350,35 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
         draft_items = state.get("draft_items", [])
         attempt = state.get("validation_attempt", 1)
 
-        try:
-            resp, usage = validate_items(
-                request=state["user_request"],
-                items=draft_items,
-                attempt=attempt
-            )
-        except Exception as e:
-            logger.error(f"VALIDATION error={e}. Force-accepting all items.")
+        resp = None
+        usage = None
+        max_validation_attempts = 3
+        current_attempt = attempt
+
+        while current_attempt <= max_validation_attempts:
+            try:
+                resp, usage = validate_items(
+                    request=state["user_request"],
+                    items=draft_items,
+                    attempt=current_attempt
+                )
+                break  # Success — exit retry loop
+            except RuntimeError as e:
+                if "identical scores" in str(e) and current_attempt < max_validation_attempts:
+                    logger.warning(
+                        f"VALIDATION identical scores on attempt={current_attempt}, "
+                        f"retrying with attempt={current_attempt + 1}"
+                    )
+                    current_attempt += 1
+                    continue  # Retry with next attempt
+                else:
+                    logger.error(f"VALIDATION error={e}. Force-accepting all items.")
+                    break
+            except Exception as e:
+                logger.error(f"VALIDATION error={e}. Force-accepting all items.")
+                break
+
+        if resp is None:
             resp = ValidationResponse(validations=[
                 ItemValidation(
                     item_index=i,

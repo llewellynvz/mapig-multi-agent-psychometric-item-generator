@@ -260,16 +260,24 @@ Consider: Construct overlap, item phrasing similarity, measurement approach, and
         HumanMessage(content=prompt)
     ]
 
-    # No include_raw=True — raw response is not needed here and triggers
-    # PydanticSerializationUnexpectedValue warnings from OpenAI SDK's
-    # 21-variant ParsedResponse union (GitHub: openai/openai-python#2872)
-    runnable = model.with_structured_output(ConvergentValidityScore, strict=False)
-    result = runnable.invoke(messages)
+    # include_raw=True kept for consistent response handling across codebase.
+    # PydanticSerializationUnexpectedValue warnings suppressed globally in
+    # backend/__init__.py (see openai/openai-python#2872)
+    runnable = model.with_structured_output(ConvergentValidityScore, strict=False, include_raw=True)
+    response = runnable.invoke(messages)
 
-    if result is None:
-        logger.error("Convergent validity structured output parsing failed (%s direction)", direction)
-        raise RuntimeError(f"Convergent validity scoring failed - LLM returned invalid format")
-    return result
+    # Handle response (same pattern as item_comparison.py)
+    if isinstance(response, dict) and "parsed" in response:
+        result = response["parsed"]
+        if result is None:
+            logger.error("Convergent validity structured output parsing failed (%s direction)", direction)
+            raise RuntimeError(f"Convergent validity scoring failed - LLM returned invalid format")
+        return result
+    else:
+        # Fallback for older LangChain behavior
+        if response is None:
+            raise RuntimeError(f"Convergent validity scoring returned None - no response from LLM")
+        return response
 
 
 def _score_single_direction_discriminant(
@@ -315,15 +323,23 @@ Consider: Theoretical definitions, empirical meta-analyses, common measurement a
         HumanMessage(content=prompt)
     ]
 
-    # No include_raw=True — raw response is not needed here and triggers
-    # PydanticSerializationUnexpectedValue warnings (openai/openai-python#2872)
-    runnable = model.with_structured_output(DiscriminantValidityScore, strict=False)
-    result = runnable.invoke(messages)
+    # include_raw=True kept for consistent response handling across codebase.
+    # PydanticSerializationUnexpectedValue warnings suppressed globally in
+    # backend/__init__.py (see openai/openai-python#2872)
+    runnable = model.with_structured_output(DiscriminantValidityScore, strict=False, include_raw=True)
+    response = runnable.invoke(messages)
 
-    if result is None:
-        logger.error("Discriminant validity structured output parsing failed (%s direction)", direction)
-        raise RuntimeError(f"Discriminant validity scoring failed - LLM returned invalid format")
-    return result
+    # Handle response
+    if isinstance(response, dict) and "parsed" in response:
+        result = response["parsed"]
+        if result is None:
+            logger.error("Discriminant validity structured output parsing failed (%s direction)", direction)
+            raise RuntimeError(f"Discriminant validity scoring failed - LLM returned invalid format")
+        return result
+    else:
+        if response is None:
+            raise RuntimeError(f"Discriminant validity scoring returned None - no response from LLM")
+        return response
 
 
 def _format_items(items: List[str]) -> str:

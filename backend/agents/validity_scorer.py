@@ -10,6 +10,7 @@ items are not available.
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -259,8 +260,10 @@ Consider: Construct overlap, item phrasing similarity, measurement approach, and
         HumanMessage(content=prompt)
     ]
 
-    runnable = model.with_structured_output(ConvergentValidityScore, strict=False, include_raw=True)
-    response = runnable.invoke(messages)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+        runnable = model.with_structured_output(ConvergentValidityScore, strict=False, include_raw=True)
+        response = runnable.invoke(messages)
 
     # Handle response (same pattern as item_comparison.py)
     if isinstance(response, dict) and "parsed" in response:
@@ -319,8 +322,10 @@ Consider: Theoretical definitions, empirical meta-analyses, common measurement a
         HumanMessage(content=prompt)
     ]
 
-    runnable = model.with_structured_output(DiscriminantValidityScore, strict=False, include_raw=True)
-    response = runnable.invoke(messages)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+        runnable = model.with_structured_output(DiscriminantValidityScore, strict=False, include_raw=True)
+        response = runnable.invoke(messages)
 
     # Handle response
     if isinstance(response, dict) and "parsed" in response:

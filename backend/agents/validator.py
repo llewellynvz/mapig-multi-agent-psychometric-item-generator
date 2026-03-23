@@ -7,6 +7,20 @@ from typing import List, Tuple
 from backend.agents.llm_factory import get_chat_model_for_agent
 from backend.agents.llm_utils import TokenUsage, _extract_token_usage
 from backend.agents.prompt_loader import load_prompt
+
+def _detect_identical_scores(validations: List[ItemValidation]) -> bool:
+    """Detect if all items received identical dimension scores.
+
+    When an LLM returns the same scores for every item in a batch,
+    it indicates lazy evaluation rather than genuine item-level assessment.
+    """
+    if len(validations) < 3:
+        return False
+    first_scores = tuple(d.score for d in validations[0].dimension_scores)
+    return all(
+        tuple(d.score for d in v.dimension_scores) == first_scores
+        for v in validations[1:]
+    )
 from backend.schemas import (
     DimensionScore,
     DraftItem,
@@ -216,6 +230,20 @@ def validate_items(
                         idx, expected_text[:80], v.item_text[:80],
                     )
                     v.item_text = expected_text
+
+        # Detect lazy identical scores — all items get same dimension scores
+        if _detect_identical_scores(result.validations):
+            logger.warning(
+                "VALIDATOR_IDENTICAL_SCORES attempt=%d model=%s items=%d — "
+                "all items received identical dimension scores, indicating lazy LLM evaluation",
+                attempt, model_name, len(result.validations),
+            )
+            if attempt == 1:
+                raise RuntimeError(
+                    "Validator returned identical scores for all items — "
+                    "forcing retry with higher-quality model"
+                )
+            # On attempt 2+, accept but the warning is logged
 
         accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(

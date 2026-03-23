@@ -79,23 +79,15 @@ def _compare_single_direction(
         ),
     ]
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
-        runnable = model.with_structured_output(ComparisonResult, strict=False, include_raw=True)
-        response = runnable.invoke(messages)
+    # No include_raw=True — raw response is not needed here and triggers
+    # PydanticSerializationUnexpectedValue warnings (openai/openai-python#2872)
+    runnable = model.with_structured_output(ComparisonResult, strict=False)
+    result = runnable.invoke(messages)
 
-    # Null handling (same as validator.py)
-    if isinstance(response, dict) and "parsed" in response:
-        result = response["parsed"]
-        if result is None:
-            logger.error(f"Structured output parsing failed for comparison ({direction_label})")
-            raise RuntimeError(f"Item comparison structured output parsing failed - LLM returned invalid format")
-        return result
-    else:
-        # Fallback for older LangChain behavior
-        if response is None:
-            raise RuntimeError(f"Item comparison returned None - no response from LLM")
-        return response
+    if result is None:
+        logger.error(f"Structured output parsing failed for comparison ({direction_label})")
+        raise RuntimeError(f"Item comparison structured output parsing failed - LLM returned invalid format")
+    return result
 
 
 def _average_comparison_results(forward: ComparisonResult, reverse: ComparisonResult) -> ComparisonResult:

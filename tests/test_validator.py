@@ -25,9 +25,9 @@ def test_prompt_instructs_cot_reasoning():
     assert "chain" in content or "reasoning" in content, "Prompt must mention chain-of-thought or reasoning"
     assert "before" in content, "Prompt must instruct reasoning BEFORE scoring"
 
-    # Task #2: Check for output reduction instructions
-    assert "passing dimension" in content or "score ≥ 7" in content or "score >= 7" in content, "Prompt must mention passing dimensions"
-    assert "empty string" in content or '""' in content, "Prompt must instruct empty reasoning for passing dimensions"
+    # Task #2: Check for reasoning requirements
+    assert "reasoning" in content, "Prompt must require reasoning for dimensions"
+    assert "brief" in content or "1-2 sentence" in content, "Prompt must specify reasoning length"
 
 
 def test_prompt_defines_four_dimensions_with_weights():

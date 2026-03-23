@@ -100,7 +100,7 @@ export interface CorrelationMatrix {
 
 export interface ComparisonInstrument {
   name: string;
-  construct: string;
+  measured_construct: string;
   source_citation: string;
   publication_year?: number;
   sample_items_count?: number;

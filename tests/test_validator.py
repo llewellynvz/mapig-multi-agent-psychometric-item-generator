@@ -249,6 +249,52 @@ def _sample_user_request() -> UserRequest:
     )
 
 
+def test_detect_identical_scores():
+    """Identical dimension scores across all items should be detected."""
+    from backend.agents.validator import _detect_identical_scores
+    from backend.schemas import ItemValidation, DimensionScore
+
+    # All identical — should detect
+    identical = [
+        ItemValidation(
+            item_index=i,
+            item_text=f"Item {i}",
+            dimension_scores=[
+                DimensionScore(dimension="correspondence", reasoning="", score=6),
+                DimensionScore(dimension="distinctiveness", reasoning="", score=8),
+                DimensionScore(dimension="clarity", reasoning="", score=9),
+                DimensionScore(dimension="specificity", reasoning="", score=9),
+            ],
+            weighted_score=7.25,
+            accept=True,
+            attempt=1,
+        )
+        for i in range(5)
+    ]
+    assert _detect_identical_scores(identical) is True
+
+    # Varied scores — should not detect
+    varied = list(identical)  # copy
+    varied[2] = ItemValidation(
+        item_index=2,
+        item_text="Item 2",
+        dimension_scores=[
+            DimensionScore(dimension="correspondence", reasoning="", score=7),
+            DimensionScore(dimension="distinctiveness", reasoning="", score=8),
+            DimensionScore(dimension="clarity", reasoning="", score=9),
+            DimensionScore(dimension="specificity", reasoning="", score=9),
+        ],
+        weighted_score=7.75,
+        accept=True,
+        attempt=1,
+    )
+    assert _detect_identical_scores(varied) is False
+
+    # Too few items — should not detect
+    assert _detect_identical_scores(identical[:2]) is False
+    assert _detect_identical_scores([]) is False
+
+
 def _sample_draft_items() -> list[DraftItem]:
     """Helper to create sample DraftItem list for validation testing."""
     return [

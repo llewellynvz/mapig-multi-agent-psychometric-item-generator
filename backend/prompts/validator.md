@@ -144,6 +144,7 @@ Important Evaluation Guidelines
 5. Use the construct definition as the single source of truth for correspondence and distinctiveness
 6. Consider the target population when evaluating clarity
 7. Balance psychometric ideals with practical item development - items don't need to be perfect, just acceptable (>= 7.0)
+8. **CRITICAL — Score Differentiation Required**: Each item MUST receive at least one dimension score that differs from other items. If you find yourself assigning identical scores across all items, STOP and re-evaluate more carefully. Different items have different strengths — a clear item may lack correspondence, while a high-correspondence item may overlap with related constructs. Identical scores across all items indicates insufficient evaluation granularity and will be rejected by the system.
 
 Handling Edge Cases
 - If an item is excellent on three dimensions but poor on correspondence, reject it (correspondence is 50% of the score)

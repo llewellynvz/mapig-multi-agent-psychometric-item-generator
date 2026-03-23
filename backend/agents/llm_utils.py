@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
@@ -156,12 +157,14 @@ def invoke_structured_with_usage(
 
     # Primary path: provider/tool-based structured output
     try:
-        try:
-            runnable = llm.with_structured_output(schema, strict=True, include_raw=True)
-        except TypeError:
-            runnable = llm.with_structured_output(schema, include_raw=True)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+            try:
+                runnable = llm.with_structured_output(schema, strict=True, include_raw=True)
+            except TypeError:
+                runnable = llm.with_structured_output(schema, include_raw=True)
 
-        result = runnable.invoke(messages)
+            result = runnable.invoke(messages)
 
         # with_structured_output(include_raw=True) returns dict with 'parsed' and 'raw'
         if isinstance(result, dict) and "parsed" in result and "raw" in result:

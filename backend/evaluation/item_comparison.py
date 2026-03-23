@@ -5,6 +5,7 @@ using Claude Opus as an expert psychometrician judge.
 """
 
 import logging
+import warnings
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.agents.llm_factory import get_chat_model_for_agent
 from backend.agents.prompt_loader import load_prompt
@@ -78,8 +79,10 @@ def _compare_single_direction(
         ),
     ]
 
-    runnable = model.with_structured_output(ComparisonResult, strict=False, include_raw=True)
-    response = runnable.invoke(messages)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+        runnable = model.with_structured_output(ComparisonResult, strict=False, include_raw=True)
+        response = runnable.invoke(messages)
 
     # Null handling (same as validator.py)
     if isinstance(response, dict) and "parsed" in response:

@@ -113,9 +113,11 @@ Severity scale (integer 1-5, required):
 
 ## TRANSLATION READINESS
 
-- Flag phrasal verbs ('give up', 'look forward to', 'put up with') as severity 3 — meaning changes in direct translation.
+- Phrasal verbs ('give up', 'look forward to', 'put up with') are severity 1 (cosmetic note) by default.
+- Only escalate phrasal verbs to severity 3 if the specific phrasal verb genuinely changes meaning in the target language AND cultural_group specifies a multilingual population.
+- Do NOT flag common phrasal verbs like "look for", "try out", "think about", "come up with", "figure out" — these are natural English and improve readability.
 - Flag abstract metaphors as severity 2 for multi-lingual populations (isiZulu, Sesotho, Afrikaans).
-- Prefer single-word equivalents over phrasal verbs (e.g., 'abandon' over 'give up', 'anticipate' over 'look forward to').
+- CRITICAL: Natural phrasing is MORE important than formal vocabulary. Items must sound like something a real person would say in conversation, not an academic paper or policy document. Do NOT push items toward stiff, formal language.
 
 ## ITERATION AWARENESS
 

@@ -38,9 +38,9 @@ MAPIG generates candidate items and review artifacts. It supports expert judgmen
 
 ---
 
-## The 12 Agents
+## The 13 Agents
 
-MAPIG uses 12 specialized AI agents, each with a single job. Think of them as a team of experts passing work down an assembly line — one drafts, others review, one decides if revisions are needed, and the final group checks how good the items really are.
+MAPIG uses 13 specialized AI agents, each with a single job. Think of them as a team of experts passing work down an assembly line — one gathers evidence, another maps the construct's theoretical structure, one drafts items guided by that structure, others review, one decides if revisions are needed, and the final group checks how good the items really are.
 
 ### 🔍 Evidence Gathering
 
@@ -49,12 +49,18 @@ MAPIG uses 12 specialized AI agents, each with a single job. Think of them as a 
 | **Retrieval Agent** | Searches your **local approved sources** (curated research papers in `data/approved_sources/`) to find theoretical grounding for item writing. No LLM needed — pure text matching. |
 | **Web Surfer** | Queries **Perplexity's academic search** to find published research — seminal papers, measurement precedents, and construct definitions from peer-reviewed journals. |
 
+### 🧬 Construct Structure Analysis
+
+| Agent | What it does |
+|-------|-------------|
+| **Facet Mapper** | The theoretical architect. Analyzes the retrieved evidence to **identify the construct's formal facet structure** before any items are written. For multi-dimensional constructs (e.g., Burnout), it identifies mutually exclusive sub-constructs and allocates items evenly across them. For unidimensional constructs (e.g., Life Satisfaction), it defines a strict "negative space fence" — what the construct is NOT — to prevent items from drifting into adjacent constructs. When running in unidimensional mode (the default), it also **flags any sub-constructs found in the literature** so users can generate items for those separately. This ensures every generated item has a clear theoretical home and prevents the common problem of all items being synonym substitutions of each other. |
+
 ### ✍️ Item Creation
 
 | Agent | What it does |
 |-------|-------------|
-| **Item Writer** | The creative engine. Takes the construct definition, evidence, and constraints, then **drafts the actual Likert-type items** following psychometric best practices (no double-barreled items, appropriate reading level, positive keying, etc.). |
-| **Validator** | The quality gate. **Scores every item on 4 dimensions** — correspondence (50%), distinctiveness (25%), clarity (15%), and specificity (10%). Items below 7.0/10 get sent back for regeneration. |
+| **Item Writer** | The creative engine. Takes the construct definition, evidence, **facet mapping**, and constraints, then **drafts the actual Likert-type items** following psychometric best practices (no double-barreled items, appropriate reading level, positive keying, etc.). When facet mapping is provided, the writer is forced to distribute items across facets — ensuring semantic diversity and moderate inter-item correlations (r = 0.40–0.70) rather than near-identical items (r > 0.85). |
+| **Validator** | The quality gate. **Scores every item on 4 dimensions** — correspondence (50%), distinctiveness (25%), clarity (15%), and specificity (10%). Items below 7.0/10 get sent back for regeneration. Detects and rejects "lazy" identical scores where all items receive the same rating — forces re-evaluation with a higher-accuracy model. |
 
 ### 🔬 Triple Review (runs in parallel)
 
@@ -88,8 +94,9 @@ The generation pipeline flows through distinct phases, each handled by specializ
 ```
 START
   -> init_run
-  -> retrieve_node          (evidence retrieval)
-  -> item_writer_node       (draft items)
+  -> retrieve_node          (evidence retrieval from local + Perplexity academic search)
+  -> facet_mapper_node      (identify construct facets, allocate items per facet)
+  -> item_writer_node       (draft items guided by facet structure)
   -> validation_node        (4-dimension scoring)
      -> [regenerate loop if items fail validation, up to 3 attempts]
   -> reviewers_fanout_node  (linguistic + bias + content review in parallel)
@@ -111,12 +118,24 @@ Two channels provide the theoretical grounding that every generated item cites:
 
 Evidence chunks are tagged with metadata — authors, theoretical model names, and identified dimensions — so the item writer can ground each item in specific literature.
 
+### Phase 1.5: Facet Mapping
+
+The **Facet Mapper Agent** analyzes the retrieved evidence to establish the construct's theoretical structure before any items are written. This is the key to generating diverse, non-redundant items.
+
+**Why this matters**: Without facet mapping, LLMs tend to generate items that are synonym substitutions of each other (e.g., "I shift my thinking", "I change my methods", "I adjust my plans"). These produce inter-item correlations above 0.85 — essentially the same item asked 7 different ways. The facet mapper forces structural diversity by identifying distinct theoretical dimensions and allocating items across them.
+
+**How it works**:
+- **Unidimensional mode** (default): The construct is treated as a single factor. All items target the full construct. If the literature reveals sub-constructs (e.g., Burnout has Exhaustion, Cynicism, Inefficacy), they are **flagged as suggestions** for the user to generate items for separately — not split into sub-scales in the current run. A strict "negative space fence" defines what the construct is NOT, preventing drift into adjacent constructs.
+- **Multi-dimensional mode** (user toggle): Items are distributed evenly across identified sub-constructs. Each facet gets `item_count / N` items with mutually exclusive descriptions and boundary exclusions.
+
+The user controls this via a "Construct structure" toggle on the setup form.
+
 ### Phase 2: Item Drafting
 
-The **Item Writer Agent** receives the construct definition, target population, constraints, and evidence chunks, then generates Likert-type items following five decades of psychometric principles:
+The **Item Writer Agent** receives the construct definition, target population, constraints, **facet mapping**, and evidence chunks, then generates Likert-type items following five decades of psychometric principles:
 
+- Facet-guided item generation: when facet mapping is provided, items are distributed across facets with explicit behavioral referent variation
 - Unidimensional focus per item
-- Facet-balanced coverage across theoretical dimensions (e.g., emotional, psychological, and social well-being for Keyes' model)
 - Positive keying only (no reverse-coded items, per current best practice)
 - Reading level matched to population (6th-8th grade general, 5th-6th clinical, 10th-12th professional)
 - No double-barreled items, idioms, or vague quantifiers
@@ -295,6 +314,7 @@ MAPIG allocates different models to different agents based on task complexity an
 
 | Agent | Default Model | With ChatGPT Toggle | Notes |
 |-------|---------------|---------------------|-------|
+| Facet Mapper | Claude Sonnet 4.5 | Claude Sonnet 4.5 | Construct structure analysis |
 | Item Writer | Claude Sonnet 4.5 | Claude Sonnet 4.5 | Always Sonnet (quality-critical) |
 | Validator | Sonnet 4.5 / Opus 4.6 | GPT-4o | Smart tiering: Sonnet first, Opus on retries |
 | Linguistic Reviewer | Claude Sonnet 4.5 | GPT-4o | |
@@ -340,6 +360,7 @@ Optional fields:
 - `previous_items` — items from previous round for refinement
 - `model_provider` — `"claude"` or `"openai"`
 - `use_chatgpt_critics` — use GPT-4o for reviewer agents
+- `is_unidimensional` (default `true`) — construct structure: true = single scale (sub-constructs flagged for separate runs), false = multi-dimensional (items distributed across sub-constructs)
 
 ### Response
 
@@ -466,6 +487,7 @@ lmaig-langgraph/
 │   ├── main.py           # FastAPI app, lifespan, routes
 │   ├── graph.py          # LangGraph workflow definition
 │   ├── agents/           # Agent implementations
+│   │   ├── facet_mapper.py
 │   │   ├── item_writer.py
 │   │   ├── validator.py
 │   │   ├── linguistic_reviewer.py
@@ -567,7 +589,7 @@ Comes from `langchain_core` which still imports `pydantic.v1`. Upstream issue �
 ```
 PydanticSerializationUnexpectedValue: Expected `none` - serialized value may not be as expected
 ```
-The OpenAI Python SDK's structured output responses contain complex discriminated unions with 20+ type variants. Pydantic V2's serializer warns when trying each variant. The actual data parses correctly — these are purely cosmetic warnings. They appear whenever the OpenAI SDK's `ParsedResponse` objects are serialized (validation, validity scoring, bias review).
+The OpenAI Python SDK's `ParsedResponse` objects contain a 21-variant discriminated union. Pydantic V2's serializer warns when trying each variant. The actual data parses correctly — these are purely cosmetic warnings. Suppressed at three levels: global filter in `backend/__init__.py`, pytest config in `pyproject.toml`, and call-site `warnings.catch_warnings()` context managers. See [openai/openai-python#2872](https://github.com/openai/openai-python/issues/2872).
 
 ## Contributing
 Issues and pull requests are welcome for:

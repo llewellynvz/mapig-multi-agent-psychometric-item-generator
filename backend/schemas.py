@@ -371,7 +371,7 @@ class ComparisonInstrument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., min_length=2, description="Instrument name (e.g., 'Rosenberg Self-Esteem Scale')")
-    construct: str = Field(..., min_length=2, description="Construct measured by this instrument")
+    measured_construct: str = Field(..., min_length=2, description="Construct measured by this instrument")
     source_citation: str = Field(..., min_length=5, description="APA-format citation for the instrument")
     publication_year: Optional[int] = Field(default=None, description="Year the instrument was published")
     sample_items_count: Optional[int] = Field(default=None, ge=0, description="Number of items in the instrument")

@@ -10,11 +10,22 @@ import logging
 from typing import Literal, Optional
 
 import httpx
+from pydantic import ValidationError
 
 from backend.schemas import ComparisonInstrument
 from backend.settings import settings
 
 log = logging.getLogger("lmaig.instrument_searcher")
+
+
+def _safe_int(val) -> Optional[int]:
+    """Safely convert LLM output to int, returning None for non-numeric values."""
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
 
 
 def search_instruments(
@@ -160,10 +171,10 @@ def _search_perplexity_instrument(
         # Build ComparisonInstrument
         instrument = ComparisonInstrument(
             name=parsed.get("name", "Unknown Instrument"),
-            construct=parsed.get("construct", construct_name),
+            measured_construct=parsed.get("construct", construct_name),
             source_citation=citation,
-            publication_year=parsed.get("year"),
-            sample_items_count=parsed.get("item_count"),
+            publication_year=_safe_int(parsed.get("year")),
+            sample_items_count=_safe_int(parsed.get("item_count")),
             psychometric_properties=parsed.get("psychometric_properties"),
             similarity_rationale=parsed.get("similarity_rationale")
         )
@@ -171,7 +182,7 @@ def _search_perplexity_instrument(
         log.info("PERPLEXITY_INSTRUMENT_SEARCH success type=%s instrument=%s", search_type, instrument.name)
         return instrument
 
-    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError) as e:
+    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError, ValidationError) as e:
         log.warning("PERPLEXITY_INSTRUMENT_SEARCH failed: %s", e)
         return None
 
@@ -193,7 +204,7 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
 
     query = (
         f"List ALL the exact item texts (questions/statements) from the "
-        f"'{instrument.name}' psychometric instrument that measures {instrument.construct}. "
+        f"'{instrument.name}' psychometric instrument that measures {instrument.measured_construct}. "
         f"Return ONLY the item texts as a JSON array of strings, e.g. "
         f'["I feel satisfied with my life", "In most ways my life is close to my ideal"]. '
         f"Include every item. Do not paraphrase — use the exact published wording. "
@@ -285,7 +296,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
         return (
             ComparisonInstrument(
                 name="IPIP-NEO",
-                construct="Big Five personality traits",
+                measured_construct="Big Five personality traits",
                 source_citation="Goldberg, L. R. (1999). A broad-bandwidth, public domain, personality inventory measuring the lower-level facets of several five-factor models. Personality Psychology in Europe, 7(1), 7-28.",
                 publication_year=1999,
                 sample_items_count=50,
@@ -294,7 +305,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
             ),
             ComparisonInstrument(
                 name="PHQ-9",
-                construct="depression severity",
+                measured_construct="depression severity",
                 source_citation="Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
                 publication_year=2001,
                 sample_items_count=9,
@@ -308,7 +319,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
         return (
             ComparisonInstrument(
                 name="PHQ-9",
-                construct="depression severity",
+                measured_construct="depression severity",
                 source_citation="Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
                 publication_year=2001,
                 sample_items_count=9,
@@ -317,7 +328,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
             ),
             ComparisonInstrument(
                 name="Rosenberg Self-Esteem Scale",
-                construct="self-esteem",
+                measured_construct="self-esteem",
                 source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
                 publication_year=1965,
                 sample_items_count=10,
@@ -331,7 +342,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
         return (
             ComparisonInstrument(
                 name="Utrecht Work Engagement Scale (UWES-9)",
-                construct="work engagement",
+                measured_construct="work engagement",
                 source_citation="Schaufeli, W. B., Bakker, A. B., & Salanova, M. (2006). The measurement of work engagement with a short questionnaire: A cross-national study. Educational and Psychological Measurement, 66(4), 701-716.",
                 publication_year=2006,
                 sample_items_count=9,
@@ -340,7 +351,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
             ),
             ComparisonInstrument(
                 name="Maslach Burnout Inventory (MBI-GS)",
-                construct="burnout",
+                measured_construct="burnout",
                 source_citation="Schaufeli, W. B., Leiter, M. P., Maslach, C., & Jackson, S. E. (1996). Maslach Burnout Inventory-General Survey. In C. Maslach, S. E. Jackson, & M. P. Leiter (Eds.), MBI Manual (3rd ed.). Consulting Psychologists Press.",
                 publication_year=1996,
                 sample_items_count=16,
@@ -354,7 +365,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
         return (
             ComparisonInstrument(
                 name="UCLA Loneliness Scale (Version 3)",
-                construct="loneliness",
+                measured_construct="loneliness",
                 source_citation="Russell, D. W. (1996). UCLA Loneliness Scale (Version 3): Reliability, validity, and factor structure. Journal of Personality Assessment, 66(1), 20-40.",
                 publication_year=1996,
                 sample_items_count=20,
@@ -363,7 +374,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
             ),
             ComparisonInstrument(
                 name="Rosenberg Self-Esteem Scale",
-                construct="self-esteem",
+                measured_construct="self-esteem",
                 source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
                 publication_year=1965,
                 sample_items_count=10,
@@ -377,7 +388,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
         return (
             ComparisonInstrument(
                 name="Need for Cognition Scale",
-                construct="need for cognition",
+                measured_construct="need for cognition",
                 source_citation="Cacioppo, J. T., Petty, R. E., & Kao, C. F. (1984). The efficient assessment of need for cognition. Journal of Personality Assessment, 48(3), 306-307.",
                 publication_year=1984,
                 sample_items_count=18,
@@ -386,7 +397,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
             ),
             ComparisonInstrument(
                 name="Big Five Inventory - Openness Subscale",
-                construct="openness to experience",
+                measured_construct="openness to experience",
                 source_citation="John, O. P., Donahue, E. M., & Kentle, R. L. (1991). The Big Five Inventory--Versions 4a and 54. Berkeley, CA: University of California, Berkeley, Institute of Personality and Social Research.",
                 publication_year=1991,
                 sample_items_count=10,
@@ -399,7 +410,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
     return (
         ComparisonInstrument(
             name="Rosenberg Self-Esteem Scale",
-            construct="self-esteem",
+            measured_construct="self-esteem",
             source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
             publication_year=1965,
             sample_items_count=10,
@@ -408,7 +419,7 @@ def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, 
         ),
         ComparisonInstrument(
             name="PHQ-9",
-            construct="depression severity",
+            measured_construct="depression severity",
             source_citation="Kroenke, K., Spitzer, R. L., & Williams, J. B. (2001). The PHQ-9: validity of a brief depression severity measure. Journal of General Internal Medicine, 16(9), 606-613.",
             publication_year=2001,
             sample_items_count=9,

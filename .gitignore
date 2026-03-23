@@ -89,3 +89,8 @@ payload.json
 test_payload.json
 test_api.py
 test_pipeline.py
+
+# specifically requested ignored files
+article_*.pdf
+network_psychometrics_skill.md
+comparison_report.md

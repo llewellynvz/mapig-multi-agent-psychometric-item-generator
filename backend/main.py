@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as _dt
 import json
+import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -50,7 +51,7 @@ from backend.logging_utils import get_performance_summary
 from backend.schemas import FinalOutput, UserRequest
 from backend.settings import STANDARD_ITEM_CONSTRAINTS, settings
 from backend.evaluation.baseline_runner import run_baseline_comparison, BaselineComparison
-from langgraph.checkpoint.memory import MemorySaver
+from backend.checkpoint_config import create_checkpointer
 
 # TODO: Token tracking implementation
 # Currently cost fields remain None until token usage tracking is added.
@@ -119,6 +120,18 @@ def _set_run_status(thread_id: str, run_id: str, **updates: Any) -> None:
     RUN_STATUS_REGISTRY[thread_id] = existing
 
 
+class _PydanticSerializationFilter(logging.Filter):
+    """Suppress cosmetic PydanticSerializationUnexpectedValue log messages.
+
+    The OpenAI SDK's ParsedResponse objects contain 20+ union type variants.
+    Pydantic V2 warns when trying each variant during serialization.
+    Data parses correctly — these are purely cosmetic noise.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "PydanticSerializationUnexpectedValue" not in record.getMessage()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
@@ -131,12 +144,16 @@ async def lifespan(app: FastAPI):
         message=".*PydanticSerializationUnexpectedValue.*",
         category=UserWarning,
     )
+    # Also suppress at the logging level — Pydantic may emit via logging
+    # rather than the warnings module, causing error-level log noise on Vercel
+    _pydantic_logger = logging.getLogger("pydantic")
+    _pydantic_logger.addFilter(_PydanticSerializationFilter())
 
-    # Use in-memory checkpointer for serverless deployment
+    # Use in-memory checkpointer with registered custom types
     # Checkpoints are ephemeral (lost on cold start) but functional during single run
-    # This is acceptable for v1 per user decision in 05-CONTEXT.md
-    # Future v2: Can migrate to Vercel Postgres with LangGraph Postgres checkpoint adapter
-    checkpointer = MemorySaver()
+    # Custom types are pre-registered to eliminate "Deserializing unregistered type" warnings
+    # and ensure forward compatibility with future LangGraph versions
+    checkpointer = create_checkpointer()
     app.state.graph = build_graph(checkpointer=checkpointer)
 
     yield

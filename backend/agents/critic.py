@@ -122,7 +122,7 @@ def _detect_stagnation(
     to catch paraphrased repetition (e.g., "satisfactory" → "good").
     Triggers at iteration >= 1 (one round earlier than before).
     """
-    if iteration < 1 or not iteration_history:
+    if iteration < 2 or not iteration_history:
         return False
     # Get previous iteration's combined comments
     prev_snap = iteration_history[-1]

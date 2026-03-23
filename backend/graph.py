@@ -919,7 +919,7 @@ def comparison_node(state: GraphState) -> GraphState:
             convergent_score, convergent_method = score_convergent_validity(
                 item_texts,
                 convergent_instrument.name,
-                convergent_instrument.construct,
+                convergent_instrument.measured_construct,
                 construct_name,
                 published_items=convergent_instrument.items,
             )
@@ -1031,7 +1031,7 @@ def cross_construct_node(state: GraphState) -> GraphState:
 
             # Score discriminant validity (embedding-based when items available, LLM fallback)
             disc_name = discriminant_instrument.name
-            disc_construct = exclusion_construct or discriminant_instrument.construct
+            disc_construct = exclusion_construct or discriminant_instrument.measured_construct
             discriminant_pair, disc_method = score_discriminant_validity(
                 item_texts,
                 disc_name,
@@ -1050,12 +1050,12 @@ def cross_construct_node(state: GraphState) -> GraphState:
             corr = discriminant_pair.estimated_correlation
             if flag == "concern":
                 summary = (
-                    f"High overlap detected between '{construct_name}' and '{discriminant_instrument.construct}' "
+                    f"High overlap detected between '{construct_name}' and '{discriminant_instrument.measured_construct}' "
                     f"(estimated r = {corr:.2f}). Consider refining item wording to improve discriminant validity."
                 )
             else:
                 summary = (
-                    f"Adequate discriminant validity between '{construct_name}' and '{discriminant_instrument.construct}' "
+                    f"Adequate discriminant validity between '{construct_name}' and '{discriminant_instrument.measured_construct}' "
                     f"(estimated r = {corr:.2f}). Constructs appear sufficiently distinct."
                 )
 
@@ -1067,7 +1067,7 @@ def cross_construct_node(state: GraphState) -> GraphState:
             )
             cross_construct_analysis = CrossConstructComparison(
                 target_construct=construct_name,
-                comparison_constructs=[discriminant_instrument.construct],
+                comparison_constructs=[discriminant_instrument.measured_construct],
                 analysis_summary=summary,
                 construct_pairs=[discriminant_pair],
                 disclaimer=disc_disclaimer,

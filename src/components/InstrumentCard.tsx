@@ -114,7 +114,7 @@ export function InstrumentCard({
           </div>
 
           <p className="text-sm text-muted-foreground">
-            <span className="text-slate-50/70">Construct:</span> {instrument.construct}
+            <span className="text-slate-50/70">Construct:</span> {instrument.measured_construct}
           </p>
 
           {instrument.similarity_rationale && (

@@ -20,6 +20,9 @@ ALLOWED_CHECKPOINT_TYPES: list[tuple[str, str]] = [
     # Items
     ("backend.schemas", "DraftItem"),
     ("backend.schemas", "DimensionScore"),
+    # Facet mapping
+    ("backend.schemas", "FacetDefinition"),
+    ("backend.schemas", "FacetMapperResponse"),
     # Validation
     ("backend.schemas", "ItemValidation"),
     ("backend.schemas", "ValidationResponse"),

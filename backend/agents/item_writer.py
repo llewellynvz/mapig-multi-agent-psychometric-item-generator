@@ -6,14 +6,23 @@ from typing import List, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
-from backend.schemas import DraftItem, EvidenceChunk, ItemWriterResponse, UserRequest
+from backend.schemas import DraftItem, EvidenceChunk, FacetMapperResponse, ItemWriterResponse, UserRequest
 from backend.settings import settings
 
 logger = logging.getLogger("lmaig.item_writer")
 
 
-def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> Tuple[ItemWriterResponse, TokenUsage]:
-    """Generate initial draft items.
+def write_items(
+    request: UserRequest,
+    evidence: List[EvidenceChunk],
+    facet_mapping: FacetMapperResponse | None = None,
+) -> Tuple[ItemWriterResponse, TokenUsage]:
+    """Generate initial draft items, optionally guided by facet mapping.
+
+    Args:
+        request: User construct specification
+        evidence: Retrieved evidence chunks
+        facet_mapping: Optional facet structure from Facet Mapper agent
 
     Returns:
         Tuple of (ItemWriterResponse, TokenUsage)
@@ -64,6 +73,7 @@ def write_items(request: UserRequest, evidence: List[EvidenceChunk]) -> Tuple[It
         "user_request": request.model_dump(),
         "evidence": [e.model_dump() for e in evidence],
         "item_count": item_count,
+        "facet_mapping": facet_mapping.model_dump(mode="json") if facet_mapping else None,
     }
 
     messages = [

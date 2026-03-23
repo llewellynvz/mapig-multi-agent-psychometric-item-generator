@@ -151,29 +151,57 @@ def validate_items(
         else:
             # Use standard allocation (respects ChatGPT toggle)
             logger.info(f"Using validator model (attempt {attempt}, use_chatgpt={use_chatgpt})")
-            model = get_chat_model_for_agent(
-                agent_name="validator",
-                model_provider=request.model_provider,
-                use_chatgpt_critics=use_chatgpt,
-            )
-            model_name = getattr(model, "model_name", getattr(model, "model", "unknown"))
-
-        # Build messages with cache_control for system prompt
-        # Cache control reduces cost by ~90% on cached portions (5-minute TTL)
-        messages = [
-            SystemMessage(
-                content=system_prompt,
-                additional_kwargs={"cache_control": {"type": "ephemeral"}}
-            ),
-            HumanMessage(
-                content=(
-                    "Validate these items using the 4-dimension rubric.\n"
-                    "CRITICAL: For each item, you MUST return the EXACT item_text as provided in the input. "
-                    "Do not paraphrase, substitute, or modify the text in any way.\n\n"
-                    f"INPUT:\n{user_payload}"
+            if attempt >= 2 and not use_chatgpt:
+                # On retry: use Opus with higher temperature to avoid deterministic
+                # identical scores, and skip prompt cache to get fresh evaluation
+                from backend.agents.llm_factory import get_claude_chat_model
+                from langchain_anthropic import ChatAnthropic
+                model = ChatAnthropic(
+                    model="claude-opus-4-6",
+                    api_key=settings.CLAUDE_API_KEY,
+                    temperature=0.5,  # Higher temp forces score differentiation
+                    max_retries=3,
+                    timeout=60,
                 )
-            ),
-        ]
+                model_name = "claude-opus-4-6"
+                logger.info(f"Retry attempt {attempt}: using Opus with temperature=0.5, no prompt cache")
+            else:
+                model = get_chat_model_for_agent(
+                    agent_name="validator",
+                    model_provider=request.model_provider,
+                    use_chatgpt_critics=use_chatgpt,
+                )
+                model_name = getattr(model, "model_name", getattr(model, "model", "unknown"))
+
+        # Build messages — disable prompt caching on retries to avoid cached lazy responses
+        if attempt > 1:
+            messages = [
+                SystemMessage(content=system_prompt),  # No cache_control on retry
+                HumanMessage(
+                    content=(
+                        f"RETRY ATTEMPT {attempt}: Previous validation returned identical scores for all items. "
+                        "You MUST evaluate each item INDIVIDUALLY with differentiated scores.\n"
+                        "CRITICAL: For each item, you MUST return the EXACT item_text as provided in the input. "
+                        "Do not paraphrase, substitute, or modify the text in any way.\n\n"
+                        f"INPUT:\n{user_payload}"
+                    )
+                ),
+            ]
+        else:
+            messages = [
+                SystemMessage(
+                    content=system_prompt,
+                    additional_kwargs={"cache_control": {"type": "ephemeral"}}
+                ),
+                HumanMessage(
+                    content=(
+                        "Validate these items using the 4-dimension rubric.\n"
+                        "CRITICAL: For each item, you MUST return the EXACT item_text as provided in the input. "
+                        "Do not paraphrase, substitute, or modify the text in any way.\n\n"
+                        f"INPUT:\n{user_payload}"
+                    )
+                ),
+            ]
 
         # Invoke with structured output, capturing raw response for token tracking
         # Use try-except pattern (same as llm_utils.py) for cross-provider compatibility
@@ -238,12 +266,12 @@ def validate_items(
                 "all items received identical dimension scores, indicating lazy LLM evaluation",
                 attempt, model_name, len(result.validations),
             )
-            if attempt == 1:
+            if attempt < 3:
                 raise RuntimeError(
                     "Validator returned identical scores for all items — "
-                    "forcing retry with higher-quality model"
+                    "forcing retry with different model/temperature"
                 )
-            # On attempt 2+, accept but the warning is logged
+            # On attempt 3 (hard limit), accept but the warning is logged
 
         accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(

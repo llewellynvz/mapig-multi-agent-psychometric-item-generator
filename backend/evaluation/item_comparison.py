@@ -80,7 +80,7 @@ def _compare_single_direction(
     ]
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+        warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
         runnable = model.with_structured_output(ComparisonResult, strict=False, include_raw=True)
         response = runnable.invoke(messages)
 

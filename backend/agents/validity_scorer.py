@@ -261,7 +261,7 @@ Consider: Construct overlap, item phrasing similarity, measurement approach, and
     ]
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+        warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
         runnable = model.with_structured_output(ConvergentValidityScore, strict=False, include_raw=True)
         response = runnable.invoke(messages)
 
@@ -323,7 +323,7 @@ Consider: Theoretical definitions, empirical meta-analyses, common measurement a
     ]
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+        warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
         runnable = model.with_structured_output(DiscriminantValidityScore, strict=False, include_raw=True)
         response = runnable.invoke(messages)
 

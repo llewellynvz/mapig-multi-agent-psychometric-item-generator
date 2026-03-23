@@ -158,7 +158,7 @@ def invoke_structured_with_usage(
     # Primary path: provider/tool-based structured output
     try:
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+            warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
             try:
                 runnable = llm.with_structured_output(schema, strict=True, include_raw=True)
             except TypeError:

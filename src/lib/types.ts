@@ -21,6 +21,7 @@ export interface UserRequest {
   model_provider?: "claude" | "openai";
   use_chatgpt_critics?: boolean;
   use_gpt52_analytics?: boolean;
+  is_unidimensional?: boolean;
 }
 
 export interface DimensionScore {

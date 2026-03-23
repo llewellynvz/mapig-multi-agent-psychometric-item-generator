@@ -372,6 +372,31 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-1">
+                  <Label htmlFor="is_unidimensional" className="cursor-pointer">Construct structure</Label>
+                  <p className="text-xs text-muted-foreground mr-6">
+                    {form.watch("is_unidimensional") ? (
+                      <>
+                        <span className="font-medium text-white">Unidimensional</span> — Items measure a single construct. Sub-constructs from literature flagged for separate runs.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-white">Multi-dimensional</span> — Items distributed across sub-constructs/facets identified in the literature.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Switch
+                  id="is_unidimensional"
+                  checked={form.watch("is_unidimensional")}
+                  onCheckedChange={(checked) => form.setValue("is_unidimensional", checked)}
+                  className="data-[state=checked]:bg-[#008da1] data-[state=unchecked]:bg-[#b1dd0c]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
                   <Label htmlFor="use_chatgpt_critics" className="cursor-pointer">Critic Model</Label>
                   <p className="text-xs text-muted-foreground mr-6">
                     {form.watch("use_chatgpt_critics") ? (

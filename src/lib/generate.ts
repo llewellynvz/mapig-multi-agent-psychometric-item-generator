@@ -189,6 +189,7 @@ export function formToRequest(values: {
   previous_items?: string[];
   model_provider?: "claude" | "openai";
   use_chatgpt_critics?: boolean;
+  is_unidimensional?: boolean;
 }): UserRequest {
   const req: UserRequest = {
     construct_name: values.construct_name,
@@ -201,6 +202,7 @@ export function formToRequest(values: {
     previous_items: values.previous_items?.length ? values.previous_items : undefined,
     model_provider: values.model_provider || "claude",
     use_chatgpt_critics: values.use_chatgpt_critics || false,
+    is_unidimensional: values.is_unidimensional ?? true,
   };
   if (values.cultural_group?.trim()) req.cultural_group = values.cultural_group.trim();
   if (values.construct_exclusions?.trim()) req.construct_exclusions = values.construct_exclusions.trim();

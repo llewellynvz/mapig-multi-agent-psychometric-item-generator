@@ -31,6 +31,7 @@ interface ProgressIndicatorProps {
 const NODE_DISPLAY_NAMES: Record<string, string> = {
   init_run: "Setting up pipeline",
   retrieve_node: "Searching academic sources",
+  facet_mapper_node: "Mapping construct facets",
   item_writer_node: "Drafting survey items",
   validation_node: "Validating item quality",
   regenerate_items_node: "Improving failed items",
@@ -49,7 +50,7 @@ const NODE_DISPLAY_NAMES: Record<string, string> = {
 
 /* ── Stage-aware progress bar ── */
 const FIRST_ITER_NODES = [
-  "init_run", "retrieve_node", "item_writer_node",
+  "init_run", "retrieve_node", "facet_mapper_node", "item_writer_node",
   "content_review_node", "linguistic_review_node", "bias_review_node",
   "critic_node", "meta_editor_node",
 ];

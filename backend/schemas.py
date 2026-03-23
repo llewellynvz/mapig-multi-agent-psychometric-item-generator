@@ -111,6 +111,12 @@ class UserRequest(BaseModel):
         description="Enable GPT-5.2 reasoning models for analytics tasks (correlation, comparison, cross-construct). Higher accuracy but 4-6x cost multiplier."
     )
 
+    # Construct dimensionality
+    is_unidimensional: bool = Field(
+        default=True,
+        description="User's intended construct structure. If true, items target a single construct and sub-constructs are flagged for separate runs."
+    )
+
 
 class AbbreviatedRequest(BaseModel):
     """Minimal request for agents that don't need full context.
@@ -216,9 +222,43 @@ class DraftItem(BaseModel):
         default_factory=list,
         description="List of EvidenceChunk.source_id values that support this item.",
     )
+    facet_name: Optional[str] = Field(
+        default=None,
+        description="Facet this item targets (from Facet Mapper agent).",
+    )
     validation_result: Optional["ItemValidation"] = Field(
         default=None,
         description="Optional validation result if item has been validated.",
+    )
+
+
+class FacetDefinition(BaseModel):
+    """A single construct facet identified by the Facet Mapper agent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    facet_name: str = Field(..., min_length=2, description="Short name for this facet (e.g., 'Attentional Shifting')")
+    facet_description: str = Field(..., min_length=10, description="What this facet IS — operational definition")
+    exclusions: str = Field(..., min_length=5, description="What this facet is NOT — negative space fence to prevent overlap")
+    target_item_count: int = Field(..., ge=1, description="Number of items to allocate to this facet")
+
+
+class FacetMapperResponse(BaseModel):
+    """Structured output from the Facet Mapper agent.
+
+    Defines the theoretical structure of a construct — either as multiple
+    mutually exclusive facets (multi-dimensional) or a single facet with
+    strict boundary exclusions (unidimensional).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    is_unidimensional: bool = Field(..., description="True if construct has only 1 facet")
+    facets: List[FacetDefinition] = Field(..., min_length=1, description="Identified facets with item allocation")
+    theoretical_basis: str = Field(..., min_length=10, description="Source model/theory for this facet structure (e.g., 'CFI model per Dennis & Vander Wal, 2010')")
+    flagged_sub_constructs: Optional[List[str]] = Field(
+        default=None,
+        description="Sub-constructs found in literature that user may want to generate items for separately (only populated in unidimensional mode)"
     )
 
 

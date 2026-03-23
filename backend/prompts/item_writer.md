@@ -52,7 +52,24 @@ Evidence-Based Item Generation:
 - If example_item is provided, treat it as a reference only
 - Items must reflect dimensions and facets documented in the evidence literature
 
-DIVERSITY REQUIREMENT (mandatory):
+FACET-BASED ITEM GENERATION (mandatory when facet_mapping provided):
+If facet_mapping is provided in the input, the Facet Mapper Agent has pre-identified the structural dimensions of this construct. You MUST follow the facet mapping rigidly:
+1. Generate EXACTLY target_item_count items for each facet listed in facet_mapping.facets
+2. Each item MUST align with its assigned facet's facet_description
+3. Each item MUST NOT overlap with the facet's exclusions (negative space fence)
+4. Items for DIFFERENT facets must be semantically distinct — NOT synonym substitutions
+5. Document the facet assignment in each item's rationale: "Targets [facet_name] dimension"
+6. Items within the SAME facet should vary in specific behavioral referent (e.g., one about cognitive shift, another about strategy change)
+7. Set the facet_name field on each item to match the assigned facet
+
+Why this matters: Items like "I shift my thinking" and "I change my methods" are synonym substitutions that measure the same narrow aspect. This produces inter-item correlations > 0.85 — essentially one item asked multiple ways. Each item must capture a DIFFERENT aspect of the construct while still measuring the overall construct. Target inter-item correlations of 0.40–0.70.
+
+Example (Cognitive Flexibility, 3 facets × 2 items each):
+Facet "Attentional Shifting": "I shift my focus when a new priority emerges" / "I redirect my attention when initial approaches stall"
+Facet "Alternatives Awareness": "I consider multiple solutions before deciding" / "I generate several possible explanations for unexpected outcomes"
+Facet "Strategy Updating": "I revise my approach when I receive critical feedback" / "I update my methods after learning about more effective practices"
+
+DIVERSITY REQUIREMENT (fallback when facet_mapping is NOT provided):
 Step 1: Identify 3-5 distinct facets from evidence. If evidence is thin, derive facets from the construct definition (e.g., cognitive, affective, behavioral components).
 Step 2: Assign each item to a DIFFERENT primary facet. No two items may share the same primary facet unless item_count exceeds the number of available facets.
 Step 3: Verify semantic diversity — items must NOT be synonym substitutions of each other. Each item must use substantially different wording and target a different aspect of the construct.

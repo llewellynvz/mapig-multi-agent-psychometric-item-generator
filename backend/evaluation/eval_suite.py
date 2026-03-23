@@ -5,7 +5,7 @@ from backend.evaluation.metrics_aggregator import aggregate_comparison_results, 
 from backend.evaluation.schemas import ComparisonResult
 from backend.schemas import UserRequest
 from backend.graph import build_graph
-from langgraph.checkpoint.memory import MemorySaver
+from backend.checkpoint_config import create_checkpointer
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,8 @@ async def run_evaluation_suite(model_provider: str = "claude") -> EvaluationMetr
         logger.warning(f"Invalid model_provider '{model_provider}', defaulting to 'claude'")
         model_provider = "claude"
 
-    # Initialize graph with in-memory checkpointer
-    checkpointer = MemorySaver()
+    # Initialize graph with in-memory checkpointer (custom types pre-registered)
+    checkpointer = create_checkpointer()
     graph = build_graph(checkpointer=checkpointer)
 
     # Step 1: Load benchmark scales

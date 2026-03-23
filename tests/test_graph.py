@@ -633,12 +633,12 @@ def test_comparison_node_with_mocked_search():
     # Mock instrument search
     mock_convergent = ComparisonInstrument(
         name="General Self-Efficacy Scale",
-        construct="self-efficacy",
+        measured_construct="self-efficacy",
         source_citation="Schwarzer & Jerusalem (1995)"
     )
     mock_discriminant = ComparisonInstrument(
         name="Rosenberg Self-Esteem Scale",
-        construct="self-esteem",
+        measured_construct="self-esteem",
         source_citation="Rosenberg (1965)"
     )
 
@@ -732,12 +732,12 @@ def test_cross_construct_node_with_mocked_scorer():
 
     convergent = ComparisonInstrument(
         name="General Self-Efficacy Scale",
-        construct="self-efficacy",
+        measured_construct="self-efficacy",
         source_citation="Schwarzer & Jerusalem (1995)"
     )
     discriminant = ComparisonInstrument(
         name="Rosenberg Self-Esteem Scale",
-        construct="self-esteem",
+        measured_construct="self-esteem",
         source_citation="Rosenberg (1965)"
     )
 
@@ -1036,8 +1036,8 @@ async def test_analytics_dispatch_merges_results():
     mock_corr_output.correlation_matrix = mock_corr_matrix
 
     # Mock comparison
-    mock_convergent = ComparisonInstrument(name="Conv Scale", construct="test", source_citation="Author (2020)")
-    mock_discriminant = ComparisonInstrument(name="Disc Scale", construct="other", source_citation="Author (2021)")
+    mock_convergent = ComparisonInstrument(name="Conv Scale", measured_construct="test", source_citation="Author (2020)")
+    mock_discriminant = ComparisonInstrument(name="Disc Scale", measured_construct="other", source_citation="Author (2021)")
     mock_comp_output = final_output.model_copy(deep=True)
     mock_comp_output.comparison_instruments = [mock_convergent, mock_discriminant]
     mock_comp_output.convergent_validity_score = 0.78
@@ -1107,8 +1107,8 @@ def test_plagiarism_flags_known_instruments():
 
     state = {"final_output": final_output, "user_request": user_request}
 
-    mock_convergent = ComparisonInstrument(name="Satisfaction With Life Scale", construct="life satisfaction", source_citation="Diener et al. (1985)")
-    mock_discriminant = ComparisonInstrument(name="PHQ-9", construct="depression", source_citation="Kroenke et al. (2001)")
+    mock_convergent = ComparisonInstrument(name="Satisfaction With Life Scale", measured_construct="life satisfaction", source_citation="Diener et al. (1985)")
+    mock_discriminant = ComparisonInstrument(name="PHQ-9", measured_construct="depression", source_citation="Kroenke et al. (2001)")
 
     # Mock: plagiarism detector returns flags for items similar to SWLS
     mock_flags = {0: "Potential similarity to Satisfaction With Life Scale item (r = 0.88)", 1: "Potential similarity to Satisfaction With Life Scale item (r = 0.92)"}
@@ -1153,8 +1153,8 @@ def test_convergent_ceiling_warning():
 
     state = {"final_output": final_output, "user_request": user_request}
 
-    mock_convergent = ComparisonInstrument(name="Test Scale", construct="test", source_citation="Author (2020)")
-    mock_discriminant = ComparisonInstrument(name="Other Scale", construct="other", source_citation="Author (2021)")
+    mock_convergent = ComparisonInstrument(name="Test Scale", measured_construct="test", source_citation="Author (2020)")
+    mock_discriminant = ComparisonInstrument(name="Other Scale", measured_construct="other", source_citation="Author (2021)")
 
     with patch("backend.agents.instrument_searcher.search_instruments", return_value=(mock_convergent, mock_discriminant)), \
          patch("backend.agents.validity_scorer.score_convergent_validity", return_value=(0.86, "llm-as-judge")), \
@@ -1298,25 +1298,26 @@ def test_bias_construct_level_filter_preserves_unique():
 
 
 def test_stagnation_jaccard_similarity():
-    """Phase 11.5 Wave 2C: Paraphrased comments detected as stagnant."""
+    """Paraphrased comments detected as stagnant at iteration >= 2."""
     from backend.agents.critic import _detect_stagnation
     from backend.schemas import ReviewComment, IterationSnapshot
 
-    # Previous iteration
+    # Previous iterations
     prev_comment = ReviewComment(type="bias", item_index=0, issue="Item 1: Cultural assumption about individual standards in measurement", severity=3, suggested_edit="Rewrite")
     history = [
         IterationSnapshot(iteration=0, linguistic_comments=[], bias_comments=[prev_comment], content_comments=[]),
+        IterationSnapshot(iteration=1, linguistic_comments=[], bias_comments=[prev_comment], content_comments=[]),
     ]
 
     # Current iteration: paraphrased — most words overlap but phrasing differs
     current_comment = ReviewComment(type="bias", item_index=0, issue="Item 1: Cultural assumption about individual standards in assessment", severity=3, suggested_edit="Rewrite")
 
-    result = _detect_stagnation([current_comment], history, iteration=1)
-    assert result is True, "Paraphrased repetition should be detected as stagnant"
+    result = _detect_stagnation([current_comment], history, iteration=2)
+    assert result is True, "Paraphrased repetition should be detected as stagnant at iteration 2"
 
 
-def test_stagnation_triggers_at_iteration_1():
-    """Phase 11.5 Wave 2C: Stagnation detection triggers at iteration >= 1 (was >= 2)."""
+def test_stagnation_requires_two_iterations():
+    """Stagnation detection requires at least 2 revision cycles (iteration >= 2)."""
     from backend.agents.critic import _detect_stagnation
     from backend.schemas import ReviewComment, IterationSnapshot
 
@@ -1325,13 +1326,21 @@ def test_stagnation_triggers_at_iteration_1():
         IterationSnapshot(iteration=0, linguistic_comments=[], bias_comments=[comment], content_comments=[]),
     ]
 
-    # At iteration=1, stagnation should now be detected
+    # At iteration=1, stagnation should NOT trigger (need 2 revision cycles first)
     result = _detect_stagnation([comment], history, iteration=1)
-    assert result is True, "Stagnation should trigger at iteration 1"
+    assert result is False, "Stagnation should not trigger at iteration 1 (too early)"
 
     # At iteration=0, should NOT trigger (no history to compare)
     result_0 = _detect_stagnation([comment], [], iteration=0)
     assert result_0 is False, "Stagnation should not trigger at iteration 0"
+
+    # At iteration=2, stagnation SHOULD trigger
+    history_2 = [
+        IterationSnapshot(iteration=0, linguistic_comments=[], bias_comments=[comment], content_comments=[]),
+        IterationSnapshot(iteration=1, linguistic_comments=[], bias_comments=[comment], content_comments=[]),
+    ]
+    result_2 = _detect_stagnation([comment], history_2, iteration=2)
+    assert result_2 is True, "Stagnation should trigger at iteration 2"
 
 
 def test_critic_downgrades_construct_level_bias():

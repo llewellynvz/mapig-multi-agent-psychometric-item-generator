@@ -7,6 +7,7 @@ from backend.agents.instrument_searcher import (
     search_instruments,
     _get_hardcoded_defaults,
     _is_blocked_publisher,
+    _safe_int,
 )
 from backend.schemas import ComparisonInstrument
 
@@ -17,7 +18,7 @@ def test_search_convergent_instrument():
         # Mock successful Perplexity search
         mock_convergent = ComparisonInstrument(
             name="Rosenberg Self-Esteem Scale",
-            construct="self-esteem",
+            measured_construct="self-esteem",
             source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
             publication_year=1965,
             sample_items_count=10,
@@ -26,7 +27,7 @@ def test_search_convergent_instrument():
         )
         mock_discriminant = ComparisonInstrument(
             name="PHQ-9",
-            construct="depression",
+            measured_construct="depression",
             source_citation="Kroenke, K., & Spitzer, R. L. (2002). The PHQ-9. Journal of General Internal Medicine, 16(9), 606-613.",
             publication_year=2002,
             sample_items_count=9,
@@ -38,10 +39,10 @@ def test_search_convergent_instrument():
         convergent, discriminant = search_instruments("self-esteem", "A person's overall subjective evaluation of their own worth")
 
         assert convergent.name == "Rosenberg Self-Esteem Scale"
-        assert convergent.construct == "self-esteem"
+        assert convergent.measured_construct == "self-esteem"
         assert convergent.publication_year == 1965
         assert discriminant.name == "PHQ-9"
-        assert discriminant.construct == "depression"
+        assert discriminant.measured_construct == "depression"
 
 
 def test_hardcoded_defaults_coverage():
@@ -49,27 +50,27 @@ def test_hardcoded_defaults_coverage():
     # Test personality domain
     conv, disc = _get_hardcoded_defaults("extraversion")
     assert conv.name is not None
-    assert "personality" in conv.construct.lower() or "extraversion" in conv.construct.lower() or "NEO" in conv.name or "IPIP" in conv.name
+    assert "personality" in conv.measured_construct.lower() or "extraversion" in conv.measured_construct.lower() or "NEO" in conv.name or "IPIP" in conv.name
 
     # Test clinical domain
     conv, disc = _get_hardcoded_defaults("depression")
     assert conv.name is not None
-    assert "depression" in conv.construct.lower() or "PHQ" in conv.name
+    assert "depression" in conv.measured_construct.lower() or "PHQ" in conv.name
 
     # Test organizational domain
     conv, disc = _get_hardcoded_defaults("work engagement")
     assert conv.name is not None
-    assert "engagement" in conv.construct.lower() or "work" in conv.construct.lower() or "UWES" in conv.name
+    assert "engagement" in conv.measured_construct.lower() or "work" in conv.measured_construct.lower() or "UWES" in conv.name
 
     # Test social domain
     conv, disc = _get_hardcoded_defaults("loneliness")
     assert conv.name is not None
-    assert "loneliness" in conv.construct.lower() or "UCLA" in conv.name
+    assert "loneliness" in conv.measured_construct.lower() or "UCLA" in conv.name
 
     # Test cognitive domain
     conv, disc = _get_hardcoded_defaults("need for cognition")
     assert conv.name is not None
-    assert "cognition" in conv.construct.lower() or "cognitive" in conv.construct.lower()
+    assert "cognition" in conv.measured_construct.lower() or "cognitive" in conv.measured_construct.lower()
 
 
 def test_search_fallback_on_failure():
@@ -105,14 +106,14 @@ def test_related_construct_discovery():
     with patch('backend.agents.instrument_searcher._search_perplexity_instrument') as mock_search:
         mock_convergent = ComparisonInstrument(
             name="RSES",
-            construct="self-esteem",
+            measured_construct="self-esteem",
             source_citation="Rosenberg (1965)",
             publication_year=1965,
             sample_items_count=10
         )
         mock_discriminant = ComparisonInstrument(
             name="SWLS",
-            construct="life satisfaction",
+            measured_construct="life satisfaction",
             source_citation="Diener et al. (1985)",
             publication_year=1985,
             sample_items_count=5,
@@ -123,5 +124,72 @@ def test_related_construct_discovery():
         conv, disc = search_instruments("self-esteem", "Overall self-worth")
 
         # Discriminant should be related but distinct
-        assert disc.construct != conv.construct
+        assert disc.measured_construct != conv.measured_construct
         assert disc.similarity_rationale is not None
+
+
+def test_safe_int_conversion():
+    """Test _safe_int handles various LLM output formats."""
+    # Valid integers
+    assert _safe_int(10) == 10
+    assert _safe_int(0) == 0
+
+    # Numeric strings
+    assert _safe_int("9") == 9
+    assert _safe_int("  42  ") == 42
+
+    # Non-numeric strings (LLM prose)
+    assert _safe_int("Not specified in available literature") is None
+    assert _safe_int("approximately 20 items (scenario-based self-report)") is None
+    assert _safe_int("") is None
+
+    # None
+    assert _safe_int(None) is None
+
+    # Float (truncates to int)
+    assert _safe_int(3.9) == 3
+
+
+def test_perplexity_non_numeric_item_count():
+    """Test that non-numeric item_count from Perplexity doesn't crash."""
+    import json
+
+    with patch('backend.agents.instrument_searcher.settings') as mock_settings:
+        mock_settings.PERPLEXITY_API_KEY = "test-key"
+        mock_settings.PERPLEXITY_MODEL = "test-model"
+        mock_settings.PERPLEXITY_BASE_URL = "https://api.perplexity.ai"
+        mock_settings.PERPLEXITY_SEARCH_MODE = "academic"
+        mock_settings.PERPLEXITY_MAX_RESULTS = 5
+        mock_settings.perplexity_domains.return_value = []
+        mock_settings.publisher_blocklist_domains.return_value = []
+
+        response_json = {
+            "choices": [{
+                "message": {
+                    "content": json.dumps({
+                        "name": "Test Scale",
+                        "authors": "Author, A.",
+                        "year": "2020",
+                        "construct": "test construct",
+                        "item_count": "Not specified in available literature (scenario-based self-report)",
+                        "psychometric_properties": "α = 0.85",
+                        "similarity_rationale": "Related to target"
+                    })
+                }
+            }]
+        }
+
+        with patch('httpx.Client') as mock_client:
+            mock_response = Mock()
+            mock_response.json.return_value = response_json
+            mock_response.raise_for_status = Mock()
+            mock_client.return_value.__enter__ = Mock(return_value=Mock(post=Mock(return_value=mock_response)))
+            mock_client.return_value.__exit__ = Mock(return_value=False)
+
+            from backend.agents.instrument_searcher import _search_perplexity_instrument
+            result = _search_perplexity_instrument("test construct", "convergent")
+
+            # Should succeed with sample_items_count=None instead of crashing
+            assert result is not None
+            assert result.name == "Test Scale"
+            assert result.sample_items_count is None

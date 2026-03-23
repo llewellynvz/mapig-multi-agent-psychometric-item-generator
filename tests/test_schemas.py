@@ -675,7 +675,7 @@ def test_comparison_instrument_validation():
     # Test valid instrument
     instrument = ComparisonInstrument(
         name="Rosenberg Self-Esteem Scale",
-        construct="Self-Esteem",
+        measured_construct="Self-Esteem",
         source_citation="Rosenberg, M. (1965). Society and the adolescent self-image. Princeton, NJ: Princeton University Press.",
         publication_year=1965,
         sample_items_count=10,
@@ -684,14 +684,14 @@ def test_comparison_instrument_validation():
     )
 
     assert instrument.name == "Rosenberg Self-Esteem Scale"
-    assert instrument.construct == "Self-Esteem"
+    assert instrument.measured_construct == "Self-Esteem"
     assert instrument.publication_year == 1965
     assert instrument.sample_items_count == 10
 
     # Test minimal valid (only required fields)
     minimal = ComparisonInstrument(
         name="Test Scale",
-        construct="Test Construct",
+        measured_construct="Test Construct",
         source_citation="Author (2020). Title. Journal."
     )
     assert minimal.publication_year is None
@@ -703,7 +703,7 @@ def test_comparison_instrument_validation():
     with pytest.raises(ValidationError) as exc_info:
         ComparisonInstrument(
             name="A",
-            construct="Test",
+            measured_construct="Test",
             source_citation="Citation here"
         )
     assert "name" in str(exc_info.value).lower()
@@ -712,7 +712,7 @@ def test_comparison_instrument_validation():
     with pytest.raises(ValidationError) as exc_info:
         ComparisonInstrument(
             name="Test Scale",
-            construct="Test",
+            measured_construct="Test",
             source_citation="Citation",
             invalid_field="should fail"
         )
@@ -850,7 +850,7 @@ def test_finaloutput_analytics_populated():
     instruments = [
         ComparisonInstrument(
             name="Test Scale",
-            construct="Test Construct",
+            measured_construct="Test Construct",
             source_citation="Author (2020). Title. Journal."
         )
     ]
@@ -913,7 +913,7 @@ def test_finaloutput_analytics_mutable_defaults():
     # Act: Modify one instance's comparison_instruments
     instrument = ComparisonInstrument(
         name="Test Scale",
-        construct="Test",
+        measured_construct="Test",
         source_citation="Citation"
     )
     output1.comparison_instruments.append(instrument)

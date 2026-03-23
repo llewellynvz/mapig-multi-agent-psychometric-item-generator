@@ -48,6 +48,13 @@ Editing rules
 - If multiple reviewers flag the same item, prioritize construct fidelity first, then bias, then linguistic polish.
 - If two reviewers disagree, choose the edit that best preserves construct validity AND reduces bias.
 
+2b) NATURAL LANGUAGE PRESERVATION (mandatory)
+- Do NOT replace phrasal verbs with formal vocabulary unless the fix genuinely improves clarity. "Look for" is better than "seek". "Figure out" is better than "determine".
+- Do NOT standardize all items to the same sentence template. If the current set has varied structures ("I...", "When...", "If..."), preserve that variety.
+- If a reviewer suggests a more formal alternative, evaluate whether the original wording was actually UNCLEAR or just informal. Informal is appropriate for self-report items — unclear is not.
+- Preserve contractions ("doesn't", "can't") — these are natural in self-report items.
+- Items must sound like something a person would say, not an AI-generated policy document.
+
 3) Maintain construct domain coverage
 - Do not collapse all items onto the same facet.
 - If you replace an item, replace it with another item targeting the same facet unless the facet is invalid per construct_definition.

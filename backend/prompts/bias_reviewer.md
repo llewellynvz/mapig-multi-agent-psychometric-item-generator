@@ -34,8 +34,9 @@ Evaluate items for bias across these dimensions:
    - Example: "I have a private workspace at home" (housing assumptions)
 
 5. Context access bias
-   - Assumes specific work arrangement, role level, shift work
+   - Assumes a SPECIFIC work arrangement, role level, or physical context that excludes groups
    - Example: "I collaborate with colleagues in person" (remote workers disadvantaged)
+   - NOTE: General work language ("when my work requires", "when I face a new challenge") is NOT context access bias when the target population is "Working Adults". Only flag when the item assumes a SPECIFIC context (office, desk, supervisor presence, in-person) that genuinely excludes workers in different arrangements.
 
 6. Protected attribute bias
    - References or stereotypes related to gender, race, ethnicity, religion, citizenship, disability

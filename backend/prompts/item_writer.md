@@ -8,6 +8,23 @@ CRITICAL PRIORITY ORDER:
 
 If evidence conflicts with construct_definition, flag in rationale and defer to evidence.
 
+NATURAL LANGUAGE REQUIREMENT (mandatory):
+Items must sound like something a real person would naturally say — not a policy document, corporate memo, or AI-generated text.
+
+Rules:
+1. VARY sentence structure across items. Do NOT use the same template for all items (e.g., "I [verb] [object] when [condition]" repeated 7 times is UNACCEPTABLE). Mix structures: some start with "I...", some with "When...", some with "If...", some as simple statements.
+2. Use NATURAL English — phrasal verbs ("look for", "figure out", "come up with") are preferred over formal alternatives ("seek", "determine", "devise") because they match how people actually speak.
+3. Use contractions where natural ("doesn't" not "does not", "can't" not "cannot") — Likert items are self-report, not legal documents.
+4. Include some items that START with a condition or context ("When plans change, I..." or "If my first approach fails, I...").
+5. Aim for items that could appear in a conversation between colleagues, not in a textbook.
+6. Self-check: read each item aloud. If it sounds like an AI wrote it, rewrite it.
+
+BAD (robotic): "I consider different solutions when my first idea does not work."
+GOOD (natural): "When my first idea doesn't work, I try a different approach."
+
+BAD (formulaic — all items same template): "I change my actions when..." / "I use different methods when..." / "I consider other options when..."
+GOOD (varied structures): "I'm quick to try a different angle when something isn't working." / "When plans change, I adapt without much difficulty." / "Figuring out new ways to tackle problems comes naturally to me."
+
 Inputs you will receive (in the user message)
 A JSON object with:
 - construct_name (string)
@@ -114,7 +131,7 @@ STRICT BOUNDARY ENFORCEMENT:
 6. Concrete language: Short, simple, concrete sentences
 7. Temporal clarity: Anchor vague quantifiers or avoid them. Avoid retrospective summation ('turned out', 'so far', 'looking back') unless construct explicitly requires trajectory. Keep items focused on CURRENT or TYPICAL state evaluation.
 8. Positive keying only: No reverse-scored items
-9. Cultural neutrality: Avoid idioms, culture-specific references. If target_population involves multi-lingual regions (e.g., South Africa), prioritize plain language translatable across local languages (isiZulu, Sesotho, Afrikaans). Avoid phrasal verbs ('give up', 'look forward to') — use single-word equivalents. Avoid abstract metaphors.
+9. Cultural neutrality: Avoid idioms, culture-specific references, and abstract metaphors. If target_population involves multi-lingual regions (e.g., South Africa), prioritize plain language translatable across local languages — but do NOT strip out natural phrasal verbs. Common phrasal verbs ("look for", "try out", "think about") are acceptable in all populations. Only avoid idiomatic phrasal verbs whose meaning genuinely changes in translation (e.g., "put up with" → may confuse in isiZulu).
 10. Accessibility: No assumptions about work, family, citizenship, resources
 
 Section B: Wording and comprehension
@@ -127,7 +144,7 @@ Section B: Wording and comprehension
 - Avoid cause and effect sequencing in the same item.
 - Use first-person agreement statements suitable for Likert responding.
 - Items should not be such that virtually everyone or no one will endorse them.
-- Items should avoid adverbs and adjectives.
+- Use adverbs sparingly for precision, not decoration. Adjectives are fine when they add clarity (e.g., "new approach" is clearer than "approach").
 
 Semantic Diversity Examples:
 ❌ BAD (redundant set - synonym substitution):

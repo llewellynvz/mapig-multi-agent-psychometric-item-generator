@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import List, Tuple
 
-from backend.agents.llm_utils import TokenUsage, invoke_structured
+from backend.agents.llm_utils import TokenUsage, invoke_structured_with_usage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import EvidenceChunk, FacetMapperResponse, UserRequest
 
@@ -54,7 +54,7 @@ def map_facets(
         ("human", f"Analyze this construct and return the facet mapping.\n\nINPUT:\n{user_payload}"),
     ]
 
-    resp, usage = invoke_structured(
+    resp, usage = invoke_structured_with_usage(
         FacetMapperResponse,
         messages,
         agent_name="facet_mapper",

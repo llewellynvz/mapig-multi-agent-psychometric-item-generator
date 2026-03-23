@@ -12,8 +12,8 @@ from backend.settings import settings
 # Agent model overrides for cost optimization
 # Format: "agent_name": ("provider", "model_name")
 AGENT_MODEL_OVERRIDES = {
-    "bias_reviewer": ("openai", "gpt-4o-mini"),  # 20x cheaper than Sonnet, async OK
-    "critic": ("openai", "gpt-4o-mini"),  # 20x cheaper, has rule fallback
+    "bias_reviewer": ("openai", "gpt-5.4-mini"),  # Cost-effective for fairness detection
+    "critic": ("openai", "gpt-5.4-mini"),  # Cost-effective, has rule fallback (90% zero-token)
 }
 
 
@@ -176,10 +176,12 @@ def get_chat_model_for_agent(
         ValueError: If required API key missing for selected provider
     """
     # Define critic agents that can be switched to ChatGPT
-    CRITIC_AGENTS = ["validator", "linguistic_reviewer", "bias_reviewer", "content_reviewer", "critic"]
+    # NOTE: validator excluded — always uses Claude (Sonnet first, Opus on retry)
+    # to prevent lazy identical-score evaluations from GPT models
+    CRITIC_AGENTS = ["linguistic_reviewer", "bias_reviewer", "content_reviewer", "critic"]
 
     # Special case: ChatGPT critics toggle
-    # When enabled, all critic agents use ChatGPT o1-5.2-flex
+    # When enabled, critic agents use ChatGPT (validator always stays on Claude)
     if use_chatgpt_critics and agent_name in CRITIC_AGENTS:
         return get_openai_chat_model(model=settings.CHATGPT_CRITIC_MODEL)
 

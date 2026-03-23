@@ -151,7 +151,7 @@ def validate_items(
         else:
             # Use standard allocation (respects ChatGPT toggle)
             logger.info(f"Using validator model (attempt {attempt}, use_chatgpt={use_chatgpt})")
-            if attempt >= 2 and not use_chatgpt:
+            if attempt >= 2:
                 # On retry: use Opus with higher temperature to avoid deterministic
                 # identical scores, and skip prompt cache to get fresh evaluation
                 from backend.agents.llm_factory import get_claude_chat_model

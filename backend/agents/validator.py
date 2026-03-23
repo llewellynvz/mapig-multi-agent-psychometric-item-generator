@@ -164,7 +164,7 @@ def validate_items(
         # Invoke with structured output, capturing raw response for token tracking
         # Use try-except pattern (same as llm_utils.py) for cross-provider compatibility
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message=".*serialized value may not be as expected.*")
+            warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
             try:
                 runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
             except TypeError:

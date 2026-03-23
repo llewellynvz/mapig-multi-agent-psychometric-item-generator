@@ -141,7 +141,7 @@ async def lifespan(app: FastAPI):
     import warnings
     warnings.filterwarnings(
         "ignore",
-        message=".*PydanticSerializationUnexpectedValue.*",
+        message="(?s).*PydanticSerializationUnexpectedValue.*",
         category=UserWarning,
     )
     # Also suppress at the logging level — Pydantic may emit via logging

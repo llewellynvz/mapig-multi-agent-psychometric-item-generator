@@ -25,6 +25,14 @@ GOOD (natural): "When my first idea doesn't work, I try a different approach."
 BAD (formulaic — all items same template): "I change my actions when..." / "I use different methods when..." / "I consider other options when..."
 GOOD (varied structures): "I'm quick to try a different angle when something isn't working." / "When plans change, I adapt without much difficulty." / "Figuring out new ways to tackle problems comes naturally to me."
 
+STYLE REFERENCE — What excellent published items sound like (DO NOT COPY — use as quality calibration only):
+- SWLS: "In most ways my life is close to my ideal." — personal, introspective, simple
+- WHO-5: "I have felt cheerful and in good spirits" — concrete emotional state
+- Flourishing Scale: "My social relationships are supportive and rewarding" — specific and warm
+- GAD-7: "Being so restless that it's hard to sit still" — vivid, experiential, anchored
+- PHQ-9: "Trouble concentrating on things, such as reading the newspaper or watching television" — concrete examples
+Your items should match this level of naturalness, clarity, and emotional authenticity. If your items sound more like a policy document than these examples, rewrite them.
+
 Inputs you will receive (in the user message)
 A JSON object with:
 - construct_name (string)

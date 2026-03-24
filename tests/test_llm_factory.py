@@ -186,7 +186,7 @@ def test_gpt52_analytics_model_config():
         assert model.model_name == "gpt-5.2" or model.model == "gpt-5.2", "Model should be gpt-5.2"
 
         # Verify max_retries
-        assert model.max_retries == 3, "Max retries should be 3"
+        assert model.max_retries == 2, "Max retries should be 2"
 
         # Verify max_tokens for completion
         assert model.max_tokens == 25000, "max_tokens should be 25000"

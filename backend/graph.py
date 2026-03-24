@@ -4,6 +4,7 @@ import logging
 import asyncio
 import concurrent.futures
 import datetime as _dt
+import time as _time
 import uuid
 from typing import List, Literal, Optional
 
@@ -166,12 +167,26 @@ class GraphState(TypedDict, total=False):
     # Phase 10: Whether GPT-5.2 is enabled for analytics
     gpt52_analytics_enabled: bool
 
+    # Time budget (Vercel 300s limit)
+    _start_time: float  # time.time() set in init_run
+
     # Output
     final_output: FinalOutput
 
 
 def _utc_now() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
+
+
+_VERCEL_MAX_DURATION = 300  # seconds (from vercel.json maxDuration)
+
+
+def _remaining_seconds(state: GraphState) -> float:
+    """Return seconds remaining in the Vercel function budget."""
+    start = state.get("_start_time")
+    if not start:
+        return _VERCEL_MAX_DURATION  # No tracking — assume full budget
+    return max(0.0, _VERCEL_MAX_DURATION - (_time.time() - start))
 
 
 def _create_abbreviated_request(
@@ -232,6 +247,7 @@ def init_run(state: GraphState) -> GraphState:
             "failed_item_indices": [],
             "timestamp_utc": state.get("timestamp_utc") or _utc_now(),
             "run_id": state.get("run_id") or str(uuid.uuid4()),
+            "_start_time": _time.time(),
             "opus_tokens_used": 0,
             "sonnet_tokens_used": 0,
             "openai_tokens_used": 0,
@@ -1142,7 +1158,21 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             return {}
 
         gpt52_enabled = state.get("gpt52_analytics_enabled", False)
-        logger.info(f"Running parallel analytics (GPT-5.2 enabled: {gpt52_enabled})")
+        remaining = _remaining_seconds(state)
+        logger.info(
+            "Running parallel analytics (GPT-5.2 enabled: %s, remaining: %.0fs)",
+            gpt52_enabled, remaining,
+        )
+
+        updated = final_output.model_copy(deep=True)
+
+        # Time budget: skip ALL analytics if <90s remain (items are already finalized)
+        if remaining < 90:
+            logger.warning(
+                "ANALYTICS_SKIPPED remaining=%.0fs (<90s) — returning finalized items without analytics",
+                remaining,
+            )
+            return {"final_output": updated}
 
         # Phase 1: correlation + comparison in parallel
         results = await asyncio.gather(
@@ -1157,9 +1187,6 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             "ok" if isinstance(correlation_result, dict) else type(correlation_result).__name__,
             "ok" if isinstance(comparison_result, dict) else type(comparison_result).__name__,
         )
-
-        # Merge into single FinalOutput
-        updated = final_output.model_copy(deep=True)
 
         if isinstance(correlation_result, dict) and "final_output" in correlation_result:
             updated.correlation_matrix = correlation_result["final_output"].correlation_matrix
@@ -1187,26 +1214,13 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             logger.error(f"Comparison analysis failed: {comparison_result}")
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
-        # Time budget guard: skip if <60s remaining to avoid Vercel timeout
-        _CROSS_CONSTRUCT_BUDGET_S = 60
-        elapsed_s = 0.0
-        ts_str = state.get("timestamp_utc")
-        if ts_str:
-            try:
-                start = _dt.datetime.fromisoformat(ts_str)
-                elapsed_s = (_dt.datetime.now(tz=_dt.timezone.utc) - start).total_seconds()
-            except (ValueError, TypeError):
-                pass
-
-        vercel_max = 300  # Vercel maxDuration
-        remaining = vercel_max - elapsed_s
-
+        remaining = _remaining_seconds(state)
         if not updated.comparison_instruments:
             logger.info("No comparison instruments found, skipping cross-construct analysis")
-        elif remaining < _CROSS_CONSTRUCT_BUDGET_S:
+        elif remaining < 60:
             logger.warning(
-                "CROSS_CONSTRUCT_SKIPPED remaining=%.0fs (need %ds) — skipping to avoid timeout",
-                remaining, _CROSS_CONSTRUCT_BUDGET_S,
+                "CROSS_CONSTRUCT_SKIPPED remaining=%.0fs (<60s) — skipping to avoid timeout",
+                remaining,
             )
         else:
             cross_state = dict(state)

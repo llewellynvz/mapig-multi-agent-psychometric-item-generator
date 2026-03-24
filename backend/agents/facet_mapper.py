@@ -13,7 +13,8 @@ from typing import List, Tuple
 
 from backend.agents.llm_utils import TokenUsage, invoke_structured_with_usage
 from backend.agents.prompt_loader import load_prompt
-from backend.schemas import EvidenceChunk, FacetMapperResponse, UserRequest
+from backend.schemas import EvidenceChunk, FacetDefinition, FacetMapperResponse, UserRequest
+from backend.settings import settings
 
 logger = logging.getLogger("lmaig.facet_mapper")
 
@@ -37,6 +38,21 @@ def map_facets(
         request.item_count,
         len(evidence),
     )
+
+    if settings.APP_MODE == "mock":
+        # Return a single-facet unidimensional mapping covering all requested items
+        return FacetMapperResponse(
+            is_unidimensional=True,
+            facets=[
+                FacetDefinition(
+                    facet_name=request.construct_name,
+                    facet_description=request.construct_definition or f"Core dimension of {request.construct_name}",
+                    exclusions="Not related constructs or sub-constructs",
+                    target_item_count=request.item_count,
+                )
+            ],
+            theoretical_basis=f"Mock facet mapping for {request.construct_name}",
+        ), TokenUsage()
 
     system_prompt = load_prompt("facet_mapper.md")
 

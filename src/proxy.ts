@@ -10,7 +10,7 @@ function logRequest(req: NextRequest) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       id: `log_${Date.now()}`,
-      location: "frontend/middleware.ts",
+      location: "frontend/proxy.ts",
       message: "next_request",
       data: { path: req.nextUrl.pathname, method: req.method },
       timestamp: Date.now(),
@@ -20,7 +20,7 @@ function logRequest(req: NextRequest) {
 }
 // #endregion
 
-export function middleware(request: NextRequest, event: NextFetchEvent) {
+export function proxy(request: NextRequest, event: NextFetchEvent) {
   // #region agent log
   event.waitUntil(logRequest(request));
   // #endregion
@@ -30,7 +30,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
 export const config = {
   matcher: [
     /*
-     * Exclude Next.js internals and static assets from middleware so chunk/js/css
+     * Exclude Next.js internals and static assets from proxy so chunk/js/css
      * requests are served directly and cannot be delayed by logging.
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)",

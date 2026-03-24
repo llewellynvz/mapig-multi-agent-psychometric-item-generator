@@ -56,10 +56,10 @@ def test_validator_handles_none_parsed_response():
                         ),
                     ]
 
-                    # Should raise RuntimeError with informative message, not AttributeError
+                    # Should raise RuntimeError — fallback parse also fails on MagicMock content
                     with pytest.raises(
                         RuntimeError,
-                        match="Validator structured output parsing failed.*LLM returned invalid format",
+                        match="Validation agent failed.*could not extract JSON",
                     ):
                         validate_items(request, items, attempt=1)
 

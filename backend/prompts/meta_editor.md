@@ -22,7 +22,7 @@ Return JSON only with this exact shape:
     {
       "item_text": "<string>",
       "construct_name": "<string>",
-      "rationale": "<string>",
+      "rationale": "<string, max 50 words / 350 characters>",
       "evidence_citations": ["<EvidenceChunk.source_id>", "..."]
     }
   ],
@@ -38,6 +38,8 @@ Return JSON only with this exact shape:
     ]
   }
 }
+
+**CRITICAL: Keep each rationale under 50 words (350 characters max). Concise, technical rationales only — 2 sentences maximum. Exceeding this limit causes a validation failure.**
 
 Editing rules
 1) Preserve count

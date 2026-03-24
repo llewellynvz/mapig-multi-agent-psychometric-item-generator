@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import warnings
-from typing import Dict, List, Optional, Tuple, Type, TypeVar
+import json
+from typing import Callable, Dict, List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -96,6 +97,7 @@ def invoke_structured_with_usage(
     model_provider: Optional[str] = None,
     use_cache_control: bool = True,
     use_chatgpt_critics: bool = False,
+    pre_validate: Optional[Callable[[dict], dict]] = None,
 ) -> Tuple[SchemaT, TokenUsage]:
     """
     Invoke the configured LLM and return validated structured output WITH token usage.
@@ -112,6 +114,8 @@ def invoke_structured_with_usage(
         model_provider: Optional provider override ("claude" or "openai")
         use_cache_control: Enable prompt caching for system messages (default: True)
         use_chatgpt_critics: Use ChatGPT for critic agents (cost comparison mode)
+        pre_validate: Optional callable to transform raw JSON dict before Pydantic
+                      validation. Used for field-level fixups (e.g. truncating strings).
 
     Returns:
         Tuple of (validated response instance, token usage)
@@ -200,4 +204,8 @@ def invoke_structured_with_usage(
             cleaned = cleaned.strip("`")
             cleaned = cleaned.replace("json", "", 1).strip()
 
+        if pre_validate:
+            data = json.loads(cleaned)
+            data = pre_validate(data)
+            return (schema.model_validate(data), usage)
         return (schema.model_validate_json(cleaned), usage)

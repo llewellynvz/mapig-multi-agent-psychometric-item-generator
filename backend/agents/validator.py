@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import warnings
 from typing import List, Tuple
 
@@ -287,7 +288,13 @@ def validate_items(
                 runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
             except TypeError:
                 runnable = model.with_structured_output(ValidationResponse, include_raw=True)
+            _t0 = time.perf_counter()
             response = runnable.invoke(messages)
+            _elapsed = time.perf_counter() - _t0
+            logger.info(
+                "LLM_CALL agent=validator model=%s attempt=%d elapsed=%.1fs",
+                model_name, attempt, _elapsed,
+            )
 
         # Extract result and token usage
         if isinstance(response, dict) and "parsed" in response and "raw" in response:
@@ -295,6 +302,7 @@ def validate_items(
             raw_message = response["raw"]
 
             # If structured parsing failed, try JSON fallback with field fixups
+            used_fallback = False
             if result is None:
                 logger.warning(
                     "VALIDATOR structured output parsed=None, attempting JSON fallback. "
@@ -302,10 +310,12 @@ def validate_items(
                     model_name, attempt,
                 )
                 result = _fallback_parse_validation(raw_message)
+                used_fallback = True
 
             usage = _extract_token_usage(raw_message, model_name)
         else:
             # Fallback: no raw message available (older LangChain behavior)
+            used_fallback = False
             result = response
             usage = TokenUsage(model_name=model_name)
 
@@ -343,18 +353,19 @@ def validate_items(
             v.accept = recalc >= 7.0
 
         # Detect lazy identical scores — all items get same dimension scores
+        # Skip retry when fallback parsing was used — retrying won't help and wastes 60s+ per attempt
         if _detect_identical_scores(result.validations):
             logger.warning(
-                "VALIDATOR_IDENTICAL_SCORES attempt=%d model=%s items=%d — "
-                "all items received identical dimension scores, indicating lazy LLM evaluation",
-                attempt, model_name, len(result.validations),
+                "VALIDATOR_IDENTICAL_SCORES attempt=%d model=%s items=%d fallback=%s — "
+                "all items received identical dimension scores",
+                attempt, model_name, len(result.validations), used_fallback,
             )
-            if attempt < 3:
+            if attempt < 3 and not used_fallback:
                 raise RuntimeError(
                     "Validator returned identical scores for all items — "
                     "forcing retry with different model/temperature"
                 )
-            # On attempt 3 (hard limit), accept but the warning is logged
+            # Accept when: attempt 3 (hard limit) OR fallback was used (retry won't help)
 
         accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(

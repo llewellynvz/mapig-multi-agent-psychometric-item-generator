@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 from typing import Any, Dict, List
 
 import httpx
@@ -216,10 +217,13 @@ def surf(request: UserRequest) -> RetrievalResponse:
         "Content-Type": "application/json",
     }
 
+    _t0 = time.perf_counter()
     with httpx.Client(timeout=60) as client:
         resp = client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
+    _elapsed = time.perf_counter() - _t0
+    log.info("PERPLEXITY_CALL elapsed=%.1fs status=%d", _elapsed, resp.status_code)
 
     # Task #4: Process LLM response for structured evidence
     evidence = _process_perplexity_response(data)
@@ -290,10 +294,13 @@ def surf(request: UserRequest) -> RetrievalResponse:
         }
 
         try:
+            _t0_retry = time.perf_counter()
             with httpx.Client(timeout=60) as client:
                 retry_resp = client.post(url, headers=headers, json=retry_payload)
                 retry_resp.raise_for_status()
                 retry_data = retry_resp.json()
+            _elapsed_retry = time.perf_counter() - _t0_retry
+            log.info("PERPLEXITY_CALL elapsed=%.1fs status=%d (retry %d)", _elapsed_retry, retry_resp.status_code, retry_count)
 
             retry_evidence = _process_perplexity_response(retry_data)
 
@@ -351,10 +358,13 @@ def surf(request: UserRequest) -> RetrievalResponse:
                     "search_domain_filter": domains,
                 },
             }
+            _t0_cultural = time.perf_counter()
             with httpx.Client(timeout=60) as client:
                 cultural_resp = client.post(url, headers=headers, json=cultural_payload)
                 cultural_resp.raise_for_status()
                 cultural_data = cultural_resp.json()
+            _elapsed_cultural = time.perf_counter() - _t0_cultural
+            log.info("PERPLEXITY_CALL elapsed=%.1fs status=%d (cultural)", _elapsed_cultural, cultural_resp.status_code)
 
             # Extract cultural context as evidence chunks
             cultural_content = cultural_data.get("choices", [{}])[0].get("message", {}).get("content", "")

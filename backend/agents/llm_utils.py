@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import time
 import warnings
 import json
+import logging
 from typing import Callable, Dict, List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
@@ -168,7 +170,13 @@ def invoke_structured_with_usage(
             except TypeError:
                 runnable = llm.with_structured_output(schema, include_raw=True)
 
+            _t0 = time.perf_counter()
             result = runnable.invoke(messages)
+            _elapsed = time.perf_counter() - _t0
+            logging.getLogger("lmaig").info(
+                "LLM_CALL agent=%s model=%s elapsed=%.1fs",
+                agent_name or "unknown", model_name, _elapsed,
+            )
 
         # with_structured_output(include_raw=True) returns dict with 'parsed' and 'raw'
         if isinstance(result, dict) and "parsed" in result and "raw" in result:
@@ -194,7 +202,13 @@ def invoke_structured_with_usage(
             "STRUCTURED_OUTPUT_FALLBACK agent=%s schema=%s error=%s",
             agent_name or "unknown", schema.__name__, e,
         )
+        _t0_fb = time.perf_counter()
         ai_msg = llm.invoke(messages)
+        _elapsed_fb = time.perf_counter() - _t0_fb
+        _logger.info(
+            "LLM_CALL agent=%s model=%s elapsed=%.1fs (fallback)",
+            agent_name or "unknown", model_name, _elapsed_fb,
+        )
         usage = _extract_token_usage(ai_msg, model_name)
 
         text = ai_msg.content if isinstance(ai_msg.content, str) else str(ai_msg.content)

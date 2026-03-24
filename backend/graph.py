@@ -231,6 +231,7 @@ def _create_abbreviated_request(
 def init_run(state: GraphState) -> GraphState:
     """Initialize control fields."""
     with step("init_run", state):
+        logger.info("ELAPSED %.0fs at init_run", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         # Sanitize user inputs before any prompt interpolation
         sanitize_user_request(state["user_request"])
 
@@ -261,6 +262,7 @@ def init_run(state: GraphState) -> GraphState:
 
 def retrieve_node(state: GraphState) -> GraphState:
     with step("retrieve_node", state):
+        logger.info("ELAPSED %.0fs at retrieve_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         # Local sources
         resp = retrieve_evidence(state["user_request"])
         evidence = list(resp.evidence)
@@ -328,6 +330,7 @@ def _check_item_diversity(items: List[DraftItem]) -> None:
 def facet_mapper_node(state: GraphState) -> GraphState:
     """Map construct facets from evidence before item generation."""
     with step("facet_mapper_node", state):
+        logger.info("ELAPSED %.0fs at facet_mapper_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         from backend.agents.facet_mapper import map_facets
 
         resp, usage = map_facets(state["user_request"], state.get("evidence", []))
@@ -341,6 +344,7 @@ def facet_mapper_node(state: GraphState) -> GraphState:
 
 def item_writer_node(state: GraphState) -> GraphState:
     with step("item_writer_node", state):
+        logger.info("ELAPSED %.0fs at item_writer_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         resp, usage = write_items(
             state["user_request"],
             state.get("evidence", []),
@@ -361,6 +365,7 @@ def item_writer_node(state: GraphState) -> GraphState:
 def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
     """Validate draft items with LLM-as-judge scoring and route based on results."""
     with step("validation_node", state):
+        logger.info("ELAPSED %.0fs at validation_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         from backend.agents.validator import validate_items
 
         draft_items = state.get("draft_items", [])
@@ -459,6 +464,7 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
 def regenerate_items_node(state: GraphState) -> GraphState:
     """Regenerate only items that failed validation."""
     with step("regenerate_items_node", state):
+        logger.info("ELAPSED %.0fs at regenerate_items_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         from backend.agents.item_writer import write_items
 
         validation_results = state.get("validation_results", [])
@@ -498,6 +504,7 @@ def regenerate_items_node(state: GraphState) -> GraphState:
 
 def linguistic_review_node(state: GraphState) -> GraphState:
     with step("linguistic_review_node", state):
+        logger.info("ELAPSED %.0fs at linguistic_review_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         resp, usage = review_linguistic(
             state["user_request"],
             state.get("draft_items", []),
@@ -512,6 +519,7 @@ def linguistic_review_node(state: GraphState) -> GraphState:
 
 def bias_review_node(state: GraphState) -> GraphState:
     with step("bias_review_node", state):
+        logger.info("ELAPSED %.0fs at bias_review_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         resp, usage = review_bias(
             state["user_request"],
             state.get("draft_items", []),
@@ -525,6 +533,7 @@ def bias_review_node(state: GraphState) -> GraphState:
 
 def content_review_node(state: GraphState) -> GraphState:
     with step("content_review_node", state):
+        logger.info("ELAPSED %.0fs at content_review_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         resp, usage = review_content(
             state["user_request"],
             state.get("draft_items", []),
@@ -545,6 +554,7 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
     (~500-800 tokens per reviewer × 3 reviewers = ~1,500-2,400 tokens saved per iteration).
     """
     with step("reviewers_fanout_node", state):
+        logger.info("ELAPSED %.0fs at reviewers_fanout_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         full_request = state["user_request"]
         # Create abbreviated request with cultural context from evidence
         abbreviated_request = _create_abbreviated_request(
@@ -639,6 +649,7 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "final
 
 def meta_editor_node(state: GraphState) -> GraphState:
     with step("meta_editor_node", state):
+        logger.info("ELAPSED %.0fs at meta_editor_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         # Smart comment filtering: Only pass high-severity comments (≥3) to Meta-Editor
         # This reduces input tokens by 40-60% while preserving critical feedback
         linguistic_comments = state.get("linguistic_comments", [])
@@ -709,6 +720,7 @@ def meta_editor_node(state: GraphState) -> GraphState:
 def finalize_node(state: GraphState) -> GraphState:
     # Collect allowlisted sources used (doc refs or urls)
     with step("finalize_node", state):
+        logger.info("ELAPSED %.0fs at finalize_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         approved_sources = []
         for e in state.get("evidence", []):
             if e.url_or_docref not in approved_sources:
@@ -852,6 +864,7 @@ async def correlation_node(state: GraphState) -> GraphState:
     to estimate pairwise correlations, then calculates McDonald's omega.
     """
     with step("correlation_node", state):
+        logger.info("ELAPSED %.0fs at correlation_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         try:
             # Extract finalized items from state
             final_output = state.get("final_output")
@@ -931,6 +944,7 @@ def comparison_node(state: GraphState) -> GraphState:
     scores convergent validity, runs plagiarism detection, and updates FinalOutput.
     """
     with step("comparison_node", state):
+        logger.info("ELAPSED %.0fs at comparison_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         try:
             # Extract finalized items from state
             final_output = state.get("final_output")
@@ -1043,6 +1057,7 @@ def cross_construct_node(state: GraphState) -> GraphState:
     and comparison constructs, builds CrossConstructComparison with validity flags.
     """
     with step("cross_construct_node", state):
+        logger.info("ELAPSED %.0fs at cross_construct_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         try:
             # Extract finalized items from state
             final_output = state.get("final_output")
@@ -1152,6 +1167,7 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
     Budget check runs at the end.
     """
     with step("analytics_dispatch_node", state):
+        logger.info("ELAPSED %.0fs at analytics_dispatch_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
         final_output = state.get("final_output")
         if not final_output or len(final_output.final_items) < 3:
             logger.info(f"Too few items for analytics (minimum 3), skipping")

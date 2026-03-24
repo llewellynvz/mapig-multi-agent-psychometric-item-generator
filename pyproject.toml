@@ -24,7 +24,7 @@ dependencies = [
 dev = ["pytest==9.0.2"]
 
 [tool.poetry]
-name = "MAPIG: Multi-Agent Psychometric Item Generator"
+name = "mapig"
 version = "0.1.0"
 description = "A multi-agent orchestrator for Psychometric Self-Report Item Generation(LangGraph + Azure OpenAI)"
 authors = ["Prof. Llewellyn E. Van Zyl <llewellyn101@gmail.com>"]

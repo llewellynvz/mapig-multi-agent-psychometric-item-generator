@@ -1187,7 +1187,28 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             logger.error(f"Comparison analysis failed: {comparison_result}")
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
-        if updated.comparison_instruments:
+        # Time budget guard: skip if <60s remaining to avoid Vercel timeout
+        _CROSS_CONSTRUCT_BUDGET_S = 60
+        elapsed_s = 0.0
+        ts_str = state.get("timestamp_utc")
+        if ts_str:
+            try:
+                start = _dt.datetime.fromisoformat(ts_str)
+                elapsed_s = (_dt.datetime.now(tz=_dt.timezone.utc) - start).total_seconds()
+            except (ValueError, TypeError):
+                pass
+
+        vercel_max = 300  # Vercel maxDuration
+        remaining = vercel_max - elapsed_s
+
+        if not updated.comparison_instruments:
+            logger.info("No comparison instruments found, skipping cross-construct analysis")
+        elif remaining < _CROSS_CONSTRUCT_BUDGET_S:
+            logger.warning(
+                "CROSS_CONSTRUCT_SKIPPED remaining=%.0fs (need %ds) — skipping to avoid timeout",
+                remaining, _CROSS_CONSTRUCT_BUDGET_S,
+            )
+        else:
             cross_state = dict(state)
             cross_state["final_output"] = updated
             try:
@@ -1196,8 +1217,6 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
                     updated.cross_construct_analysis = cross_result["final_output"].cross_construct_analysis
             except Exception as e:
                 logger.error(f"Cross-construct analysis failed: {e}")
-        else:
-            logger.info("No comparison instruments found, skipping cross-construct analysis")
 
         # Budget check
         if gpt52_enabled:

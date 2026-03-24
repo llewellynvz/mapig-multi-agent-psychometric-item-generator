@@ -76,7 +76,8 @@ class Settings(BaseSettings):
 
     # Orchestrator tuning
     ITEM_COUNT: int = 10
-    # Max 3 iterations: rounds 1-2 are strict, round 3 is a rare safety net
+    # Max 2 iterations: fits within Vercel 300s budget. Stagnation detection
+    # typically triggers by iteration 2 anyway. Raise to 3 for local dev only.
     MAX_ITERATIONS: int = 3
     CRITIC_MAX_SEVERITY_TO_ACCEPT: int = Field(default=2, ge=1, le=5)
 

@@ -139,8 +139,8 @@ def get_gpt52_analytics_model() -> ChatOpenAI:
         reasoning=reasoning_config,
         max_tokens=25000,
         temperature=0.2,
-        max_retries=3,
-        timeout=60,
+        max_retries=2,
+        timeout=45,  # Tight budget for Vercel 300s limit
     )
 
 

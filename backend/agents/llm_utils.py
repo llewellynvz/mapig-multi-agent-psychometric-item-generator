@@ -196,7 +196,6 @@ def invoke_structured_with_usage(
 
     except Exception as e:
         # Fallback: validate returned text as JSON
-        import logging
         _logger = logging.getLogger("lmaig")
         _logger.warning(
             "STRUCTURED_OUTPUT_FALLBACK agent=%s schema=%s error=%s",

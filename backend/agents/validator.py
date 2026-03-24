@@ -330,6 +330,18 @@ def validate_items(
                     )
                     v.item_text = expected_text
 
+        # Server-side weighted_score recalculation — LLMs often miscalculate
+        _WEIGHTS = {"correspondence": 0.5, "distinctiveness": 0.25, "clarity": 0.15, "specificity": 0.10}
+        for v in result.validations:
+            recalc = sum(ds.score * _WEIGHTS.get(ds.dimension, 0) for ds in v.dimension_scores)
+            if abs(v.weighted_score - recalc) > 0.01:
+                logger.warning(
+                    "VALIDATOR_SCORE_MISMATCH item=%d llm=%.2f recalc=%.2f",
+                    v.item_index, v.weighted_score, recalc,
+                )
+            v.weighted_score = round(recalc, 2)
+            v.accept = recalc >= 7.0
+
         # Detect lazy identical scores — all items get same dimension scores
         if _detect_identical_scores(result.validations):
             logger.warning(

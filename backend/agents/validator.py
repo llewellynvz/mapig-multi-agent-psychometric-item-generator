@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import warnings
 from typing import List, Tuple
@@ -31,6 +32,81 @@ from backend.schemas import (
 from backend.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+_REASONING_MAX = 280
+
+
+def _clamp_validation_fields(data: dict) -> dict:
+    """Fix common field-level issues in raw validator JSON before Pydantic validation."""
+    for v in data.get("validations", []):
+        if not isinstance(v, dict):
+            continue
+        for ds in v.get("dimension_scores", []):
+            if not isinstance(ds, dict):
+                continue
+            # Truncate oversized reasoning
+            reasoning = ds.get("reasoning", "")
+            if isinstance(reasoning, str) and len(reasoning) > _REASONING_MAX:
+                truncated = reasoning[:_REASONING_MAX]
+                last_period = truncated.rfind(". ")
+                if last_period > 0:
+                    ds["reasoning"] = truncated[: last_period + 1]
+                else:
+                    ds["reasoning"] = truncated[: _REASONING_MAX - 3] + "..."
+            # Clamp score to valid range
+            score = ds.get("score")
+            if isinstance(score, (int, float)):
+                ds["score"] = max(1, min(10, int(score)))
+    return data
+
+
+def _fallback_parse_validation(raw_message) -> ValidationResponse:
+    """Extract JSON from raw LLM response and parse with field-level fixups.
+
+    Mirrors the fallback logic in invoke_structured_with_usage but specific to
+    the validator's ValidationResponse schema.
+    """
+    # Extract text content from the raw AI message
+    content = getattr(raw_message, "content", None)
+    if content is None:
+        raise RuntimeError("Validator fallback: no content in raw message")
+
+    # Handle tool call responses (Anthropic returns list of content blocks)
+    raw_json = None
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict):
+                # Tool use block
+                if block.get("type") == "tool_use" and "input" in block:
+                    raw_json = block["input"]
+                    break
+                # Text block with JSON
+                if block.get("type") == "text" and block.get("text", "").strip().startswith("{"):
+                    try:
+                        raw_json = json.loads(block["text"])
+                    except json.JSONDecodeError:
+                        continue
+    elif isinstance(content, str):
+        text = content.strip()
+        if text.startswith("```"):
+            text = text.strip("`").replace("json", "", 1).strip()
+        try:
+            raw_json = json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+    if raw_json is None:
+        raise RuntimeError(
+            "Validator fallback: could not extract JSON from raw response"
+        )
+
+    # Apply field-level fixups
+    if isinstance(raw_json, dict):
+        raw_json = _clamp_validation_fields(raw_json)
+
+    logger.info("VALIDATOR fallback parse succeeded after field fixups")
+    return ValidationResponse.model_validate(raw_json)
 
 
 def _use_smart_validation() -> bool:
@@ -218,19 +294,14 @@ def validate_items(
             result = response["parsed"]
             raw_message = response["raw"]
 
-            # CRITICAL: Check if parsing failed (returns None when schema doesn't match)
+            # If structured parsing failed, try JSON fallback with field fixups
             if result is None:
-                logger.error(
-                    f"Structured output parsing failed for validator. "
-                    f"Model: {model_name}, Attempt: {attempt}/3. "
-                    f"Raw response available but couldn't parse into ValidationResponse schema."
+                logger.warning(
+                    "VALIDATOR structured output parsed=None, attempting JSON fallback. "
+                    "Model: %s, Attempt: %d/3",
+                    model_name, attempt,
                 )
-                raise RuntimeError(
-                    f"Validator structured output parsing failed - LLM returned invalid format. "
-                    f"Model: {model_name}, Attempt: {attempt}/3. "
-                    f"This may indicate the LLM returned malformed JSON or broke the expected schema. "
-                    f"Check logs for raw response details."
-                )
+                result = _fallback_parse_validation(raw_message)
 
             usage = _extract_token_usage(raw_message, model_name)
         else:

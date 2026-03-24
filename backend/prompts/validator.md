@@ -130,6 +130,8 @@ After scoring all four dimensions, compute the weighted score:
 
 Weighted_Score = (Correspondence × 0.5) + (Distinctiveness × 0.25) + (Clarity × 0.15) + (Specificity × 0.10)
 
+**CRITICAL**: You MUST compute weighted_score using the EXACT formula above. Do not estimate or use simple averages. Example: if scores are 8, 7, 9, 6, then weighted_score = (8×0.5)+(7×0.25)+(9×0.15)+(6×0.10) = 4.0+1.75+1.35+0.60 = 7.70
+
 Acceptance Decision
 - accept = True if weighted_score >= 7.0
 - accept = False if weighted_score < 7.0

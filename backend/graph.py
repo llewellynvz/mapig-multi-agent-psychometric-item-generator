@@ -386,10 +386,14 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                 break  # Success — exit retry loop
             except RuntimeError as e:
                 if "identical scores" in str(e) and current_attempt < max_validation_attempts:
+                    rem_sec = _remaining_seconds(state)
                     logger.warning(
                         f"VALIDATION identical scores on attempt={current_attempt}, "
-                        f"retrying with attempt={current_attempt + 1}"
+                        f"retrying with attempt={current_attempt + 1}. Time remaining: {rem_sec:.0f}s"
                     )
+                    if rem_sec < 60:
+                        logger.error(f"ABORTING VALIDATION RETRY: Only {rem_sec:.0f}s remaining in Vercel budget.")
+                        break
                     current_attempt += 1
                     continue  # Retry with next attempt
                 else:
@@ -437,9 +441,13 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                 goto="reviewers_fanout_node"
             )
 
-        if attempt >= max_attempts:
-            # Max retries exhausted; accept best available
-            logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
+        rem_sec = _remaining_seconds(state)
+        if attempt >= max_attempts or rem_sec < 60:
+            # Max retries exhausted or time budget low; accept best available
+            if rem_sec < 60:
+                logger.warning(f"Vercel budget low ({rem_sec:.0f}s left). Skipping item regeneration.")
+            else:
+                logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
             return Command(
                 update={
                     "validation_results": validation_results,
@@ -630,6 +638,12 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "final
         use_chatgpt_critics=use_chatgpt_critics,
         iteration_history=state.get("iteration_history", []),
     )
+
+    rem_sec = _remaining_seconds(state)
+    if decision == "revise" and rem_sec < 45:
+        logger.warning(f"Vercel budget critically low ({rem_sec:.0f}s). Overriding critic decision to finalize.")
+        decision = "stop_max_iterations"
+        reason += f" [Forced finalize: {rem_sec:.0f}s left]"
 
     if decision == "revise":
         return Command(

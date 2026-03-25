@@ -1,0 +1,32 @@
+{
+  "total_duration_s": 2.6381990000081714,
+  "passed": false,
+  "runs": [
+    {
+      "construct_name": "Cognitive Flexibility",
+      "success": false,
+      "duration_s": 2.6381648000096902,
+      "item_count": 0,
+      "unique_facets": 0,
+      "mean_weighted_score": 0.0,
+      "min_weighted_score": 0.0,
+      "validation_attempts": 0,
+      "iteration_count": 0,
+      "stop_reason": "",
+      "content_comments": 0,
+      "linguistic_comments": 0,
+      "bias_comments": 0,
+      "has_correlation_matrix": false,
+      "has_comparison_instruments": false,
+      "mcdonalds_omega": null,
+      "convergent_validity": null,
+      "plagiarism_flags": 0,
+      "warnings": [],
+      "error": "Client error '401 Unauthorized' for url 'https://api.perplexity.ai/v2/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401"
+    }
+  ],
+  "global_warnings": [],
+  "errors": [
+    "Cognitive Flexibility: Client error '401 Unauthorized' for url 'https://api.perplexity.ai/v2/chat/completions'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401"
+  ]
+}

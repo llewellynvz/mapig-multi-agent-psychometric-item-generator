@@ -37,7 +37,12 @@ logger = logging.getLogger(__name__)
 _REASONING_MAX = 280
 
 # Field name variants the LLM may return instead of "dimension_scores"
-_DIMENSION_SCORES_ALIASES = {"item_scores", "item_dimension_scores", "scores", "dimensionScores"}
+_DIMENSION_SCORES_ALIASES = {
+    "item_score", "item_scores",
+    "item_dimension_scores",
+    "scores", "dimension_score",
+    "dimensionScores", "dimensionScore",
+}
 
 
 def _clamp_validation_fields(data: dict) -> dict:
@@ -227,7 +232,7 @@ def validate_items(
                 api_key=settings.CLAUDE_API_KEY,
                 temperature=0.5,
                 max_retries=3,
-                timeout=60,
+                timeout=80,
             )
             model_name = "claude-opus-4-6"
         elif _use_smart_validation():
@@ -298,7 +303,7 @@ def validate_items(
             # If structured parsing failed, try JSON fallback with field fixups
             used_fallback = False
             if result is None:
-                logger.warning(
+                logger.info(
                     "VALIDATOR structured output parsed=None, attempting JSON fallback. "
                     "Model: %s, Attempt: %d/3",
                     model_name, attempt,

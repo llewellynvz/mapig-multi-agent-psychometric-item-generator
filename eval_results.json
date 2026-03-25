@@ -1,0 +1,112 @@
+{
+  "total_duration_s": 750.1424112999957,
+  "passed": false,
+  "runs": [
+    {
+      "construct_name": "Cognitive Flexibility",
+      "success": true,
+      "duration_s": 214.6371908000001,
+      "item_count": 7,
+      "unique_facets": 4,
+      "mean_weighted_score": 8.742857142857142,
+      "min_weighted_score": 7.45,
+      "validation_attempts": 1,
+      "iteration_count": 2,
+      "stop_reason": "All feedback within threshold (max: 2, medium+: 0). Iteration 2/3: threshold mode final [rule-based, 0 tokens]",
+      "content_comments": 18,
+      "linguistic_comments": 8,
+      "bias_comments": 4,
+      "has_correlation_matrix": true,
+      "has_comparison_instruments": true,
+      "mcdonalds_omega": 0.8999225036327319,
+      "convergent_validity": 0.35,
+      "plagiarism_flags": 0,
+      "warnings": [
+        "Internal consistency TOO HIGH \u2014 possible item redundancy",
+        "Redundancy flags: Items 6 and 7 are redundant (r = 0.84) \u2014 consider replacing one"
+      ],
+      "error": null
+    },
+    {
+      "construct_name": "Emotional Intelligence",
+      "success": true,
+      "duration_s": 201.98971139999048,
+      "item_count": 7,
+      "unique_facets": 0,
+      "mean_weighted_score": 8.507142857142858,
+      "min_weighted_score": 7.15,
+      "validation_attempts": 1,
+      "iteration_count": 3,
+      "stop_reason": "Reached MAX_ITERATIONS before all medium+ issues were resolved. Iteration 3/3: threshold mode final",
+      "content_comments": 20,
+      "linguistic_comments": 7,
+      "bias_comments": 4,
+      "has_correlation_matrix": true,
+      "has_comparison_instruments": true,
+      "mcdonalds_omega": 0.9054897611730042,
+      "convergent_validity": 0.08499999999999999,
+      "plagiarism_flags": 0,
+      "warnings": [
+        "Hit max iterations (3)",
+        "No facet_name assigned to any item",
+        "Internal consistency TOO HIGH \u2014 possible item redundancy"
+      ],
+      "error": null
+    },
+    {
+      "construct_name": "Growth Mindset",
+      "success": true,
+      "duration_s": 141.45645289999084,
+      "item_count": 5,
+      "unique_facets": 1,
+      "mean_weighted_score": 8.959999999999999,
+      "min_weighted_score": 8.3,
+      "validation_attempts": 1,
+      "iteration_count": 2,
+      "stop_reason": "All feedback within threshold (max: 3, medium+: 1). Iteration 2/3: threshold mode final [rule-based, 0 tokens]",
+      "content_comments": 9,
+      "linguistic_comments": 6,
+      "bias_comments": 6,
+      "has_correlation_matrix": true,
+      "has_comparison_instruments": true,
+      "mcdonalds_omega": 0.8331313806367181,
+      "convergent_validity": 0.24000000000000002,
+      "plagiarism_flags": 0,
+      "warnings": [
+        "Low facet diversity: only 1 facets for 5 items",
+        "Redundancy flags: Items 3 and 4 are redundant (r = 0.78) \u2014 consider replacing one"
+      ],
+      "error": null
+    },
+    {
+      "construct_name": "Job Satisfaction",
+      "success": true,
+      "duration_s": 192.05776350000815,
+      "item_count": 7,
+      "unique_facets": 0,
+      "mean_weighted_score": 7.0,
+      "min_weighted_score": 7.0,
+      "validation_attempts": 1,
+      "iteration_count": 2,
+      "stop_reason": "All feedback within threshold (max: 3, medium+: 3). Iteration 2/3: threshold mode final [rule-based, 0 tokens]",
+      "content_comments": 20,
+      "linguistic_comments": 5,
+      "bias_comments": 15,
+      "has_correlation_matrix": true,
+      "has_comparison_instruments": true,
+      "mcdonalds_omega": 0.930186295543399,
+      "convergent_validity": 0.325,
+      "plagiarism_flags": 0,
+      "warnings": [
+        "ALL validation dimension scores are identical (7) \u2014 likely lazy LLM evaluation",
+        "No facet_name assigned to any item",
+        "Content reviewer flagged ALL items at severity >= 3",
+        "Internal consistency TOO HIGH \u2014 possible item redundancy",
+        "Redundancy flags: Items 1 and 2 are redundant (r = 0.75) \u2014 consider replacing one, Items 1 and 7 are redundant (r = 0.92) \u2014 consider replacing one"
+      ],
+      "error": null
+    }
+  ],
+  "global_warnings": [],
+  "errors": []
+}

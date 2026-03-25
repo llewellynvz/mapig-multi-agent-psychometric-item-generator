@@ -337,20 +337,21 @@ def validate_items(
             v.weighted_score = round(recalc, 2)
             v.accept = recalc >= 7.0
 
-        # Detect lazy identical scores — all items get same dimension scores
-        # Skip retry when fallback parsing was used — retrying won't help and wastes 60s+ per attempt
+        # Detect lazy identical scores — all items get same dimension scores.
+        # Always retry (up to attempt 3) regardless of whether fallback parsing was used,
+        # because attempt 2+ uses Opus with higher temperature — a different model that
+        # may produce differentiated scores even if Sonnet was lazy.
         if _detect_identical_scores(result.validations):
             logger.warning(
                 "VALIDATOR_IDENTICAL_SCORES attempt=%d model=%s items=%d fallback=%s — "
                 "all items received identical dimension scores",
                 attempt, model_name, len(result.validations), used_fallback,
             )
-            if attempt < 3 and not used_fallback:
+            if attempt < 3:
                 raise RuntimeError(
                     "Validator returned identical scores for all items — "
                     "forcing retry with different model/temperature"
                 )
-            # Accept when: attempt 3 (hard limit) OR fallback was used (retry won't help)
 
         accepted_count = sum(1 for v in result.validations if v.accept)
         logger.info(

@@ -167,6 +167,11 @@ class AbbreviatedRequest(BaseModel):
         description="Searched cultural context notes for the specified cultural_group. Passed to reviewers for culturally informed feedback.",
     )
 
+    evidence_summary: Optional[str] = Field(
+        default=None,
+        description="Compact summary of theoretical models, dimensions, and boundary conditions from evidence. Gives reviewers theoretical grounding without full evidence payload.",
+    )
+
 
 class EvidenceChunk(BaseModel):
     """A small evidence unit from an approved source.

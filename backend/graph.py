@@ -214,6 +214,34 @@ def _create_abbreviated_request(
         if cultural_chunks:
             cultural_notes = " ".join(cultural_chunks)
 
+    # Build compact evidence summary for reviewers (~500 tokens)
+    evidence_summary = None
+    if evidence:
+        theories: set[str] = set()
+        dimensions: list[str] = []
+        boundaries: list[str] = []
+        for e in evidence:
+            if e.theoretical_model:
+                theories.add(e.theoretical_model)
+            if e.dimensions:
+                for d in e.dimensions:
+                    if d not in dimensions:
+                        dimensions.append(d)
+            if e.evidence_type == "boundary_conditions" and e.snippet:
+                boundaries.append(e.snippet[:120])
+        parts: list[str] = []
+        if theories:
+            parts.append(f"Theoretical models: {'; '.join(sorted(theories))}")
+        if dimensions:
+            parts.append(f"Dimensions: {', '.join(dimensions[:15])}")
+        if boundaries:
+            parts.append(f"Boundary conditions: {' | '.join(boundaries[:3])}")
+        if parts:
+            evidence_summary = " // ".join(parts)
+            # Cap at ~500 tokens (~2000 chars)
+            if len(evidence_summary) > 2000:
+                evidence_summary = evidence_summary[:2000] + "..."
+
     return AbbreviatedRequest(
         construct_name=full_request.construct_name,
         construct_definition=full_request.construct_definition,
@@ -225,6 +253,7 @@ def _create_abbreviated_request(
         model_provider=full_request.model_provider,
         use_chatgpt_critics=full_request.use_chatgpt_critics,
         cultural_context_notes=cultural_notes,
+        evidence_summary=evidence_summary,
     )
 
 

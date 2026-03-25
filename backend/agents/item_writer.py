@@ -78,6 +78,7 @@ def write_items(
             style_reference = ref_path.read_text(encoding="utf-8")
     except Exception:
         pass  # Non-critical; prompt has inline examples as fallback
+    logger.info("STYLE_REFERENCE loaded=%s chars=%d", style_reference is not None, len(style_reference or ""))
 
     user_payload = {
         "user_request": request.model_dump(),

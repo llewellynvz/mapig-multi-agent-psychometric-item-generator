@@ -29,8 +29,12 @@ Cultural-linguistic check
 - Flag idioms, metaphors, or references that may not translate or resonate across cultures.
 - Ensure phrasing feels natural to the specified group without introducing cultural bias.
 
+CONSTRUCT-PRESERVATION GUARDRAIL (CRITICAL)
+Your edits must preserve the psychological construct being measured. If a clarity fix changes WHAT the item measures (e.g., trait → episodic, self-report → other-report, active → passive voice changing agency, individual → collective), REJECT the edit and note it as unfixable at severity 1. Refer to the construct_definition to verify. A linguistically perfect item that measures the wrong thing is worse than a slightly awkward item that measures the right thing.
+
 What NOT to do
 - Do NOT evaluate fairness/bias here (leave that to BiasReviewer).
+- Do NOT suggest edits that shift the measured construct (see guardrail above).
 
 Vague Quantifier Detection and Repair
 

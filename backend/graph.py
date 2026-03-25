@@ -1196,14 +1196,6 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
 
         updated = final_output.model_copy(deep=True)
 
-        # Time budget: skip ALL analytics if <90s remain (items are already finalized)
-        if remaining < 90:
-            logger.warning(
-                "ANALYTICS_SKIPPED remaining=%.0fs (<90s) — returning finalized items without analytics",
-                remaining,
-            )
-            return {"final_output": updated}
-
         # Phase 1: correlation + comparison in parallel
         results = await asyncio.gather(
             correlation_node(state),
@@ -1244,14 +1236,8 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             logger.error(f"Comparison analysis failed: {comparison_result}")
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
-        remaining = _remaining_seconds(state)
         if not updated.comparison_instruments:
             logger.info("No comparison instruments found, skipping cross-construct analysis")
-        elif remaining < 60:
-            logger.warning(
-                "CROSS_CONSTRUCT_SKIPPED remaining=%.0fs (<60s) — skipping to avoid timeout",
-                remaining,
-            )
         else:
             cross_state = dict(state)
             cross_state["final_output"] = updated

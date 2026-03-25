@@ -6,7 +6,6 @@ import time
 import warnings
 from typing import List, Tuple
 
-from backend.agents.llm_factory import get_chat_model_for_agent
 from backend.agents.llm_utils import TokenUsage, _extract_token_usage
 from backend.agents.prompt_loader import load_prompt
 
@@ -204,51 +203,37 @@ def validate_items(
             "attempt": attempt,
         }
 
-        # Convert to LangChain messages with cache_control for cost optimization
-        # Only apply cache control for Claude models (Anthropic API supports prompt caching)
         from langchain_core.messages import HumanMessage, SystemMessage
 
-        # Determine model based on smart validation and ChatGPT critics toggle
-        # Smart validation: Use Sonnet first (80% cheaper), only use Opus if items fail
-        # ChatGPT critics: Override to use ChatGPT if enabled
-        use_chatgpt = getattr(request, "use_chatgpt_critics", False)
+        # Validator always uses Claude (excluded from ChatGPT critics toggle).
+        # Smart validation: Sonnet for attempt 1 (~80% cheaper), Opus for retries.
+        from backend.agents.llm_factory import get_claude_chat_model
 
-        if _use_smart_validation() and attempt == 1 and not use_chatgpt:
-            # Smart validation: Sonnet first attempt (Claude only)
-            logger.info(f"Smart validation: Attempting with Sonnet first (attempt {attempt})")
-            model = get_chat_model_for_agent(
-                agent_name="validator",
-                model_provider="claude",
-                use_chatgpt_critics=False,
+        if attempt >= 2:
+            # Retry: Opus with higher temperature to force score differentiation,
+            # no prompt cache header to avoid cached lazy responses.
+            from langchain_anthropic import ChatAnthropic
+            model = ChatAnthropic(
+                model="claude-opus-4-6",
+                api_key=settings.CLAUDE_API_KEY,
+                temperature=0.5,
+                max_retries=3,
+                timeout=60,
             )
-            # Override to force Sonnet for first attempt (not Opus)
-            from backend.agents.llm_factory import get_claude_chat_model
+            model_name = "claude-opus-4-6"
+        elif _use_smart_validation():
+            # Smart validation: Sonnet for first attempt
             model = get_claude_chat_model(model="claude-sonnet-4-5")
             model_name = "claude-sonnet-4-5"
         else:
-            # Use standard allocation (respects ChatGPT toggle)
-            logger.info(f"Using validator model (attempt {attempt}, use_chatgpt={use_chatgpt})")
-            if attempt >= 2:
-                # On retry: use Opus with higher temperature to avoid deterministic
-                # identical scores, and skip prompt cache to get fresh evaluation
-                from backend.agents.llm_factory import get_claude_chat_model
-                from langchain_anthropic import ChatAnthropic
-                model = ChatAnthropic(
-                    model="claude-opus-4-6",
-                    api_key=settings.CLAUDE_API_KEY,
-                    temperature=0.5,  # Higher temp forces score differentiation
-                    max_retries=3,
-                    timeout=60,
-                )
-                model_name = "claude-opus-4-6"
-                logger.info(f"Retry attempt {attempt}: using Opus with temperature=0.5, no prompt cache")
-            else:
-                model = get_chat_model_for_agent(
-                    agent_name="validator",
-                    model_provider=request.model_provider,
-                    use_chatgpt_critics=use_chatgpt,
-                )
-                model_name = getattr(model, "model_name", getattr(model, "model", "unknown"))
+            # Smart validation disabled: use default Opus
+            model = get_claude_chat_model(model="claude-opus-4-6")
+            model_name = "claude-opus-4-6"
+
+        logger.info(
+            "VALIDATOR model_selected=%s attempt=%d smart_validation=%s",
+            model_name, attempt, _use_smart_validation(),
+        )
 
         # Build messages — disable prompt caching on retries to avoid cached lazy responses
         if attempt > 1:
@@ -282,12 +267,12 @@ def validate_items(
 
         # Invoke with structured output, capturing raw response for token tracking
         # Use try-except pattern (same as llm_utils.py) for cross-provider compatibility
+        # Note: Do NOT pass strict=True — Claude Opus returns parsed=None with strict mode
+        # because the schema's nested DimensionScore/ItemValidation types cause tool_use
+        # parsing failures. Without strict, Anthropic uses flexible parsing that works reliably.
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
-            try:
-                runnable = model.with_structured_output(ValidationResponse, strict=True, include_raw=True)
-            except TypeError:
-                runnable = model.with_structured_output(ValidationResponse, include_raw=True)
+            runnable = model.with_structured_output(ValidationResponse, include_raw=True)
             _t0 = time.perf_counter()
             response = runnable.invoke(messages)
             _elapsed = time.perf_counter() - _t0

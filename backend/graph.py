@@ -791,6 +791,22 @@ def finalize_node(state: GraphState) -> GraphState:
             enriched_item = item.model_copy(deep=True)
             if idx in validation_lookup:
                 enriched_item.validation_result = validation_lookup[idx]
+            else:
+                # LLM skipped this item — create a placeholder validation
+                logger.warning("FINALIZE_MISSING_VALIDATION item_index=%d — creating placeholder", idx)
+                enriched_item.validation_result = ItemValidation(
+                    item_index=idx,
+                    item_text=item.item_text,
+                    dimension_scores=[
+                        DimensionScore(dimension="correspondence", reasoning="Validation unavailable", score=5),
+                        DimensionScore(dimension="distinctiveness", reasoning="Validation unavailable", score=5),
+                        DimensionScore(dimension="clarity", reasoning="Validation unavailable", score=5),
+                        DimensionScore(dimension="specificity", reasoning="Validation unavailable", score=5),
+                    ],
+                    weighted_score=5.0,
+                    accept=False,
+                    attempt=state.get("validation_attempt", 1),
+                )
             enriched_items.append(enriched_item)
 
         model_info = {"mode": settings.APP_MODE}

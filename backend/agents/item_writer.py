@@ -69,11 +69,22 @@ def write_items(
 
     system_prompt = load_prompt("item_writer.md")
 
+    # Load item style reference bank for quality calibration
+    style_reference = None
+    try:
+        import pathlib
+        ref_path = pathlib.Path(__file__).resolve().parent.parent.parent / "data" / "item_style_reference.md"
+        if ref_path.exists():
+            style_reference = ref_path.read_text(encoding="utf-8")
+    except Exception:
+        pass  # Non-critical; prompt has inline examples as fallback
+
     user_payload = {
         "user_request": request.model_dump(),
         "evidence": [e.model_dump() for e in evidence],
         "item_count": item_count,
         "facet_mapping": facet_mapping.model_dump(mode="json") if facet_mapping else None,
+        "style_reference": style_reference,
     }
 
     messages = [

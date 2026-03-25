@@ -228,13 +228,12 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
         "temperature": 0,
     }
 
-    domains = settings.perplexity_domains()
-    if domains:
-        payload["web_search_options"] = {
-            "search_mode": settings.PERPLEXITY_SEARCH_MODE,
-            "num_search_results": settings.PERPLEXITY_MAX_RESULTS,
-            "search_domain_filter": domains,
-        }
+    # Do NOT apply academic domain filter for item fetching — items may be on
+    # general web (ResearchGate PDFs, course pages, open-access supplements)
+    payload["web_search_options"] = {
+        "search_mode": "web",  # General web, not academic-only
+        "num_search_results": 10,
+    }
 
     url = settings.PERPLEXITY_BASE_URL.rstrip("/") + "/chat/completions"
     headers = {
@@ -242,40 +241,64 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
         "Content-Type": "application/json",
     }
 
-    try:
-        with httpx.Client(timeout=30) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+    def _try_fetch(p: dict) -> list | None:
+        """Attempt item fetch and return parsed items or None."""
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.post(url, headers=headers, json=p)
+                resp.raise_for_status()
+                data = resp.json()
 
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        if not content:
-            return instrument
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if not content:
+                return None
 
-        # Extract JSON array from response
-        arr_start = content.find("[")
-        arr_end = content.rfind("]") + 1
-        if arr_start < 0 or arr_end <= arr_start:
-            log.warning("FETCH_ITEMS no JSON array found for %s", instrument.name)
-            return instrument
+            arr_start = content.find("[")
+            arr_end = content.rfind("]") + 1
+            if arr_start < 0 or arr_end <= arr_start:
+                return None
 
-        items = json.loads(content[arr_start:arr_end])
+            items = json.loads(content[arr_start:arr_end])
+            if (
+                isinstance(items, list)
+                and len(items) >= 3
+                and all(isinstance(it, str) and len(it.strip()) > 5 for it in items)
+            ):
+                return [it.strip() for it in items]
+            return None
+        except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError) as e:
+            log.warning("FETCH_ITEMS attempt failed for %s: %s", instrument.name, e)
+            return None
 
-        # Validate: must be a list of non-empty strings, at least 3 items
-        if (
-            isinstance(items, list)
-            and len(items) >= 3
-            and all(isinstance(it, str) and len(it.strip()) > 5 for it in items)
-        ):
-            log.info("FETCH_ITEMS success instrument=%s items=%d", instrument.name, len(items))
-            return instrument.model_copy(update={"items": [it.strip() for it in items]})
-        else:
-            log.warning("FETCH_ITEMS invalid items for %s (count=%d)", instrument.name, len(items) if isinstance(items, list) else 0)
-            return instrument
+    # Attempt 1: standard query
+    items = _try_fetch(payload)
+    if items:
+        log.info("FETCH_ITEMS success instrument=%s items=%d", instrument.name, len(items))
+        return instrument.model_copy(update={"items": items})
 
-    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError) as e:
-        log.warning("FETCH_ITEMS failed for %s: %s", instrument.name, e)
-        return instrument
+    # Attempt 2: broader query targeting PDFs and full texts
+    log.info("FETCH_ITEMS retry with broader query for %s", instrument.name)
+    retry_query = (
+        f'"{instrument.name}" questionnaire items full text. '
+        f"List ALL exact item texts (questions/statements) from this instrument. "
+        f"Return ONLY a JSON array of strings. If not available, return []."
+    )
+    retry_payload = {
+        "model": settings.PERPLEXITY_MODEL,
+        "messages": [
+            {"role": "system", "content": payload["messages"][0]["content"]},
+            {"role": "user", "content": retry_query},
+        ],
+        "temperature": 0,
+        "web_search_options": {"search_mode": "web", "num_search_results": 15},
+    }
+    items = _try_fetch(retry_payload)
+    if items:
+        log.info("FETCH_ITEMS retry success instrument=%s items=%d", instrument.name, len(items))
+        return instrument.model_copy(update={"items": items})
+
+    log.warning("FETCH_ITEMS no items found for %s after 2 attempts", instrument.name)
+    return instrument
 
 
 def _get_hardcoded_defaults(construct_name: str) -> tuple[ComparisonInstrument, ComparisonInstrument]:

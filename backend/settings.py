@@ -72,7 +72,7 @@ class Settings(BaseSettings):
 
     # Evidence depth
     EVIDENCE_MIN_CHUNKS: int = 20
-    EVIDENCE_MAX_RETRIES: int = 2
+    EVIDENCE_MAX_RETRIES: int = 3
 
     # Orchestrator tuning
     ITEM_COUNT: int = 10

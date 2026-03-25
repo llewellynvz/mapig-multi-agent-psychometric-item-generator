@@ -448,6 +448,39 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                 logger.warning(f"Vercel budget low ({rem_sec:.0f}s left). Skipping item regeneration.")
             else:
                 logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
+
+            # Quality gate: filter out items with weighted_score < 5.0
+            # These are too poor to send through the review pipeline
+            _MIN_FORCE_ACCEPT_SCORE = 5.0
+            passing = [v for v in validation_results if v.weighted_score >= _MIN_FORCE_ACCEPT_SCORE]
+            filtered_count = len(validation_results) - len(passing)
+            if filtered_count > 0:
+                logger.warning(
+                    "QUALITY_GATE_FILTERED dropped=%d items below %.1f threshold (kept %d)",
+                    filtered_count, _MIN_FORCE_ACCEPT_SCORE, len(passing),
+                )
+                # If too few survive, keep the top-3 by score
+                if len(passing) < 3:
+                    passing = sorted(validation_results, key=lambda v: v.weighted_score, reverse=True)[:3]
+                    logger.warning("QUALITY_GATE_FALLBACK keeping top-%d items by score", len(passing))
+                # Update draft_items to only include surviving items
+                surviving_indices = {v.item_index for v in passing}
+                draft_items = state.get("draft_items", [])
+                filtered_items = [item for i, item in enumerate(draft_items) if i in surviving_indices]
+                # Re-index items and validation results
+                reindexed_validations = []
+                for new_idx, v in enumerate(passing):
+                    v_copy = v.model_copy(update={"item_index": new_idx})
+                    reindexed_validations.append(v_copy)
+                return Command(
+                    update={
+                        "draft_items": filtered_items,
+                        "validation_results": reindexed_validations,
+                        **token_update,
+                    },
+                    goto="reviewers_fanout_node"
+                )
+
             return Command(
                 update={
                     "validation_results": validation_results,
@@ -495,8 +528,12 @@ def regenerate_items_node(state: GraphState) -> GraphState:
         modified_request.previous_items = [draft_items[i].item_text for i in failed_indices]
         modified_request.item_count = len(failed_indices)
 
-        # Regenerate failed items
-        resp, usage = write_items(modified_request, state.get("evidence", []))
+        # Regenerate failed items (preserve facet guidance)
+        resp, usage = write_items(
+            modified_request,
+            state.get("evidence", []),
+            facet_mapping=state.get("facet_mapping"),
+        )
         token_update = _accumulate_tokens(state, usage)
 
         # Merge: keep accepted items, replace failed items
@@ -1236,8 +1273,16 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             logger.error(f"Comparison analysis failed: {comparison_result}")
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
+        # Time-budget check: cross-construct requires 2 GPT-5.2 calls (~30-60s).
+        # Skip if insufficient time to prevent hard Vercel timeout.
+        remaining = _remaining_seconds(state)
         if not updated.comparison_instruments:
             logger.info("No comparison instruments found, skipping cross-construct analysis")
+        elif remaining < 40:
+            logger.warning(
+                "CROSS_CONSTRUCT_BUDGET remaining=%.0fs (<40s) — skipping to prevent Vercel timeout",
+                remaining,
+            )
         else:
             cross_state = dict(state)
             cross_state["final_output"] = updated

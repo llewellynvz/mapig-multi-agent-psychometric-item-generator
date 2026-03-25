@@ -19,9 +19,9 @@ def test_validator_handles_none_parsed_response():
         with patch("backend.agents.validator.load_prompt") as mock_prompt:
             mock_prompt.return_value = "Test prompt"
 
-            # Patch get_chat_model_for_agent
+            # Patch get_claude_chat_model (validator always uses Claude)
             with patch(
-                "backend.agents.validator.get_chat_model_for_agent"
+                "backend.agents.llm_factory.get_claude_chat_model"
             ) as mock_get_model:
                 # Setup mock chain
                 mock_model = MagicMock()
@@ -76,9 +76,9 @@ def test_validator_handles_none_fallback_response():
         with patch("backend.agents.validator.load_prompt") as mock_prompt:
             mock_prompt.return_value = "Test prompt"
 
-            # Patch get_chat_model_for_agent
+            # Patch get_claude_chat_model (validator always uses Claude)
             with patch(
-                "backend.agents.validator.get_chat_model_for_agent"
+                "backend.agents.llm_factory.get_claude_chat_model"
             ) as mock_get_model:
                 # Setup mock chain
                 mock_model = MagicMock()
@@ -162,9 +162,9 @@ def test_validator_succeeds_with_valid_response():
         with patch("backend.agents.validator.load_prompt") as mock_prompt:
             mock_prompt.return_value = "Test prompt"
 
-            # Patch get_chat_model_for_agent
+            # Patch get_claude_chat_model (validator always uses Claude)
             with patch(
-                "backend.agents.validator.get_chat_model_for_agent"
+                "backend.agents.llm_factory.get_claude_chat_model"
             ) as mock_get_model:
                 # Setup mock chain
                 mock_model = MagicMock()

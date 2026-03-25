@@ -1,0 +1,36 @@
+{
+  "total_duration_s": 291.5380110999977,
+  "passed": false,
+  "runs": [
+    {
+      "construct_name": "Cognitive Flexibility",
+      "success": true,
+      "duration_s": 291.53715229999216,
+      "item_count": 7,
+      "unique_facets": 0,
+      "mean_weighted_score": 7.892857142857143,
+      "min_weighted_score": 7.05,
+      "validation_attempts": 3,
+      "iteration_count": 2,
+      "stop_reason": "All feedback within threshold (max: 3, medium+: 1). Iteration 2/3: threshold mode final [rule-based, 0 tokens]",
+      "content_comments": 24,
+      "linguistic_comments": 10,
+      "bias_comments": 9,
+      "has_correlation_matrix": true,
+      "has_comparison_instruments": true,
+      "mcdonalds_omega": 0.8988576852597265,
+      "convergent_validity": 0.25,
+      "plagiarism_flags": 0,
+      "warnings": [
+        "No facet_name assigned to any item",
+        "Content reviewer flagged ALL items at severity >= 3",
+        "Internal consistency TOO HIGH \u2014 possible item redundancy",
+        "Redundancy flags: Items 2 and 6 are redundant (r = 0.84) \u2014 consider replacing one, Items 3 and 7 are redundant (r = 0.79) \u2014 consider replacing one",
+        "Run took 292s (> 280s budget target)"
+      ],
+      "error": null
+    }
+  ],
+  "global_warnings": [],
+  "errors": []
+}

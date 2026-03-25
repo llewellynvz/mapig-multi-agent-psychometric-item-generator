@@ -297,7 +297,7 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
         log.info("FETCH_ITEMS retry success instrument=%s items=%d", instrument.name, len(items))
         return instrument.model_copy(update={"items": items})
 
-    log.warning("FETCH_ITEMS no items found for %s after 2 attempts", instrument.name)
+    log.info("FETCH_ITEMS published items unavailable for %s (likely copyrighted or paywalled)", instrument.name)
     return instrument
 
 

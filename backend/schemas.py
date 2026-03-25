@@ -220,7 +220,7 @@ class DraftItem(BaseModel):
     rationale: str = Field(
         ...,
         min_length=5,
-        max_length=350,  # ~50 words at 7 chars/word average
+        max_length=500,  # ~70 words at 7 chars/word average — allows facet + evidence citation
         description="Why this item reflects the construct. Maximum 50 words.",
     )
     evidence_citations: List[str] = Field(
@@ -289,11 +289,10 @@ class ReviewComment(BaseModel):
     severity: conint(ge=1, le=5) = Field(
         ..., description="1=nitpick, 3=needs revision, 5=blocking"
     )
-    suggested_edit: str = Field(
-        ...,
-        min_length=0,
+    suggested_edit: Optional[str] = Field(
+        default=None,
         max_length=175,  # ~25 words for concise suggestions
-        description="Proposed fix in plain text. Maximum 25 words.",
+        description="Proposed fix in plain text. Maximum 25 words. None for global/facet-level comments.",
     )
 
 

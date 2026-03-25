@@ -141,7 +141,7 @@ def _search_perplexity_instrument(
     }
 
     try:
-        with httpx.Client(timeout=60) as client:
+        with httpx.Client(timeout=30) as client:
             resp = client.post(url, headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
@@ -243,7 +243,7 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
     }
 
     try:
-        with httpx.Client(timeout=60) as client:
+        with httpx.Client(timeout=30) as client:
             resp = client.post(url, headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()

@@ -37,7 +37,7 @@ def get_openai_chat_model(model: Optional[str] = None) -> ChatOpenAI:
         "api_key": settings.OPENAI_API_KEY,
         "temperature": 0.2,
         "max_retries": 3,
-        "timeout": 60,
+        "timeout": 45,
     }
     if settings.OPENAI_BASE_URL:
         kwargs["base_url"] = settings.OPENAI_BASE_URL
@@ -65,7 +65,7 @@ def get_azure_chat_model() -> AzureChatOpenAI:
         api_version=settings.AZURE_OPENAI_API_VERSION,
         temperature=0.2,
         max_retries=3,
-        timeout=60,
+        timeout=45,
     )
 
 
@@ -92,7 +92,7 @@ def get_claude_chat_model(model: str = "claude-opus-4-6") -> ChatAnthropic:
         api_key=settings.CLAUDE_API_KEY,
         temperature=0.2,
         max_retries=3,
-        timeout=60,
+        timeout=45,
         # Enable prompt caching to reduce input token costs by ~50% for repeated prompts
         default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
     )

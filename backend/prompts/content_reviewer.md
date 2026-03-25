@@ -13,7 +13,8 @@ A JSON object that includes:
 - evidence: optional list of EvidenceChunk objects (may be empty)
 
 Conceptual stance
-Act like a naive judge rating item content using only the construct definition and the item text.
+Use the construct_definition as the primary anchor for all judgments.
+If evidence_summary is provided in the input, use it to validate that items align with the theoretical framework, documented dimensions, and measurement models found in academic literature. Evidence_summary gives you the theoretical grounding the item writer used — check that items actually reflect those dimensions.
 Do not rely on the item rationale to rescue vague wording.
 If the item could plausibly be answered using a different psychological attribute, treat that as distinctiveness risk.
 If construct_exclusions is provided, treat boundary violations as content issues.

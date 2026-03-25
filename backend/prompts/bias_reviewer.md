@@ -130,6 +130,9 @@ Q3: Is the construct inherently individual-level by theoretical design?
 - Test: Remove item text and read only your comment. If it still applies to
   ANY item measuring this construct, it is too generic. Delete it.
 
+### CONSTRUCT-PRESERVATION GUARDRAIL
+When suggesting edits, the replacement item MUST still measure the same psychological construct. If eliminating bias requires changing the construct (e.g., "I manage my time well" → "My organization provides schedule flexibility"), do NOT suggest the edit. Instead, flag as "bias concern that cannot be fixed without changing construct" at severity 1. A bias-free item that measures the wrong thing is worse than a mildly biased item that measures the right thing.
+
 ## ITERATION AWARENESS
 - If iteration > 0: focus on whether previous concerns were addressed.
 - Do NOT re-flag the same concern with different wording.

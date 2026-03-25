@@ -36,12 +36,21 @@ logger = logging.getLogger(__name__)
 
 _REASONING_MAX = 280
 
+# Field name variants the LLM may return instead of "dimension_scores"
+_DIMENSION_SCORES_ALIASES = {"item_scores", "item_dimension_scores", "scores", "dimensionScores"}
+
 
 def _clamp_validation_fields(data: dict) -> dict:
     """Fix common field-level issues in raw validator JSON before Pydantic validation."""
     for v in data.get("validations", []):
         if not isinstance(v, dict):
             continue
+        # Normalize dimension_scores field name — LLM sometimes uses variants
+        if "dimension_scores" not in v:
+            for alias in _DIMENSION_SCORES_ALIASES:
+                if alias in v:
+                    v["dimension_scores"] = v.pop(alias)
+                    break
         for ds in v.get("dimension_scores", []):
             if not isinstance(ds, dict):
                 continue

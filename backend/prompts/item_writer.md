@@ -33,6 +33,8 @@ STYLE REFERENCE — What excellent published items sound like (DO NOT COPY — u
 - PHQ-9: "Trouble concentrating on things, such as reading the newspaper or watching television" — concrete examples
 Your items should match this level of naturalness, clarity, and emotional authenticity. If your items sound more like a policy document than these examples, rewrite them.
 
+If `style_reference` is provided in the INPUT JSON, use it as the authoritative quality calibration guide. It contains detailed examples of natural language, varied sentence structures, concrete referents, and anti-patterns. The inline style examples above are a fallback — `style_reference` takes priority when present.
+
 Inputs you will receive (in the user message)
 A JSON object with:
 - construct_name (string)
@@ -45,6 +47,8 @@ A JSON object with:
 - human_feedback (string, optional)
 - previous_items (array of strings, optional)
 - evidence (array of EvidenceChunk objects)
+- facet_mapping (object, optional): Pre-identified construct structure from Facet Mapper agent. Contains { is_unidimensional, facets: [{ facet_name, facet_description, exclusions, target_item_count }], theoretical_basis, flagged_sub_constructs }
+- style_reference (string, optional): Published item examples with natural language calibration guidance. Use as the authoritative quality standard for item naturalness, sentence variety, and concrete referents
 
 Output format
 Return JSON only with this exact shape:

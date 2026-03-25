@@ -140,7 +140,7 @@ def get_gpt52_analytics_model() -> ChatOpenAI:
         max_tokens=25000,
         temperature=0.2,
         max_retries=2,
-        timeout=45,  # Tight budget for Vercel 300s limit
+        timeout=30,  # Tight budget for Vercel 300s limit
     )
 
 

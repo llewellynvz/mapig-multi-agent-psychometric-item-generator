@@ -95,12 +95,29 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
     try:
         message_content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         if message_content:
-            # Look for JSON in the response
-            json_start = message_content.find("{")
-            json_end = message_content.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = message_content[json_start:json_end]
-                parsed = json.loads(json_str)
+            # Strip markdown code fences before JSON extraction
+            cleaned = message_content.strip()
+            if cleaned.startswith("```"):
+                # Remove opening fence (```json or ```)
+                first_newline = cleaned.find("\n")
+                if first_newline > 0:
+                    cleaned = cleaned[first_newline + 1:]
+                # Remove closing fence
+                if cleaned.rstrip().endswith("```"):
+                    cleaned = cleaned.rstrip()[:-3].rstrip()
+
+            # Try parsing cleaned content directly first
+            parsed = None
+            try:
+                parsed = json.loads(cleaned)
+            except (json.JSONDecodeError, ValueError):
+                # Fall back to substring extraction (first { to last })
+                json_start = cleaned.find("{")
+                json_end = cleaned.rfind("}") + 1
+                if json_start >= 0 and json_end > json_start:
+                    parsed = json.loads(cleaned[json_start:json_end])
+
+            if parsed is not None:
 
                 # Process evidence chunks with enhanced metadata
                 _valid_evidence_types = {"theoretical_definition", "dimensions", "measurement_precedent", "boundary_conditions", "cultural_context"}
@@ -276,6 +293,8 @@ def surf(request: UserRequest) -> RetrievalResponse:
         ]
         if retry_count >= 2:
             broad_query_parts.append("(6) Handbook chapters, test reviews, and measurement compendia")
+        if retry_count >= 3:
+            broad_query_parts.append("(7) ANY peer-reviewed study using this construct as a variable")
 
         broad_query = "\n".join(broad_query_parts)
 
@@ -304,14 +323,15 @@ def surf(request: UserRequest) -> RetrievalResponse:
 
             retry_evidence = _process_perplexity_response(retry_data)
 
-            # Deduplicate by URL
-            seen_urls = {e.url_or_docref for e in evidence}
+            # Deduplicate by source_id (not URL — same URL can have multiple distinct evidence chunks)
+            seen_ids = {e.source_id for e in evidence}
             for chunk in retry_evidence:
-                if chunk.url_or_docref not in seen_urls:
+                if chunk.source_id not in seen_ids:
                     evidence.append(chunk)
-                    seen_urls.add(chunk.url_or_docref)
+                    seen_ids.add(chunk.source_id)
 
             # Also supplement from search_results
+            seen_urls = {e.url_or_docref for e in evidence}
             for sr in retry_data.get("search_results") or []:
                 u = (sr.get("url") or "").strip()
                 if not u or u in seen_urls:

@@ -1366,7 +1366,7 @@ def test_evidence_settings_exist():
 
     s = Settings(APP_MODE="mock")
     assert s.EVIDENCE_MIN_CHUNKS == 20, "EVIDENCE_MIN_CHUNKS should default to 20"
-    assert s.EVIDENCE_MAX_RETRIES == 2, "EVIDENCE_MAX_RETRIES should default to 2"
+    assert s.EVIDENCE_MAX_RETRIES == 3, "EVIDENCE_MAX_RETRIES should default to 3"
     # PERPLEXITY_MAX_RESULTS code default is 40 (may be overridden by .env)
     assert hasattr(s, "PERPLEXITY_MAX_RESULTS"), "PERPLEXITY_MAX_RESULTS must exist"
     assert s.PERPLEXITY_MAX_RESULTS >= 40, "PERPLEXITY_MAX_RESULTS should be at least 40"

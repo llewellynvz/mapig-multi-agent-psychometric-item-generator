@@ -64,6 +64,10 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
     gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
     gpt52_output = state.get("gpt52_output_tokens", 0)
 
+    # Accumulate cache metrics
+    cache_read = state.get("cache_read_tokens", 0) + getattr(usage, "cache_read_input_tokens", 0)
+    cache_creation = state.get("cache_creation_tokens", 0) + getattr(usage, "cache_creation_input_tokens", 0)
+
     # Phase 7: GPT-5.2 routing with separate reasoning tracking
     if "gpt-5.2" in model_name:
         gpt52_tokens += usage.total_tokens
@@ -91,6 +95,8 @@ def _accumulate_tokens(state: GraphState, usage: TokenUsage) -> dict:
         "gpt52_tokens_used": gpt52_tokens,
         "gpt52_reasoning_tokens": gpt52_reasoning,
         "gpt52_output_tokens": gpt52_output,
+        "cache_read_tokens": cache_read,
+        "cache_creation_tokens": cache_creation,
     }
 
 
@@ -166,6 +172,10 @@ class GraphState(TypedDict, total=False):
     gpt52_output_tokens: int
     # Phase 10: Whether GPT-5.2 is enabled for analytics
     gpt52_analytics_enabled: bool
+
+    # Prompt caching metrics (accumulated across all agents)
+    cache_read_tokens: int
+    cache_creation_tokens: int
 
     # Time budget (Vercel 300s limit)
     _start_time: float  # time.time() set in init_run
@@ -286,6 +296,8 @@ def init_run(state: GraphState) -> GraphState:
             "gpt52_reasoning_tokens": 0,
             "gpt52_output_tokens": 0,
             "gpt52_analytics_enabled": state.get("user_request").use_gpt52_analytics if state.get("user_request") and hasattr(state.get("user_request"), "use_gpt52_analytics") else False,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
         }
 
 
@@ -673,14 +685,12 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
             len(bias_resp.comments),
         )
 
-        # Accumulate all token usage
-        combined_usage = TokenUsage(
-            input_tokens=content_usage.input_tokens + linguistic_usage.input_tokens + bias_usage.input_tokens,
-            output_tokens=content_usage.output_tokens + linguistic_usage.output_tokens + bias_usage.output_tokens,
-            total_tokens=content_usage.total_tokens + linguistic_usage.total_tokens + bias_usage.total_tokens,
-            model_name=content_usage.model_name,  # All use same model
-        )
-        token_update = _accumulate_tokens(state, combined_usage)
+        # Accumulate token usage per reviewer (each may use a different model)
+        token_update = _accumulate_tokens(state, content_usage)
+        intermediate = {**state, **token_update}
+        token_update = _accumulate_tokens(intermediate, linguistic_usage)
+        intermediate = {**intermediate, **token_update}
+        token_update = _accumulate_tokens(intermediate, bias_usage)
 
         return {
             "content_comments": content_resp.comments,
@@ -881,6 +891,18 @@ def finalize_node(state: GraphState) -> GraphState:
 
         total_cost = opus_cost + sonnet_cost + chatgpt_cost + openai_cost + gpt52_reasoning_cost + gpt52_output_cost
 
+        # Prompt caching savings estimate
+        cache_read = state.get("cache_read_tokens", 0)
+        cache_creation = state.get("cache_creation_tokens", 0)
+        # Cached tokens are charged at 10% of input rate (90% discount).
+        # Use Sonnet input rate ($3/M) as conservative estimate for blended savings.
+        cache_savings = (cache_read / 1_000_000) * 3.0 * 0.9 if cache_read > 0 else 0.0
+        if cache_read > 0 or cache_creation > 0:
+            logger.info(
+                "CACHE_METRICS cache_read_tokens=%d cache_creation_tokens=%d estimated_savings=$%.4f",
+                cache_read, cache_creation, cache_savings,
+            )
+
         # Determine if smart validation was used
         from backend.agents.validator import _use_smart_validation
         smart_val_enabled = _use_smart_validation()
@@ -918,6 +940,8 @@ def finalize_node(state: GraphState) -> GraphState:
             gpt52_reasoning_cost=round(gpt52_reasoning_cost, 4) if gpt52_reasoning_cost > 0 else None,
             gpt52_output_cost=round(gpt52_output_cost, 4) if gpt52_output_cost > 0 else None,
             analytics_budget_exceeded=budget_exceeded if total_gpt52_cost > 0 else None,
+            cache_read_tokens=cache_read if cache_read > 0 else None,
+            cache_savings_usd=round(cache_savings, 4) if cache_savings > 0 else None,
         )
 
         # Phase 03.1: Extract review feedback from GraphState for complete metadata export

@@ -44,6 +44,10 @@ _DIMENSION_SCORES_ALIASES = {
     "dimensionScores", "dimensionScore",
 }
 
+# Known dimension names — used to fix LLM returning dimension name as key
+# e.g. {"clarity": "clarity", ...} instead of {"dimension": "clarity", ...}
+_KNOWN_DIMENSIONS = {"correspondence", "distinctiveness", "clarity", "specificity"}
+
 
 def _clamp_validation_fields(data: dict) -> dict:
     """Fix common field-level issues in raw validator JSON before Pydantic validation."""
@@ -59,6 +63,12 @@ def _clamp_validation_fields(data: dict) -> dict:
         for ds in v.get("dimension_scores", []):
             if not isinstance(ds, dict):
                 continue
+            # Fix dimension name used as key: {"clarity": "clarity"} → {"dimension": "clarity"}
+            if "dimension" not in ds:
+                for dim_name in _KNOWN_DIMENSIONS:
+                    if dim_name in ds:
+                        ds["dimension"] = ds.pop(dim_name)
+                        break
             # Truncate oversized reasoning
             reasoning = ds.get("reasoning", "")
             if isinstance(reasoning, str) and len(reasoning) > _REASONING_MAX:
@@ -224,8 +234,9 @@ def validate_items(
         from backend.agents.llm_factory import get_claude_chat_model
 
         if attempt >= 2:
-            # Retry: Opus with higher temperature to force score differentiation,
-            # no prompt cache header to avoid cached lazy responses.
+            # Retry: Opus with higher temperature to force score differentiation.
+            # Prompt caching enabled for system prompt (billing optimization only —
+            # human message differs per attempt, ensuring fresh evaluation).
             from langchain_anthropic import ChatAnthropic
             model = ChatAnthropic(
                 model="claude-opus-4-6",
@@ -233,6 +244,7 @@ def validate_items(
                 temperature=0.5,
                 max_retries=3,
                 timeout=80,
+                default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
             )
             model_name = "claude-opus-4-6"
         elif _use_smart_validation():
@@ -249,10 +261,14 @@ def validate_items(
             model_name, attempt, _use_smart_validation(),
         )
 
-        # Build messages — disable prompt caching on retries to avoid cached lazy responses
+        # Build messages — cache system prompt on retries (billing savings only).
+        # Human message differs per attempt ("RETRY ATTEMPT X:"), ensuring fresh evaluation.
         if attempt > 1:
             messages = [
-                SystemMessage(content=system_prompt),  # No cache_control on retry
+                SystemMessage(
+                    content=system_prompt,
+                    additional_kwargs={"cache_control": {"type": "ephemeral"}}
+                ),
                 HumanMessage(
                     content=(
                         f"RETRY ATTEMPT {attempt}: Previous validation returned identical scores for all items. "

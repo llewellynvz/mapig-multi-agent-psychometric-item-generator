@@ -406,6 +406,118 @@ def test_accumulate_tokens_existing_models_unchanged():
     assert result["gpt52_output_tokens"] == 0
 
 
+def test_accumulate_tokens_cache_metrics():
+    """Cache metrics are accumulated across _accumulate_tokens calls."""
+    from backend.graph import _accumulate_tokens
+    from backend.agents.llm_utils import TokenUsage
+
+    state = {
+        "opus_tokens_used": 0,
+        "sonnet_tokens_used": 0,
+        "openai_tokens_used": 0,
+        "chatgpt_tokens_used": 0,
+        "gpt52_tokens_used": 0,
+        "gpt52_reasoning_tokens": 0,
+        "gpt52_output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+    }
+
+    usage = TokenUsage(
+        model_name="claude-sonnet-4-5",
+        input_tokens=3000,
+        output_tokens=500,
+        total_tokens=3500,
+        cache_creation_input_tokens=1500,
+        cache_read_input_tokens=0,
+    )
+
+    result = _accumulate_tokens(state, usage)
+    assert result["cache_creation_tokens"] == 1500
+    assert result["cache_read_tokens"] == 0
+    assert result["sonnet_tokens_used"] == 3500
+
+    # Second call: cache hit
+    usage2 = TokenUsage(
+        model_name="claude-sonnet-4-5",
+        input_tokens=1500,
+        output_tokens=500,
+        total_tokens=2000,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=1500,
+    )
+
+    result2 = _accumulate_tokens({**state, **result}, usage2)
+    assert result2["cache_creation_tokens"] == 1500
+    assert result2["cache_read_tokens"] == 1500
+    assert result2["sonnet_tokens_used"] == 5500
+
+
+def test_extract_token_usage_anthropic_cache_metrics():
+    """_extract_token_usage extracts Anthropic cache metrics from response_metadata."""
+    from backend.agents.llm_utils import _extract_token_usage
+
+    class MockMessage:
+        usage_metadata = None
+        response_metadata = {
+            "usage": {
+                "input_tokens": 3000,
+                "output_tokens": 500,
+                "cache_creation_input_tokens": 1500,
+                "cache_read_input_tokens": 1200,
+            }
+        }
+
+    usage = _extract_token_usage(MockMessage(), "claude-sonnet-4-5")
+    assert usage.input_tokens == 3000
+    assert usage.output_tokens == 500
+    assert usage.cache_creation_input_tokens == 1500
+    assert usage.cache_read_input_tokens == 1200
+
+
+def test_extract_token_usage_openai_cached_tokens():
+    """_extract_token_usage extracts OpenAI cached tokens from prompt_tokens_details."""
+    from backend.agents.llm_utils import _extract_token_usage
+
+    class MockMessage:
+        usage_metadata = None
+        response_metadata = {
+            "token_usage": {
+                "prompt_tokens": 2000,
+                "completion_tokens": 300,
+                "total_tokens": 2300,
+                "prompt_tokens_details": {
+                    "cached_tokens": 1024,
+                },
+            }
+        }
+
+    usage = _extract_token_usage(MockMessage(), "gpt-5.4-mini")
+    assert usage.input_tokens == 2000
+    assert usage.output_tokens == 300
+    assert usage.cache_read_input_tokens == 1024
+    assert usage.cache_creation_input_tokens == 0
+
+
+def test_extract_token_usage_no_cache_metrics():
+    """_extract_token_usage handles responses without cache metrics gracefully."""
+    from backend.agents.llm_utils import _extract_token_usage
+
+    class MockMessage:
+        usage_metadata = None
+        response_metadata = {
+            "usage": {
+                "input_tokens": 1000,
+                "output_tokens": 200,
+            }
+        }
+
+    usage = _extract_token_usage(MockMessage(), "claude-sonnet-4-5")
+    assert usage.input_tokens == 1000
+    assert usage.cache_creation_input_tokens == 0
+    assert usage.cache_read_input_tokens == 0
+
+
 def test_analytics_placeholders_no_op():
     """Phase 09-02 Task 2: comparison_node and cross_construct_node gracefully skip on missing data.
 

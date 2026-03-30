@@ -295,6 +295,45 @@ def test_detect_identical_scores():
     assert _detect_identical_scores([]) is False
 
 
+def test_clamp_fixes_dimension_name_as_key():
+    """Dimension name used as key should be normalized to 'dimension' field.
+
+    Production error: LLM returned {"clarity": "clarity", "reasoning": "...", "score": 8}
+    instead of {"dimension": "clarity", "reasoning": "...", "score": 8}.
+    """
+    from backend.agents.validator import _clamp_validation_fields
+
+    malformed = {
+        "validations": [
+            {
+                "item_index": 0,
+                "item_text": "I enjoy what I am doing.",
+                "weighted_score": 8.0,
+                "accept": True,
+                "attempt": 1,
+                "dimension_scores": [
+                    {"dimension": "correspondence", "reasoning": "Good match.", "score": 8},
+                    {"dimension": "distinctiveness", "reasoning": "Distinct.", "score": 8},
+                    {"clarity": "clarity", "reasoning": "Clear item.", "score": 8},  # malformed
+                    {"specificity": "specificity", "reasoning": "Specific.", "score": 7},  # malformed
+                ],
+            }
+        ]
+    }
+
+    fixed = _clamp_validation_fields(malformed)
+    scores = fixed["validations"][0]["dimension_scores"]
+
+    # All four should now have "dimension" as the field name
+    for ds in scores:
+        assert "dimension" in ds, f"Missing 'dimension' field in {ds}"
+        assert ds["dimension"] in {"correspondence", "distinctiveness", "clarity", "specificity"}
+
+    # The malformed ones should have been fixed
+    assert scores[2] == {"dimension": "clarity", "reasoning": "Clear item.", "score": 8}
+    assert scores[3] == {"dimension": "specificity", "reasoning": "Specific.", "score": 7}
+
+
 def _sample_draft_items() -> list[DraftItem]:
     """Helper to create sample DraftItem list for validation testing."""
     return [

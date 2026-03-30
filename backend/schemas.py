@@ -503,6 +503,10 @@ class AuditMetadata(BaseModel):
     gpt52_output_cost: Optional[float] = Field(default=None, description="GPT-5.2 output token cost in USD")
     analytics_budget_exceeded: Optional[bool] = Field(default=None, description="Whether analytics budget cap was exceeded")
 
+    # Prompt caching metrics
+    cache_read_tokens: Optional[int] = Field(default=None, description="Total cached input tokens (Anthropic + OpenAI)")
+    cache_savings_usd: Optional[float] = Field(default=None, description="Estimated savings from prompt caching in USD")
+
 
 class FinalOutput(BaseModel):
     """Final items plus audit metadata.

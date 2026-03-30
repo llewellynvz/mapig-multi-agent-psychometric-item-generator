@@ -21,6 +21,8 @@ class TokenUsage(BaseModel):
     reasoning_tokens: int = 0  # Phase 7: GPT-5.2 reasoning token tracking
     total_tokens: int = 0
     model_name: str = ""
+    cache_creation_input_tokens: int = 0  # Anthropic: tokens written to cache
+    cache_read_input_tokens: int = 0  # Anthropic: tokens read from cache (90% discount)
 
 
 def _extract_token_usage(response_message, model_name: str = "") -> TokenUsage:
@@ -57,6 +59,23 @@ def _extract_token_usage(response_message, model_name: str = "") -> TokenUsage:
             usage.input_tokens = openai_usage.get("prompt_tokens", 0)
             usage.output_tokens = openai_usage.get("completion_tokens", 0)
             usage.total_tokens = openai_usage.get("total_tokens", 0)
+
+    # Extract cache metrics from response_metadata (not in usage_metadata)
+    if hasattr(response_message, "response_metadata"):
+        resp_meta = response_message.response_metadata
+        # Anthropic: cache metrics in usage dict
+        if "usage" in resp_meta:
+            claude_usage = resp_meta["usage"]
+            usage.cache_creation_input_tokens = claude_usage.get("cache_creation_input_tokens", 0) or 0
+            usage.cache_read_input_tokens = claude_usage.get("cache_read_input_tokens", 0) or 0
+        # OpenAI: cached tokens in prompt_tokens_details
+        elif "token_usage" in resp_meta:
+            openai_usage = resp_meta["token_usage"]
+            details = openai_usage.get("prompt_tokens_details") or {}
+            if isinstance(details, dict):
+                usage.cache_read_input_tokens = details.get("cached_tokens", 0) or 0
+            elif hasattr(details, "cached_tokens"):
+                usage.cache_read_input_tokens = getattr(details, "cached_tokens", 0) or 0
 
     return usage
 

@@ -10,6 +10,8 @@ from pydantic import BaseModel
 
 from backend.settings import settings
 
+logger = logging.getLogger("lmaig")
+
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 Message = Tuple[str, str]
 
@@ -187,12 +189,16 @@ def invoke_structured_with_usage(
             try:
                 runnable = llm.with_structured_output(schema, strict=True, include_raw=True)
             except TypeError:
+                logger.warning(
+                    "STRUCTURED_OUTPUT strict=True not supported for model=%s, using non-strict",
+                    model_name,
+                )
                 runnable = llm.with_structured_output(schema, include_raw=True)
 
             _t0 = time.perf_counter()
             result = runnable.invoke(messages)
             _elapsed = time.perf_counter() - _t0
-            logging.getLogger("lmaig").info(
+            logger.info(
                 "LLM_CALL agent=%s model=%s elapsed=%.1fs",
                 agent_name or "unknown", model_name, _elapsed,
             )
@@ -215,8 +221,7 @@ def invoke_structured_with_usage(
 
     except Exception as e:
         # Fallback: validate returned text as JSON
-        _logger = logging.getLogger("lmaig")
-        _logger.warning(
+        logger.warning(
             "STRUCTURED_OUTPUT_FALLBACK agent=%s schema=%s error=%s",
             agent_name or "unknown", schema.__name__, e,
         )

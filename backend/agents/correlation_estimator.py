@@ -42,6 +42,7 @@ async def embed_items(items: List[str]) -> np.ndarray:
 def compute_cosine_similarity_matrix(embeddings: np.ndarray) -> np.ndarray:
     """Compute NxN cosine similarity matrix."""
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1, norms)  # Guard against zero-norm embeddings
     normalized = embeddings / norms
     sim = normalized @ normalized.T
     np.clip(sim, -1.0, 1.0, out=sim)  # Clamp IEEE 754 floating point overshoot

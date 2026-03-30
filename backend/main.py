@@ -13,6 +13,8 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, StreamingResponse
 
+logger = logging.getLogger("lmaig")
+
 # #region agent log
 import os as _os
 # Use /tmp for Vercel serverless environment (read-only filesystem)

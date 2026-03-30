@@ -1190,6 +1190,13 @@ def cross_construct_node(state: GraphState) -> GraphState:
                 logger.warning("No comparison_instruments in final_output, skipping cross-construct analysis")
                 return {}
 
+            if len(final_output.comparison_instruments) < 2:
+                logger.warning(
+                    "Only %d comparison instrument(s) found, need 2 for cross-construct analysis",
+                    len(final_output.comparison_instruments),
+                )
+                return {}
+
             final_items = final_output.final_items
             if not final_items:
                 logger.warning("No final items in final_output, skipping cross-construct analysis")

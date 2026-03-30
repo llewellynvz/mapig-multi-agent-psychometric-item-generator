@@ -70,6 +70,8 @@ export interface AuditMetadata {
   gpt52_reasoning_cost?: number;
   gpt52_output_cost?: number;
   analytics_budget_exceeded?: boolean;
+  cache_read_tokens?: number;
+  cache_savings_usd?: number;
 }
 
 export interface ReviewComment {

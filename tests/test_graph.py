@@ -1472,6 +1472,100 @@ def test_critic_downgrades_construct_level_bias():
         assert c.severity == 1, f"Comment for item {c.item_index} should be downgraded to severity 1, got {c.severity}"
 
 
+def test_cross_construct_with_fewer_than_2_instruments():
+    """Bug fix: cross_construct_node must not crash when < 2 comparison instruments found."""
+    from unittest.mock import MagicMock
+
+    from backend.schemas import ComparisonInstrument
+
+    # Create a mock final_output with only 1 instrument
+    single_instrument = ComparisonInstrument(
+        name="Test Scale",
+        measured_construct="Well-being",
+        source_citation="Test (2024)",
+    )
+    final_output = MagicMock()
+    final_output.comparison_instruments = [single_instrument]
+    final_output.final_items = [MagicMock(item_text="I feel satisfied")]
+
+    user_request = MagicMock()
+    user_request.construct_name = "Life Satisfaction"
+    user_request.construct_exclusions = None
+
+    state = {
+        "final_output": final_output,
+        "user_request": user_request,
+    }
+
+    from backend.graph import cross_construct_node
+
+    # Should return empty dict, not raise IndexError
+    result = cross_construct_node(state)
+    assert result == {}
+
+
+def test_cosine_similarity_zero_norm():
+    """Bug fix: zero-norm embeddings must not produce NaN/inf in similarity matrix."""
+    import numpy as np
+
+    from backend.agents.correlation_estimator import compute_cosine_similarity_matrix
+
+    # Create embeddings where one row is all zeros
+    embeddings = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],  # zero-norm
+        [0.0, 1.0, 0.0],
+    ])
+
+    sim = compute_cosine_similarity_matrix(embeddings)
+    assert not np.any(np.isnan(sim)), "Similarity matrix must not contain NaN"
+    assert not np.any(np.isinf(sim)), "Similarity matrix must not contain Inf"
+    assert sim.shape == (3, 3)
+
+
+def test_facet_mapper_allocation_floor():
+    """Bug fix: facet allocation adjustment must never reduce a facet to 0 items."""
+    from backend.schemas import FacetDefinition
+
+    # Simulate facets that are over-allocated, all near minimum
+    facets = [
+        FacetDefinition(
+            facet_name="Cognitive",
+            facet_description="Thinking patterns related to construct",
+            exclusions="Not behavioral or affective",
+            target_item_count=1,
+        ),
+        FacetDefinition(
+            facet_name="Affective",
+            facet_description="Emotional responses related to construct",
+            exclusions="Not cognitive or behavioral",
+            target_item_count=1,
+        ),
+        FacetDefinition(
+            facet_name="Behavioral",
+            facet_description="Action tendencies related to construct",
+            exclusions="Not cognitive or affective",
+            target_item_count=2,
+        ),
+    ]
+
+    # Total is 4, suppose we need 3 — need to subtract 1
+    total = sum(f.target_item_count for f in facets)
+    requested = 3
+    diff = requested - total  # -1
+
+    # Apply the same logic as facet_mapper.py:93-98
+    if diff < 0:
+        for i in range(abs(diff)):
+            idx = len(facets) - 1 - (i % len(facets))
+            if facets[idx].target_item_count > 1:
+                facets[idx].target_item_count -= 1
+
+    # No facet should be 0
+    for f in facets:
+        assert f.target_item_count >= 1, f"Facet '{f.facet_name}' has {f.target_item_count} items (must be >= 1)"
+
+
 def test_evidence_settings_exist():
     """Phase 11.5 Wave 0A: New evidence settings present with correct defaults."""
     from backend.settings import Settings

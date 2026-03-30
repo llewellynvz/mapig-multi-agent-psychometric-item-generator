@@ -120,7 +120,7 @@ def _detect_stagnation(
 
     Uses Jaccard word-level similarity (threshold 0.7) instead of MD5 hash
     to catch paraphrased repetition (e.g., "satisfactory" → "good").
-    Triggers at iteration >= 1 (one round earlier than before).
+    Triggers at iteration >= 2 (requires 2 revision cycles before stagnation can force-accept).
     """
     if iteration < 2 or not iteration_history:
         return False

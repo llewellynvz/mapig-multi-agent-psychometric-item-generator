@@ -17,7 +17,7 @@ Watch the full walkthrough tutorial showing how to use MAPIG to generate psychom
 ---
 
 ## How It Works
-
+![MAPIG Process Flow](./public/processflow.png)
 MAPIG follows the same logic a scale development team would use — just automated. You provide a construct definition, target population, and constraints. The system then moves through six phases:
 
 1. **Gather evidence** from academic literature (local curated sources + live academic search)

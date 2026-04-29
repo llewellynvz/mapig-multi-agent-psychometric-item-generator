@@ -106,6 +106,101 @@ def test_pairwise_kappa_matrix_returns_dict():
     assert "a|c" in out
 
 
+# ----- New IRR metrics: Spearman rank correlation + verdict-level α -----
+
+
+def test_spearman_perfect_agreement():
+    from backend.analytics.krippendorff import spearman_correlation
+    a = np.array([1, 2, 3, 4, 5], dtype=float)
+    b = np.array([1, 2, 3, 4, 5], dtype=float)
+    assert spearman_correlation(a, b) == 1.0
+
+
+def test_spearman_perfect_inverse():
+    from backend.analytics.krippendorff import spearman_correlation
+    a = np.array([1, 2, 3, 4, 5], dtype=float)
+    b = np.array([5, 4, 3, 2, 1], dtype=float)
+    assert spearman_correlation(a, b) == -1.0
+
+
+def test_spearman_robust_to_scale_differences():
+    """Two raters that disagree on absolute scale but agree on ordering
+    should have high Spearman ρ — the case differing-rubric experts hit."""
+    from backend.analytics.krippendorff import spearman_correlation
+    # Rater A uses 1-5 scale; rater B uses 1-3 but in same order
+    a = np.array([1, 2, 3, 4, 5], dtype=float)
+    b = np.array([1, 1, 2, 2, 3], dtype=float)  # same ordering, different scale
+    rho = spearman_correlation(a, b)
+    assert rho > 0.9, f"Expected ρ > 0.9 for same-ordered ratings, got {rho}"
+
+
+def test_spearman_returns_nan_with_too_few_pairs():
+    from backend.analytics.krippendorff import spearman_correlation
+    a = np.array([1, 2], dtype=float)
+    b = np.array([1, 2], dtype=float)
+    assert np.isnan(spearman_correlation(a, b))
+
+
+def test_spearman_handles_ties():
+    """Tied ranks should be averaged per standard Spearman."""
+    from backend.analytics.krippendorff import spearman_correlation
+    a = np.array([1, 1, 2, 3], dtype=float)
+    b = np.array([1, 1, 2, 3], dtype=float)
+    # Identical with ties → ρ = 1.0
+    assert spearman_correlation(a, b) == 1.0
+
+
+def test_pairwise_spearman_matrix():
+    from backend.analytics.krippendorff import pairwise_spearman_matrix
+    ratings = np.array([
+        [1, 2, 3, 4, 5],
+        [1, 2, 3, 4, 5],
+        [5, 4, 3, 2, 1],
+    ], dtype=float)
+    out = pairwise_spearman_matrix(ratings, ["a", "b", "c"])
+    assert out["a|b"] == 1.0
+    assert out["a|c"] == -1.0
+    assert "b|c" in out
+
+
+def test_krippendorff_alpha_nominal_perfect_agreement():
+    from backend.analytics.krippendorff import krippendorff_alpha_nominal
+    ratings = [
+        ["accept", "revise", "accept"],
+        ["accept", "revise", "accept"],
+        ["accept", "revise", "accept"],
+    ]
+    assert krippendorff_alpha_nominal(ratings) == 1.0
+
+
+def test_krippendorff_alpha_nominal_disagreement():
+    from backend.analytics.krippendorff import krippendorff_alpha_nominal
+    ratings = [
+        ["accept", "revise", "accept"],
+        ["revise", "accept", "reject"],
+        ["accept", "revise", "accept"],
+    ]
+    alpha = krippendorff_alpha_nominal(ratings)
+    # Substantial disagreement → α near 0 or below
+    assert alpha < 0.5
+
+
+def test_expert_panel_returns_verdict_alpha_and_spearman(monkeypatch):
+    """End-to-end: ExpertConsensus must populate the new IRR fields."""
+    monkeypatch.setattr("backend.settings.settings.APP_MODE", "mock")
+    request = _make_request()
+    items = _make_items(4)
+    consensus, _usage = run_expert_panel(
+        request=request, items=items, evidence=[], pfa_result=None,
+    )
+    # New fields must be present
+    assert hasattr(consensus, "irr_verdict_alpha")
+    assert hasattr(consensus, "irr_pairwise_spearman")
+    # Spearman should be computed (mock-mode returns differing scores per role)
+    assert consensus.irr_pairwise_spearman is not None
+    assert len(consensus.irr_pairwise_spearman) >= 1
+
+
 # ----- Aggregation helpers -----
 
 

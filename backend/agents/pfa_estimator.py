@@ -253,10 +253,67 @@ def compute_model_fit(
 # ----- Main estimator -----
 
 
-def _decide_verdict(rmsr: float, recovery: float) -> str:
-    if rmsr < settings.PFA_RMSR_GOOD and recovery >= settings.PFA_RECOVERY_GOOD:
+def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool]]:
+    """Reflect each factor column so its dominant loading is positive.
+
+    Factor analysis has sign indeterminacy: F and -F are equivalent solutions
+    (Mulaik, 2010, Foundations of Factor Analysis, ch. 7). Convention from
+    Lorenzo-Seva & ten Berge (2006, Methodology, 2(2), 57-64): reflect each
+    factor so the loading with greatest absolute magnitude is positive. This
+    matches the convention used by SPSS, lavaan, Mplus, and Procrustes target
+    rotation, and ensures Tucker's congruence is computed against the
+    correctly-oriented factor.
+
+    Without this step, oblimin (used by `factor-analyzer`) can converge to a
+    solution where all loadings on a factor are negative — mathematically
+    equivalent but visually wrong: items measuring well-being would appear to
+    "load negatively" on the well-being factor, and Tucker's congruence
+    against a one-hot expected pattern would come back at -0.998 instead of
+    +0.998.
+
+    Returns:
+        (aligned_loadings, was_flipped_per_factor)
+    """
+    aligned = loadings.copy()
+    n_factors = aligned.shape[1]
+    flipped: List[bool] = []
+    for j in range(n_factors):
+        col = aligned[:, j]
+        if col.size == 0:
+            flipped.append(False)
+            continue
+        dominant_idx = int(np.argmax(np.abs(col)))
+        dominant_value = float(col[dominant_idx])
+        if dominant_value < 0:
+            aligned[:, j] = -col
+            flipped.append(True)
+        else:
+            flipped.append(False)
+    return aligned, flipped
+
+
+def _decide_verdict(
+    rmsr: float,
+    recovery: float,
+    mean_abs_congruence: float = 0.0,
+) -> str:
+    """Decide overall fit verdict.
+
+    Considers RMSR (lower=better), factor recovery rate (higher=better), and
+    mean absolute Tucker's congruence (higher=better). Tucker's congruence is
+    used as |x| because the sign carries no fit information per Lorenzo-Seva &
+    ten Berge (2006) §3 — it only encodes factor orientation, which is
+    arbitrary up to a reflection.
+    """
+    excellent_congruence = mean_abs_congruence >= settings.PFA_TUCKERS_THRESHOLD_EXCELLENT
+    fair_congruence = mean_abs_congruence >= settings.PFA_TUCKERS_THRESHOLD_FAIR
+    good_rmsr = rmsr < settings.PFA_RMSR_GOOD
+    good_recovery = recovery >= settings.PFA_RECOVERY_GOOD
+    acceptable_recovery = recovery >= settings.PFA_RECOVERY_ACCEPTABLE
+
+    if good_rmsr and good_recovery and (excellent_congruence or mean_abs_congruence == 0.0):
         return "good"
-    if recovery >= settings.PFA_RECOVERY_ACCEPTABLE:
+    if acceptable_recovery and (fair_congruence or mean_abs_congruence == 0.0):
         return "acceptable"
     return "poor"
 
@@ -383,12 +440,28 @@ def run_pfa(
             model_identifiability=_compute_identifiability(len(items), n_factors),
         )
 
+    logger.info(
+        "PFA_EMBED items=%d dims=%d model=%s reverse_coded=%d",
+        len(items), int(embeddings.shape[1]), embedding_model,
+        sum(1 for p in polarities if p < 0),
+    )
+
     polarity_arr = np.array(polarities).reshape(-1, 1)
     embeddings = embeddings * polarity_arr
 
     # 3. Cosine similarity → diagonal = 1
     sim = compute_cosine_similarity_matrix(embeddings)
     np.fill_diagonal(sim, 1.0)
+
+    # Log off-diagonal stats — useful for diagnosing degenerate inputs
+    iu = np.triu_indices(sim.shape[0], k=1)
+    if iu[0].size > 0:
+        off_diag = sim[iu]
+        logger.info(
+            "PFA_COSINE_MATRIX off_diag_min=%.3f off_diag_max=%.3f off_diag_mean=%.3f n=%d",
+            float(off_diag.min()), float(off_diag.max()),
+            float(off_diag.mean()), int(off_diag.size),
+        )
 
     # 4. EFA via factor-analyzer
     # Workaround for factor-analyzer ↔ scikit-learn 1.8+ incompatibility:
@@ -417,6 +490,7 @@ def run_pfa(
     except Exception:
         pass
 
+    solver_used = "factor_analyzer:oblimin"
     try:
         from factor_analyzer import FactorAnalyzer
 
@@ -427,15 +501,23 @@ def run_pfa(
         loadings = np.asarray(fa.loadings_)
         eigenvalues, _ = fa.get_eigenvalues()
         eigenvalues = np.asarray(eigenvalues, dtype=float).tolist()
+        logger.info(
+            "PFA_EFA_SOLVER chosen=factor_analyzer rotation=oblimin n_factors=%d",
+            n_factors,
+        )
     except Exception as e:
         logger.error("PFA FactorAnalyzer fit failed: %s", e, exc_info=True)
+        solver_used = "svd_fallback"
         # Fall back to PCA via SVD
         try:
             U, S, Vt = np.linalg.svd(sim)
             # Take top n_factors components scaled by sqrt(eigenvalue) → loadings
             loadings = U[:, :n_factors] * np.sqrt(np.abs(S[:n_factors]))
             eigenvalues = S.tolist()
-            logger.warning("PFA fell back to SVD-based loadings")
+            logger.warning(
+                "PFA_EFA_SOLVER chosen=svd_fallback reason=%s",
+                type(e).__name__,
+            )
         except Exception as e2:
             logger.error("PFA SVD fallback failed: %s", e2)
             return PFAResult(
@@ -455,15 +537,61 @@ def run_pfa(
                 model_identifiability=_compute_identifiability(len(items), n_factors),
             )
 
-    # 5. Tucker's congruence vs expected pattern (one-hot)
+    # 4b. Log raw (pre-alignment) loadings stats per factor — useful for
+    # forensic analysis when a run produces unexpected results.
+    for j in range(loadings.shape[1]):
+        col_raw = loadings[:, j]
+        logger.info(
+            "PFA_LOADINGS_RAW factor=%d min=%.3f max=%.3f mean=%.3f sum=%.3f",
+            j,
+            float(col_raw.min()),
+            float(col_raw.max()),
+            float(col_raw.mean()),
+            float(col_raw.sum()),
+        )
+
+    # 4c. Sign-align factor columns. Without this, oblimin can converge to a
+    # solution where loadings on a factor are all-negative — equivalent up to
+    # reflection but visually wrong (Mulaik 2010 ch. 7; Lorenzo-Seva &
+    # ten Berge 2006). Convention: dominant loading must be positive.
+    loadings, sign_flips = _align_factor_signs(loadings)
+    for j, was_flipped in enumerate(sign_flips):
+        col_aligned = loadings[:, j]
+        dom_idx = int(np.argmax(np.abs(col_aligned))) if col_aligned.size else -1
+        dom_val = float(col_aligned[dom_idx]) if dom_idx >= 0 else 0.0
+        logger.info(
+            "PFA_SIGN_ALIGNMENT factor=%d flipped=%s dominant_idx=%d dominant_value=%.3f",
+            j, was_flipped, dom_idx, dom_val,
+        )
+
+    # 5. Tucker's congruence vs expected pattern (one-hot). Sign should now be
+    # naturally positive after alignment, but we still take abs() in the
+    # verdict band as a defensive safety net (per Lorenzo-Seva & ten Berge
+    # 2006 §3, only the magnitude carries fit information).
     expected_pattern = build_expected_pattern(expected_assignments, n_factors)
     congruence = tuckers_congruence(loadings, expected_pattern).tolist()
+    for j, c in enumerate(congruence):
+        abs_c = abs(c)
+        if abs_c >= settings.PFA_TUCKERS_THRESHOLD_EXCELLENT:
+            band = "excellent"
+        elif abs_c >= settings.PFA_TUCKERS_THRESHOLD_FAIR:
+            band = "fair"
+        else:
+            band = "below_threshold"
+        logger.info(
+            "PFA_TUCKER factor=%d signed=%.3f abs=%.3f band=%s",
+            j, c, abs_c, band,
+        )
 
     # 6. Factor recovery rate
     recovery, _ = factor_recovery_rate(loadings, expected_assignments)
 
     # 7. 4-rule retention check
     retention = compute_retention_flags(loadings, expected_assignments)
+    n_well_loaded = sum(1 for is_ok, _ in retention if is_ok)
+    logger.info(
+        "PFA_RETENTION well_loaded=%d/%d", n_well_loaded, len(retention),
+    )
 
     # 8. DAAL labels
     daal_labels = label_factors_via_daal(loadings, expected_assignments, facet_labels)
@@ -493,7 +621,10 @@ def run_pfa(
         )
 
     identifiability = _compute_identifiability(len(items), n_factors)
-    verdict = _decide_verdict(rmsr, recovery)
+    mean_abs_congruence = (
+        float(np.mean([abs(c) for c in congruence])) if congruence else 0.0
+    )
+    verdict = _decide_verdict(rmsr, recovery, mean_abs_congruence=mean_abs_congruence)
 
     # When the model is saturated, RMSR=0 and CAF=1 trivially — fit_verdict
     # of "good" would be misleading. Downgrade verdict to acknowledge that
@@ -519,8 +650,10 @@ def run_pfa(
         )
 
     logger.info(
-        "PFA done n_factors=%d recovery=%.3f rmsr=%.3f caf=%.3f congruence=%s verdict=%s identifiability=%s",
-        n_factors, recovery, rmsr, caf,
+        "PFA_VERDICT solver=%s n_factors=%d recovery=%.3f rmsr=%.3f caf=%.3f "
+        "mean_abs_congruence=%.3f congruence=%s verdict=%s identifiability=%s",
+        solver_used, n_factors, recovery, rmsr, caf,
+        mean_abs_congruence,
         [round(c, 3) for c in congruence], verdict, identifiability,
     )
 

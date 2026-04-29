@@ -27,11 +27,14 @@ from backend.schemas import (
     DimensionScore,
     DraftItem,
     EvidenceChunk,
+    ExpertConsensus,
     FacetMapperResponse,
     FinalOutput,
     IterationSnapshot,
     ItemValidation,
     MetaEditorResponse,
+    PersonaValidationResponse,
+    PFAResult,
     ReviewComment,
     RevisionPlan,
     UserRequest,
@@ -179,6 +182,12 @@ class GraphState(TypedDict, total=False):
 
     # Time budget (Vercel 300s limit)
     _start_time: float  # time.time() set in init_run
+
+    # Phase 14-16: PFA, Expert Panel, Persona Validator
+    persona_validation: Optional[PersonaValidationResponse]
+    pfa_pruning_result: Optional[PFAResult]
+    pfa_dropped_indices: List[int]
+    expert_consensus: Optional[ExpertConsensus]
 
     # Output
     final_output: FinalOutput
@@ -386,10 +395,14 @@ def facet_mapper_node(state: GraphState) -> GraphState:
 def item_writer_node(state: GraphState) -> GraphState:
     with step("item_writer_node", state):
         logger.info("ELAPSED %.0fs at item_writer_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
+        # Initial path: over-generate when PFA is enabled so PFA pruning can trim
+        # weak items down to the user's requested item_count.
+        overgenerate = bool(settings.PFA_ENABLED and settings.PFA_OVERGENERATE_FACTOR > 1.0)
         resp, usage = write_items(
             state["user_request"],
             state.get("evidence", []),
             facet_mapping=state.get("facet_mapping"),
+            overgenerate=overgenerate,
         )
         token_update = _accumulate_tokens(state, usage)
 
@@ -474,9 +487,31 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
         if not failed:
             # All items passed
             logger.info("Validation passed: all items scored >= 7.0")
+
+            # Phase 16: Persona-based ambiguity detection (lightweight, parallel signal)
+            persona_resp: Optional[PersonaValidationResponse] = None
+            if settings.PERSONA_VALIDATOR_ENABLED and settings.PERSONA_VALIDATOR_PERSONAS > 0:
+                try:
+                    from backend.agents.persona_validator import validate_with_personas
+                    persona_resp, persona_usage = validate_with_personas(
+                        state["user_request"],
+                        draft_items,
+                    )
+                    intermediate_state = {**state, **token_update}
+                    token_update = _accumulate_tokens(intermediate_state, persona_usage)
+                    if persona_resp.flagged_items:
+                        logger.info(
+                            "PERSONA_VALIDATOR flagged %d items for ambiguity",
+                            len(persona_resp.flagged_items),
+                        )
+                except Exception as e:
+                    logger.warning("Persona validator failed: %s", e)
+                    persona_resp = None
+
             return Command(
                 update={
                     "validation_results": validation_results,
+                    "persona_validation": persona_resp,
                     **token_update,
                 },
                 goto="reviewers_fanout_node"
@@ -700,7 +735,7 @@ def reviewers_fanout_node(state: GraphState) -> GraphState:
         }
 
 
-def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "finalize_node"]]:
+def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "pfa_pruning_node"]]:
     user_request = state.get("user_request")
     model_provider = user_request.model_provider if user_request else "claude"
     use_chatgpt_critics = user_request.use_chatgpt_critics if user_request else False
@@ -730,10 +765,10 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "final
             goto="meta_editor_node",
         )
 
-    # accept / stop_max_iterations / needs_human all end the loop
+    # accept / stop_max_iterations / needs_human → proceed to PFA pruning then expert panel
     return Command(
         update={"stop_reason": reason},
-        goto="finalize_node",
+        goto="pfa_pruning_node",
     )
 
 
@@ -805,6 +840,117 @@ def meta_editor_node(state: GraphState) -> GraphState:
             "content_comments": [],
             **token_update,
         }
+
+
+def pfa_pruning_node(state: GraphState) -> GraphState:
+    """Phase 14: Prune over-generated items via PFA.
+
+    Drops weakly-loaded items down to user's requested item_count, preserving
+    at least one item per facet. Runs after critic accept, before expert panel.
+    """
+    with step("pfa_pruning_node", state):
+        logger.info("ELAPSED %.0fs at pfa_pruning_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
+        if not settings.PFA_ENABLED:
+            logger.info("PFA pruning disabled by settings")
+            return {}
+
+        items = state.get("draft_items", [])
+        target = state["user_request"].item_count
+        if len(items) <= target:
+            logger.info("PFA pruning skipped: have %d items, target=%d", len(items), target)
+            return {}
+
+        try:
+            from backend.agents.pfa_pruning import prune_items
+            kept, dropped, pfa_result = prune_items(
+                items,
+                facet_mapping=state.get("facet_mapping"),
+                target_count=target,
+            )
+            return {
+                "draft_items": kept,
+                "pfa_pruning_result": pfa_result,
+                "pfa_dropped_indices": dropped,
+            }
+        except Exception as e:
+            logger.error("PFA pruning failed: %s", e, exc_info=True)
+            return {}
+
+
+def expert_panel_node(state: GraphState) -> GraphState:
+    """Phase 15: Multi-expert face/content validity panel.
+
+    Three experts (psychometric, domain, localization) rate items independently,
+    then a debate round reduces disagreement. Outputs ExpertConsensus + a
+    RevisionPlan to be applied by one final meta-editor pass.
+    """
+    with step("expert_panel_node", state):
+        logger.info("ELAPSED %.0fs at expert_panel_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
+        if not settings.EXPERT_PANEL_ENABLED:
+            logger.info("Expert panel disabled by settings")
+            return {}
+
+        rem_sec = _remaining_seconds(state)
+        if rem_sec < 60:
+            logger.warning(
+                "EXPERT_PANEL_BUDGET remaining=%.0fs (<60s) — skipping to preserve finalize budget",
+                rem_sec,
+            )
+            return {}
+
+        try:
+            from backend.agents.expert_panel import run_expert_panel
+            consensus, usage = run_expert_panel(
+                request=state["user_request"],
+                items=state.get("draft_items", []),
+                evidence=state.get("evidence", []),
+                pfa_result=state.get("pfa_pruning_result"),
+            )
+            token_update = _accumulate_tokens(state, usage)
+            return {
+                "expert_consensus": consensus,
+                **token_update,
+            }
+        except Exception as e:
+            logger.error("Expert panel failed: %s", e, exc_info=True)
+            return {}
+
+
+def expert_revision_node(state: GraphState) -> GraphState:
+    """Phase 15: Apply expert panel consensus revisions in ONE pass.
+
+    Calls revise_items with phase='expert_revision'. Does NOT re-trigger the
+    critic loop. Preserves the existing iteration cap.
+    """
+    with step("expert_revision_node", state):
+        logger.info("ELAPSED %.0fs at expert_revision_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
+        consensus = state.get("expert_consensus")
+        if not consensus or not consensus.consensus_revisions.edits:
+            logger.info("Expert revision skipped: no consensus revisions to apply")
+            return {}
+
+        try:
+            resp, usage = revise_items(
+                request=state["user_request"],
+                items=state.get("draft_items", []),
+                linguistic_comments=[],
+                bias_comments=[],
+                content_comments=[],
+                iteration=state.get("iteration", 0),
+                phase="expert_revision",
+                expert_consensus_revisions=consensus.consensus_revisions,
+            )
+            token_update = _accumulate_tokens(state, usage)
+            logger.info(
+                "EXPERT_REVISION applied edits=%d", len(resp.revision_plan.edits)
+            )
+            return {
+                "draft_items": resp.revised_items,
+                **token_update,
+            }
+        except Exception as e:
+            logger.error("Expert revision failed: %s. Items returned unchanged.", e, exc_info=True)
+            return {}
 
 
 def finalize_node(state: GraphState) -> GraphState:
@@ -969,6 +1115,9 @@ def finalize_node(state: GraphState) -> GraphState:
             bias_feedback=bias_feedback,
             content_feedback=content_feedback,
             iteration_history=iteration_history,
+            persona_validation=state.get("persona_validation"),
+            expert_consensus=state.get("expert_consensus"),
+            pfa_result=state.get("pfa_pruning_result"),
         )
 
         # Phase 10: Extract GPT-5.2 analytics toggle
@@ -1369,6 +1518,32 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             except Exception as e:
                 logger.error(f"Cross-construct analysis failed: {e}")
 
+        # Phase 14: Pseudo-Factor Analysis (post-final structure report for the UI)
+        if settings.PFA_ENABLED:
+            remaining = _remaining_seconds(state)
+            if remaining < 25:
+                logger.warning(
+                    "PFA_ANALYTICS_BUDGET remaining=%.0fs (<25s) — skipping post-final PFA",
+                    remaining,
+                )
+            else:
+                try:
+                    from backend.analytics.pfa_analytics import compute_pfa_analytics
+                    pfa_result = compute_pfa_analytics(
+                        final_items=updated.final_items,
+                        facet_mapping=state.get("facet_mapping"),
+                        items_dropped=state.get("pfa_dropped_indices", []),
+                    )
+                    updated.pfa_result = pfa_result
+                    logger.info(
+                        "PFA_ANALYTICS done verdict=%s recovery=%.3f rmsr=%.3f",
+                        pfa_result.fit_verdict,
+                        pfa_result.factor_recovery_rate,
+                        pfa_result.rmsr,
+                    )
+                except Exception as e:
+                    logger.error(f"PFA analytics failed: {e}", exc_info=True)
+
         # Budget check
         if gpt52_enabled:
             gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
@@ -1408,6 +1583,10 @@ def build_graph(checkpointer=None):
     builder.add_node("analytics_dispatch_node", analytics_dispatch_node)
 
     builder.add_node("facet_mapper_node", facet_mapper_node)
+    # Phase 14-15: PFA pruning + expert panel + expert revision
+    builder.add_node("pfa_pruning_node", pfa_pruning_node)
+    builder.add_node("expert_panel_node", expert_panel_node)
+    builder.add_node("expert_revision_node", expert_revision_node)
 
     builder.add_edge(START, "init_run")
     builder.add_edge("init_run", "retrieve_node")
@@ -1424,11 +1603,16 @@ def build_graph(checkpointer=None):
     # Use parallel reviewers instead of sequential
     builder.add_edge("reviewers_fanout_node", "critic_node")
 
-    # Critic routes to either meta-editor (revise) or finalize (end)
+    # Critic routes to either meta-editor (revise) or PFA pruning (accept).
     # Meta-editor loops back into parallel reviewers.
     builder.add_edge("meta_editor_node", "reviewers_fanout_node")
 
-    # Phase 10: Analytics dispatch (correlation + comparison parallel, then cross-construct)
+    # Phase 14-15: PFA pruning → expert panel → one final meta-editor pass → finalize.
+    builder.add_edge("pfa_pruning_node", "expert_panel_node")
+    builder.add_edge("expert_panel_node", "expert_revision_node")
+    builder.add_edge("expert_revision_node", "finalize_node")
+
+    # Phase 10: Analytics dispatch (correlation + comparison parallel, then cross-construct, then PFA)
     builder.add_edge("finalize_node", "analytics_dispatch_node")
     builder.add_edge("analytics_dispatch_node", END)
 

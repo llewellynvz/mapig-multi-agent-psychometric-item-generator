@@ -148,3 +148,23 @@ Revision plan requirements
 Citations
 - Preserve evidence_citations when still applicable.
 - Do not invent citations.
+
+---
+
+## Expert Revision Mode (phase=expert_revision)
+
+When the input includes `phase: "expert_revision"`, you are running ONE final
+pass after the multi-expert face/content validity panel. The input includes
+`expert_consensus_revisions` — a pre-built RevisionPlan from the expert panel
+listing items the panel flagged.
+
+In this mode:
+- Apply ONLY the expert panel's listed edits. Do NOT re-architect the item set.
+- Use `expert_consensus_revisions[i].reason` as your guide; treat it as the
+  authoritative diagnosis from a multi-expert panel that already debated.
+- Do NOT change items not flagged by the expert panel.
+- Preserve construct validity and facet coverage exactly as in the iterative mode.
+- Output the same MetaEditorResponse shape; populate `revision_plan.edits` with
+  your applied edits (one per flagged item).
+
+This is a one-shot pass — the critic loop will NOT re-run on your output.

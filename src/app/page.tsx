@@ -9,6 +9,9 @@ import { EvidenceAuditPanel } from "@/components/EvidenceAuditPanel";
 import { FeedbackHistoryPanel, type FeedbackHistoryEntry } from "@/components/FeedbackHistoryPanel";
 import { GeneratedItemsTable } from "@/components/GeneratedItemsTable";
 import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
+import { PFAPanel } from "@/components/PFAPanel";
+import { ExpertPanelCard } from "@/components/ExpertPanelCard";
+import { PersonaValidationCard } from "@/components/PersonaValidationCard";
 import { InstrumentSetupForm } from "@/components/InstrumentSetupForm";
 import { ProgressIndicator, type CompletedNode, type ProgressState } from "@/components/ProgressIndicator";
 import { SetupSnapshotCard } from "@/components/SetupSnapshotCard";
@@ -600,6 +603,11 @@ export default function HomePage() {
             {/* Full-width setup snapshot bar (Edit button inside card) */}
             <SetupSnapshotCard values={submittedSetup} horizontal onEditSetup={handleStartNew} />
 
+            {/* Persona-based ambiguity detection (collapsed by default) */}
+            {result && result.persona_validation && (
+              <PersonaValidationCard validation={result.persona_validation} />
+            )}
+
             {/* 2-column main content: 60/40 split */}
             <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
               {/* Left (60%): Generated items + Correlation */}
@@ -650,6 +658,11 @@ export default function HomePage() {
                   isPending={mutation.isPending}
                 />
 
+                {/* Expert face/content validity panel */}
+                {result && result.expert_consensus && (
+                  <ExpertPanelCard consensus={result.expert_consensus} />
+                )}
+
                 {/* Instrument Comparison (moved from bottom analytics row) */}
                 {result && result.comparison_instruments && result.comparison_instruments.length >= 2 ? (
                   <ComparisonPanel
@@ -694,6 +707,11 @@ export default function HomePage() {
                 />
               </div>
             </div>
+
+            {/* Pseudo-Factor Analysis full-width row (centerpiece structural result) */}
+            {result && result.pfa_result && result.pfa_result.loadings.length > 0 && (
+              <PFAPanel pfa={result.pfa_result} />
+            )}
 
           </section>
         )}

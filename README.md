@@ -38,9 +38,9 @@ Evidence Gathering
                     v
            Facet Mapper (construct structure analysis)
                     |
-              Item Writer (draft items guided by facets)
+              Item Writer (drafts ~2× requested items, guided by facets)
                     |
-              Validator (4-dimension scoring, up to 3 regeneration attempts)
+              Validator (4-dimension scoring + Persona Validator parallel)
                     |
         ┌───────────┼───────────┐
    Linguistic    Bias       Content        <- Triple Review (parallel)
@@ -51,22 +51,28 @@ Evidence Gathering
                     |
          ┌──── accept ────┐──── revise ──> Meta Editor ──> back to Triple Review
          v
+     PFA Pruning (drop weak items via embedding factor analysis)
+         |
+     Expert Panel (psychometric / domain / localization, with debate + IRR)
+         |
+     Meta Editor (one final pass applying expert consensus revisions)
+         |
      Finalize (audit metadata, cost calculation)
          |
-    ┌────┼────┐
-    v    v    v
- Correlation  Instrument   Validity        <- Post-Finalization Analytics
- Estimator    Searcher     Scorer
-    └────┼────┘
+    ┌────┼────┬────┐
+    v    v    v    v
+ Correlation  Instrument   Validity   PFA Analytics  <- Post-Finalization Analytics
+ Estimator    Searcher     Scorer     (factor structure report)
+    └────┼────┴────┘
          v
    Final Output
 ```
 
 ---
 
-## The 13 Agents
+## The Specialised Agents
 
-MAPIG uses 13 specialized AI agents, each with a single job. Think of them as a team of experts passing work down an assembly line — one gathers evidence, another maps the construct's theoretical structure, one drafts items guided by that structure, others review, one decides if revisions are needed, and the final group checks how good the items really are.
+MAPIG uses a team of specialised AI agents, each with a single job. Think of them as a team of experts passing work down an assembly line — one gathers evidence, another maps the construct's theoretical structure, one drafts items guided by that structure, others review, one decides if revisions are needed, persona-based and multi-expert panels assess face/content validity, factor analysis on item embeddings prunes weak items, and the final group checks how good the items really are.
 
 ### Evidence Gathering
 
@@ -85,8 +91,9 @@ MAPIG uses 13 specialized AI agents, each with a single job. Think of them as a 
 
 | Agent | What it does |
 |-------|-------------|
-| **Item Writer** | The creative engine. Takes the construct definition, evidence, **facet mapping**, and constraints, then **drafts Likert-type items** following psychometric best practices — no double-barreled items, appropriate reading level, positive keying only (per current best practice), and each item grounded in specific evidence with a rationale citing the source. When facet mapping is provided, items are distributed across facets to ensure semantic diversity and moderate inter-item correlations (target: r = 0.40-0.70). |
+| **Item Writer** | The creative engine. Takes the construct definition, evidence, **facet mapping**, and constraints, then **drafts Likert-type items** following psychometric best practices — no double-barreled items, appropriate reading level, positive keying only (per current best practice), and each item grounded in specific evidence with a rationale citing the source. **Over-generates by ~2×** the requested item count so the downstream PFA pruning step can trim weak items based on factor structure (Suárez-Álvarez et al., 2026). |
 | **Validator** | The quality gate. **Scores every item on 4 weighted dimensions**: correspondence with the construct definition (50%), distinctiveness from neighboring constructs (25%), clarity for the target population (15%), and specificity of language (10%). Items scoring below 7.0/10 are sent back for regeneration — only the failed items, not the whole batch. The validator also detects "lazy" identical scores (where all items receive the same rating) and forces re-evaluation with a more powerful model. |
+| **Persona Validator** | Adapted from Step 13 of Keane & McNaughton (2026). Generates 2–3 respondent personas from `target_population` and `cultural_group` (e.g., "early-20s nurse in Cape Town"), then has each persona rate every item on a 1–5 Likert scale and provide a one-sentence interpretation. Items where personas disagree by ≥ 2 Likert points are flagged for ambiguity. This catches a different failure mode than bias or linguistic clarity — it surfaces items that *different respondents read differently*. |
 
 ### Triple Review (runs in parallel)
 
@@ -103,13 +110,21 @@ Three independent reviewers evaluate all items simultaneously, each looking at a
 | Agent | What it does |
 |-------|-------------|
 | **Critic** | The decision-maker. Reads all reviewer feedback and decides: **accept the items or send them back for revision**. Uses adaptive thresholds that gradually relax over iterations to prevent infinite revision loops. Also detects stagnation — when revisions are just paraphrasing the same content without meaningful improvement — and force-accepts to move forward. |
-| **Meta Editor** | The surgeon. When the critic says "revise", this agent **applies reviewer feedback precisely** — fixing only the flagged issues while preserving item count, facet balance, and construct fidelity. It will reject changes that would alter what the item measures (e.g., changing "I am satisfied with my life" to "My community is satisfied with life"). |
+| **Meta Editor** | The surgeon. When the critic says "revise", this agent **applies reviewer feedback precisely** — fixing only the flagged issues while preserving item count, facet balance, and construct fidelity. It will reject changes that would alter what the item measures (e.g., changing "I am satisfied with my life" to "My community is satisfied with life"). Also runs a one-shot pass after the Expert Panel applies consensus revisions. |
+
+### Pre-Calibration Structure & Expert Validity
+
+| Agent | What it does |
+|-------|-------------|
+| **PFA Pruning** | Runs **Pseudo-Factor Analysis** (Varrasi et al., 2026) on the over-generated item pool. Embeds items via `text-embedding-3-large`, computes cosine similarity, runs EFA via `factor-analyzer` (oblimin rotation), and drops items that fail the 4-rule retention check from Suárez-Álvarez et al. (2026): item must (1) load on its parent facet, (2) load higher on parent than any other factor, (3) load higher on parent than the average of cross-loadings, and (4) load higher than the average of all other items on the parent factor. **Hard constraint**: never drops the last item of any facet (preserves coverage). |
+| **Expert Panel** | Three "expert" agents (Psychometric, Domain, Localization) **independently rate items on role-specific 1–5 rubrics**, then participate in a single debate round where each sees peers' anonymized scores and may revise. Computes **Krippendorff's α** (overall ordinal agreement) plus pairwise Cohen's κ between expert pairs. The aggregated **ExpertConsensus** produces a `RevisionPlan` that the Meta Editor applies in a single final pass — without re-triggering the critic loop, preserving the iteration cap. |
 
 ### Post-Finalization Analytics
 
 | Agent | What it does |
 |-------|-------------|
 | **Correlation Estimator** | Estimates **how items relate to each other** before any empirical data collection, using the embedding-based method validated by Hommel & Arslan (2024). Produces a full inter-item correlation matrix, McDonald's omega, and internal consistency flags. |
+| **PFA Analytics** | Reports the **post-prune factor structure** for the UI: per-item factor loadings, Tucker's congruence (vs. expected facet pattern), factor recovery rate, RMSR + CAF model-free fit indices, eigenvalues, and DAAL-derived factor labels. Verdict banner: *good* / *acceptable* / *poor* fit. |
 | **Instrument Searcher** | Automatically **finds published scales** that measure the same or related constructs (e.g., finds the Satisfaction with Life Scale if you're building a life satisfaction measure, and the Flourishing Scale as a discriminant benchmark). Filters out commercial/proprietary instruments. Used for benchmarking your items against established instruments. |
 | **Validity Scorer** | Estimates **convergent and discriminant validity** — how well your items align with similar instruments (should be high) and how distinct they are from different constructs (should be low). Also runs plagiarism detection to ensure your items are original, not paraphrased copies of existing scales. |
 
@@ -173,6 +188,45 @@ The final analytics stage estimates how distinct your target construct is from r
 4. Provides a construct pair analysis with reasoning about where the conceptual boundaries lie
 
 This tells you whether your generated items are measuring what you claim — or whether they may be inadvertently capturing a neighboring construct.
+
+### Pseudo-Factor Analysis (PFA)
+
+After the critic accepts the item set, MAPIG runs **PFA** — embedding-based exploratory factor analysis — *before* any respondent has been recruited (Varrasi et al., 2026; Suárez-Álvarez et al., 2026).
+
+**How it works**:
+1. Items are embedded via OpenAI `text-embedding-3-large` (signs flipped for any reverse-keyed items so all point in the same conceptual direction).
+2. Pairwise cosine similarity becomes the input "correlation" matrix (diagonal = 1.0).
+3. EFA is run via the pure-Python `factor-analyzer` package with **oblimin (oblique) rotation** — preferred for psychological constructs where factors are typically correlated.
+4. **Tucker's congruence** is computed against the expected one-hot facet pattern from the Facet Mapper. >0.85 fair, >0.95 excellent (Lorenzo-Seva & ten Berge, 2006).
+5. **Factor recovery rate** measures the fraction of expected factors successfully recovered (majority of expected items load primarily on the right factor at ≥ 0.30).
+6. **DAAL labels** (Dominant Average Absolute Loading) attach human-readable facet names to each numerical factor.
+7. **RMSR** (Root Mean Square Residual) and **CAF** (Common Part Accounted For) provide model-free fit indices.
+
+**Pruning** uses the 4-rule retention check from Suárez-Álvarez et al. (2026): each item must (1) load on its parent facet, (2) load higher there than on any other factor, (3) load higher than the average of cross-loadings, and (4) load higher than the average of all other items on the parent factor. Items failing any rule are dropped — but the system never drops the last item of any facet, preserving facet coverage.
+
+The post-prune PFA result is then shown in the UI's **PFA Panel**: a loading heatmap, factor-recovery summary, retention badges per item, eigenvalues, residual correlation matrix, and an overall *good / acceptable / poor* fit verdict.
+
+### Expert Panel — Multi-Agent Face/Content Validity
+
+After PFA pruning, three "expert" agents independently rate the cleaned item set on role-specific 1–5 rubrics:
+
+- **Psychometric Expert**: face validity, parsimony, redundancy, response-set vulnerability, scaling appropriateness (frameworks: Kline, 2015; DeVellis & Thorpe, 2016; AERA/APA/NCME *Standards*).
+- **Domain Expert**: construct fidelity, theoretical alignment, evidence anchoring, boundary precision (receives the construct definition + top-5 evidence chunks).
+- **Localization Expert**: cultural fit for the target population, idiom risk, reading-level appropriateness, inclusivity, translatability (subsumes the persona-rater role from Keane & McNaughton, 2026, Step 13).
+
+**Round 2 (debate)**: each expert sees peers' anonymized round-1 scores and may revise items where they disagreed by ≥ 2 points. Capped at one debate round to bound cost.
+
+**Inter-rater reliability** is computed as **Krippendorff's α** (ordinal level) plus pairwise **Cohen's κ** (linear-weighted). When α falls below 0.6, a warning is logged and surfaced in the UI — the items are still finalized, but you know the experts substantially disagreed.
+
+The aggregated **ExpertConsensus** is converted into a `RevisionPlan` and handed to the **Meta Editor** for one final pass — applied without re-triggering the critic loop, preserving the iteration cap.
+
+### Persona-Based Conceptual Alignment (Step 13)
+
+Inside the validation stage, MAPIG runs a lightweight persona check (Keane & McNaughton, 2026, Step 13). Three respondent personas are derived from `target_population` + `cultural_group` (e.g., early-20s end, late-50s end, a culturally distinct sub-group). Each persona rates every item on a 1–5 Likert scale and provides a one-sentence interpretation in their voice.
+
+Items where personas disagree by ≥ 2 Likert points are **flagged for ambiguity** — a different failure mode than bias or linguistic clarity, since it surfaces items that *different respondents read differently*.
+
+This runs once per validation pass (≤ 3 GPT-5.4-mini calls) and does not extend iteration count. Output is shown in the UI's **Persona Validation Card** (collapsed by default).
 
 ---
 
@@ -539,3 +593,19 @@ Hommel, B. E., & Arslan, R. C. (2024). Language models accurately infer correlat
 Lee, P., Son, M., & Jia, Z. (2025). AI-powered automatic item generation for psychological tests: A conceptual framework for an LLM-based multi-agent AIG system. *Journal of Business and Psychology*, 1-29.
 
 Clark, L. A., & Watson, D. (1995). Constructing validity: Basic issues in objective scale development. *Psychological Assessment*, 7(3), 309-319.
+
+Varrasi, S., Platania, G. A., Castellano, S., et al. (2026). Expanding psychometrics with pretrained language models: Evaluating pseudo-factor analysis in applied and multilingual contexts. *Methods in Psychology*, 14, 100244.
+
+Suárez-Álvarez, J., He, Q., Guenole, N., & D'Urso, D. (2026). Using artificial intelligence in test construction: A practical guide. *Psicothema*, 38(1), 1-12.
+
+Keane, A., & McNaughton, R. B. (2026). AI-supported item generation for an entrepreneurial mindset scale, with persona-based validation (Step 13). *International Journal of Market Research*, 68(2).
+
+Lorenzo-Seva, U., & ten Berge, J. M. F. (2006). Tucker's congruence coefficient as a meaningful index of factor similarity. *Methodology*, 2(2), 57-64.
+
+Krippendorff, K. (2018). *Content Analysis: An Introduction to Its Methodology* (4th ed.). Sage.
+
+Kline, P. (2015). *A Handbook of Test Construction: Introduction to Psychometric Design*. Routledge.
+
+DeVellis, R. F., & Thorpe, C. T. (2016). *Scale Development: Theory and Applications* (4th ed.). SAGE Publications.
+
+American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for Educational and Psychological Testing*.

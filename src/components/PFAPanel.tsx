@@ -67,6 +67,25 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
         </div>
       </CardHeader>
       <CardContent className="pt-5">
+        {/* Saturated-model banner — RMSR=0 / CAF=1 are uninformative when n_items is too small */}
+        {pfa.model_identifiability === "saturated" && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="h-4 w-4 text-amber-300" />
+              <span className="text-sm font-semibold text-amber-200">
+                Saturated model — fit indices uninformative
+              </span>
+            </div>
+            <p className="text-[12px] text-amber-100/90">
+              With {pfa.n_items} item{pfa.n_items === 1 ? "" : "s"} on {pfa.n_factors} factor
+              {pfa.n_factors === 1 ? "" : "s"}, the model has zero degrees of freedom, so the
+              correlation matrix is reproduced exactly (RMSR = 0, CAF = 1) by construction. The
+              loadings remain interpretable, but Tucker&apos;s congruence and recovery are the
+              meaningful signals here. Generate more items per factor for diagnostic fit.
+            </p>
+          </div>
+        )}
+
         {/* Summary cards */}
         <div className="grid gap-4 sm:grid-cols-3 mb-6">
           <div className="flex flex-col items-center text-center rounded-lg border border-border/40 bg-slate-900/30 p-4">

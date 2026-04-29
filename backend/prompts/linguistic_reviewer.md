@@ -154,3 +154,4 @@ Comment requirements
 - issue must start with "Item <n>:" where n is the 1-based item number.
 - suggested_edit must be a full rewritten replacement item_text.
 - Keep edits minimal. Preserve intended facet unless it is unclear.
+- **Polarity constraint** — if the user's `constraints` list includes the string `"Positively keyed only"`, your `suggested_edit` MUST NOT introduce negation tokens (`not`, `n't`, `never`, `no`). Rephrase positively (e.g., instead of "When my first method does not work, I try a different way", write "When my first method falls short, I try a different way"). The meta-editor will reject and revert any negated edit.

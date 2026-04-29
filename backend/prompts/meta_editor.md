@@ -57,6 +57,12 @@ Editing rules
 - Preserve contractions ("doesn't", "can't") — these are natural in self-report items.
 - Items must sound like something a person would say, not an AI-generated policy document.
 
+2c) POSITIVE KEYING (mandatory when "Positively keyed only" is in constraints)
+- If the user's constraints include the string `"Positively keyed only"`, the revised item text MUST NOT contain any of: `not`, `n't`, `never`, `no ` (negation), or any reverse-coded phrasing.
+- This applies even when a reviewer suggests an edit like `"When my first method does not work, I try a different way."` — REJECT that suggestion. Rephrase positively (e.g., `"When my first method falls short, I try a different way."`).
+- A reviewer's `suggested_edit` is advisory; you are the polarity gatekeeper. Never apply a suggestion that introduces a negation.
+- If the only viable edit would introduce a negation, keep the original item text and note it in `revision_plan.summary`.
+
 3) Maintain construct domain coverage
 - Do not collapse all items onto the same facet.
 - If you replace an item, replace it with another item targeting the same facet unless the facet is invalid per construct_definition.

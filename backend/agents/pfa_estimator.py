@@ -261,6 +261,30 @@ def _decide_verdict(rmsr: float, recovery: float) -> str:
     return "poor"
 
 
+def _compute_identifiability(n_items: int, n_factors: int) -> str:
+    """Return 'saturated' / 'identified' / 'over_identified' for the EFA model.
+
+    Degrees of freedom for EFA on a correlation matrix:
+        dof = (p*(p-1)/2) - (p*k - k*(k-1)/2)
+    where p = n_items, k = n_factors. dof <= 0 means the model is at least
+    just-identified (saturated when dof = 0; under-identified when dof < 0).
+    Fit indices like RMSR are uninformative when dof <= 0 because the model
+    perfectly reproduces the correlation matrix by construction.
+    """
+    p = max(int(n_items), 0)
+    k = max(int(n_factors), 0)
+    if p < 2 or k < 1:
+        return "saturated"
+    unique_correlations = p * (p - 1) // 2
+    free_loadings = p * k - k * (k - 1) // 2
+    dof = unique_correlations - free_loadings
+    if dof <= 0:
+        return "saturated"
+    if dof == 1:
+        return "identified"
+    return "over_identified"
+
+
 def _facet_assignments_from_mapping(
     items: List[DraftItem],
     facet_mapping: Optional[FacetMapperResponse],
@@ -318,6 +342,7 @@ def run_pfa(
             residual_correlation_matrix=[],
             items_dropped=items_dropped or [],
             fit_verdict="poor",
+            model_identifiability="saturated",
         )
 
     embedding_model = embedding_model or settings.PFA_EMBEDDING_MODEL
@@ -355,6 +380,7 @@ def run_pfa(
             residual_correlation_matrix=[],
             items_dropped=items_dropped or [],
             fit_verdict="poor",
+            model_identifiability=_compute_identifiability(len(items), n_factors),
         )
 
     polarity_arr = np.array(polarities).reshape(-1, 1)
@@ -426,6 +452,7 @@ def run_pfa(
                 residual_correlation_matrix=[],
                 items_dropped=items_dropped or [],
                 fit_verdict="poor",
+                model_identifiability=_compute_identifiability(len(items), n_factors),
             )
 
     # 5. Tucker's congruence vs expected pattern (one-hot)
@@ -465,12 +492,36 @@ def run_pfa(
             )
         )
 
+    identifiability = _compute_identifiability(len(items), n_factors)
     verdict = _decide_verdict(rmsr, recovery)
 
+    # When the model is saturated, RMSR=0 and CAF=1 trivially — fit_verdict
+    # of "good" would be misleading. Downgrade verdict to acknowledge that
+    # the structural fit cannot be evaluated.
+    if identifiability == "saturated":
+        # Don't claim "good" when we have no degrees of freedom
+        if verdict == "good":
+            verdict = "acceptable"
+
+    # Build a dynamic disclaimer that reflects the saturation case
+    if identifiability == "saturated":
+        disclaimer = (
+            "Model is saturated: with this few items, the EFA reproduces the "
+            "correlation matrix exactly (RMSR=0 / CAF=1 by construction). Fit "
+            "indices are uninformative; loadings remain interpretable. "
+            "Add more items per factor for diagnostic fit."
+        )
+    else:
+        disclaimer = (
+            "Pseudo-Factor Analysis on sentence-embedding cosine similarity "
+            "(Varrasi et al., 2026). Pre-calibration heuristic; not a substitute "
+            "for empirical EFA on respondent data."
+        )
+
     logger.info(
-        "PFA done n_factors=%d recovery=%.3f rmsr=%.3f caf=%.3f congruence=%s verdict=%s",
+        "PFA done n_factors=%d recovery=%.3f rmsr=%.3f caf=%.3f congruence=%s verdict=%s identifiability=%s",
         n_factors, recovery, rmsr, caf,
-        [round(c, 3) for c in congruence], verdict,
+        [round(c, 3) for c in congruence], verdict, identifiability,
     )
 
     return PFAResult(
@@ -490,4 +541,6 @@ def run_pfa(
         ],
         items_dropped=items_dropped or [],
         fit_verdict=verdict,  # type: ignore[arg-type]
+        model_identifiability=identifiability,  # type: ignore[arg-type]
+        disclaimer=disclaimer,
     )

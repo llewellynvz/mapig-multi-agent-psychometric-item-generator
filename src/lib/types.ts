@@ -72,6 +72,10 @@ export interface AuditMetadata {
   analytics_budget_exceeded?: boolean;
   cache_read_tokens?: number;
   cache_savings_usd?: number;
+  // Phase 14-16 follow-up: surface quality-gate fallback + non-fatal warnings
+  force_accepted_below_threshold?: boolean;
+  forced_scores?: number[];
+  warnings?: string[];
 }
 
 export interface ReviewComment {
@@ -155,6 +159,7 @@ export interface PFAResult {
   residual_correlation_matrix: number[][];
   items_dropped: number[];
   fit_verdict: "good" | "acceptable" | "poor";
+  model_identifiability?: "saturated" | "identified" | "over_identified";
   disclaimer: string;
 }
 

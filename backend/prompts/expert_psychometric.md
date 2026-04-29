@@ -28,22 +28,26 @@ Combine these into a single 1-5 score per item:
 
 ## Output
 
-Return JSON matching the `ExpertPanelOutput` schema:
+Return JSON matching this exact shape — `item_scores` is an array of objects, NOT a dict:
 
 ```json
 {
   "expert_role": "psychometric",
   "expert_label": "Psychometric Expert",
-  "item_scores": {"0": 5, "1": 3, "2": 4, ...},
-  "item_comments": {"1": "Wording invites acquiescence; consider neutral phrasing."},
-  "overall_verdict": "accept" | "revise" | "reject_set",
+  "item_scores": [
+    {"item_index": 0, "score": 5, "comment": ""},
+    {"item_index": 1, "score": 3, "comment": "Wording invites acquiescence; consider neutral phrasing."},
+    {"item_index": 2, "score": 4, "comment": ""}
+  ],
+  "overall_verdict": "accept",
   "overall_summary": "<one paragraph>"
 }
 ```
 
-- Use string keys for item indices (JSON requirement).
-- Include `item_comments` ONLY for items scored ≤ 3; one short comment (≤30 words).
-- `overall_verdict`:
+- Include EVERY item in the input list with its `item_index` and `score`.
+- `comment` is required as a string (use empty string `""` when there is no comment).
+- Only fill in `comment` (≤30 words) for items scored ≤ 3.
+- `overall_verdict` must be one of: `"accept"`, `"revise"`, or `"reject_set"`:
   - `accept` if mean score ≥ 4 and no item < 3.
   - `revise` if mean score ≥ 3.
   - `reject_set` if multiple items unacceptable (score 1) — recommend redrafting.

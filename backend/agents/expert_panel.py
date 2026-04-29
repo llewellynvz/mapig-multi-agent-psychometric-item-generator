@@ -19,7 +19,7 @@ import statistics
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, conint
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.agents.llm_utils import TokenUsage, invoke_structured_with_usage
 from backend.agents.prompt_loader import load_prompt
@@ -46,31 +46,46 @@ logger = logging.getLogger("lmaig.expert_panel")
 # --- Inner-agent schemas (LLM I/O) ---
 
 
+class _ExpertItemScore(BaseModel):
+    """One expert's rating for a single item — flat schema for OpenAI strict mode.
+
+    All fields required (no defaults) — strict mode rejects optionals. LLM must
+    emit `comment=""` when there is no comment.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    item_index: int = Field(..., ge=0)
+    score: int = Field(..., ge=1, le=5)
+    comment: str = Field(..., max_length=300)
+
+
 class _ExpertPanelOutput(BaseModel):
+    """LLM I/O schema. Uses List[_ExpertItemScore] (not Dict[str, conint(...)])
+    because OpenAI strict structured-output rejects Dict-with-additionalProperties
+    and fields with default_factory not present in `required`.
+
+    All fields are required (no defaults) — OpenAI strict mode rejects optional
+    fields. The LLM must always emit a value (use empty string when N/A).
+    """
+
     model_config = ConfigDict(extra="forbid")
     expert_role: ExpertRole
     expert_label: str = Field(..., min_length=2)
-    # JSON requires string keys; convert to int post-validation
-    item_scores: Dict[str, conint(ge=1, le=5)] = Field(default_factory=dict)  # type: ignore[valid-type]
-    item_comments: Dict[str, str] = Field(default_factory=dict)
+    item_scores: List[_ExpertItemScore]
     overall_verdict: str = Field(..., min_length=2)
-    overall_summary: str = Field(default="", max_length=600)
+    overall_summary: str = Field(..., max_length=600)
 
 
 def _to_evaluation(out: _ExpertPanelOutput) -> ExpertEvaluation:
-    """Convert LLM string-key dicts → ExpertEvaluation int-key dicts."""
+    """Convert flat LLM list → ExpertEvaluation int-key dicts."""
     scores: Dict[int, int] = {}
-    for k, v in out.item_scores.items():
-        try:
-            scores[int(k)] = int(v)
-        except (TypeError, ValueError):
-            continue
     comments: Dict[int, str] = {}
-    for k, v in out.item_comments.items():
-        try:
-            comments[int(k)] = str(v)[:300]
-        except (TypeError, ValueError):
-            continue
+    for s in out.item_scores:
+        idx = int(s.item_index)
+        # Defensive clamp in case LLM returns slightly out-of-range values
+        scores[idx] = max(1, min(5, int(s.score)))
+        if s.comment:
+            comments[idx] = s.comment[:300]
 
     verdict = out.overall_verdict.strip().lower()
     if verdict not in {"accept", "revise", "reject_set"}:

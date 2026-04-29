@@ -118,11 +118,23 @@ class Settings(BaseSettings):
     EXPERT_PANEL_DEBATE_ROUNDS: int = 1  # 0 disables debate; 1 = single revision round
     EXPERT_PANEL_IRR_MIN: float = 0.6  # Below this, log warning + surface in UI
     EXPERT_PANEL_DISSENT_SD: float = 1.0  # Item-level dissent flag threshold
+    # Reliability follow-up (post-investigation): graceful-degradation thresholds.
+    # Below GATE we skip the panel entirely; below DEBATE_MIN we still run round 1
+    # but skip the debate; below PARTIAL_MIN we return whatever round-1 evals
+    # completed by deadline.
+    EXPERT_PANEL_GATE_SECONDS: int = 25
+    EXPERT_PANEL_DEBATE_MIN_REMAINING: int = 15
+    EXPERT_PANEL_PARTIAL_MIN_REMAINING: int = 8
 
     # Phase 16: Persona Validator
     PERSONA_VALIDATOR_ENABLED: bool = True
     PERSONA_VALIDATOR_PERSONAS: int = 3  # Set 0 to disable
     PERSONA_VALIDATOR_DISAGREEMENT_THRESHOLD: int = 2  # Likert points; SD ≥ this flags item
+    # Reliability follow-up: persona descriptors can occasionally exceed the
+    # schema cap when LLMs emit prose preamble. The truncation is rare with the
+    # new "JSON only, max 400 chars" prompt — but we keep it for robustness.
+    PERSONA_LABEL_MAX_CHARS: int = 1500
+    PERSONA_LABEL_TRUNCATION_ENABLED: bool = True
 
     def publisher_blocklist_domains(self) -> list[str]:
         """Return blocked publisher domains for copyright protection."""

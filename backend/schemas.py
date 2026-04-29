@@ -622,7 +622,17 @@ class PersonaRating(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    persona_label: str = Field(..., min_length=2, max_length=600, description="Persona descriptor (e.g., '32-year-old township nurse in Cape Town')")
+    persona_label: str = Field(
+        ...,
+        min_length=2,
+        max_length=1500,
+        description=(
+            "Persona descriptor (e.g., '32-year-old township nurse in Cape Town'). "
+            "Cap raised from 600→1500 to accommodate richer 2–3 sentence biographies "
+            "without crashing on edge-case LLM responses. Defensive truncation is "
+            "applied at construction time to enforce settings.PERSONA_LABEL_MAX_CHARS."
+        ),
+    )
     item_index: int = Field(..., ge=0, description="0-based item index")
     rating: conint(ge=1, le=5) = Field(..., description="1-5 Likert rating from this persona")
     interpretation: str = Field(..., min_length=3, max_length=1000, description="2-4 sentence cognitive-interview-style interpretation in the persona's voice")

@@ -103,27 +103,35 @@ def _generate_personas_via_llm(
         )
 
     system = (
-        "You generate detailed respondent personas for cognitive-interview-style "
-        "survey item validation. Each persona is a 2-3 sentence biographical sketch "
-        "covering: age + life stage, occupation/role with seniority, education + "
-        "literacy level, primary language(s) and English fluency, cultural "
-        "reference frame, current life context (family, work pressure, health, "
-        "geography). The personas must be DISTINCT — they should produce DIFFERENT "
-        "interpretations of the same item. Avoid generic descriptions."
+        "You generate respondent personas for cognitive-interview-style survey "
+        "item validation. Each persona is a TIGHT 1-2 sentence biographical "
+        "sketch covering: age + life stage, occupation/role, education + "
+        "literacy level, primary language(s) + English fluency, cultural "
+        "reference frame, and ONE current life context detail. Personas must "
+        "be DISTINCT — they should produce DIFFERENT interpretations of the "
+        "same item. "
+        "\n\n"
+        "STRICT FORMAT RULES:\n"
+        "- Each persona descriptor is STRICTLY 1-2 sentences, MAX 80 words, "
+        "MAX 400 characters. Longer descriptors will be truncated and lose "
+        "meaning.\n"
+        "- Respond with JSON only — no preamble, no commentary, no "
+        "explanation, no markdown code fences. The first character of your "
+        "response MUST be `{`.\n"
+        "- The output schema is: {\"personas\": [\"<descriptor 1>\", ...]}."
     )
     human = (
-        f"Generate exactly {n} richly detailed respondent personas for a survey "
-        f"targeted at: target_population={request.target_population!r} "
+        f"Generate exactly {n} concise but distinct respondent personas for a "
+        f"survey targeted at: target_population={request.target_population!r} "
         f"cultural_group={request.cultural_group!r}.\n\n"
-        f"Each persona should be 2–3 sentences with concrete biographical detail. "
-        f"Cover at least:\n"
-        f"  - The YOUNGER end of the population (early 20s, less life experience).\n"
-        f"  - The OLDER end (50s/60s, different cultural reference frame).\n"
-        f"  - A culturally or linguistically DISTINCT sub-group whose comprehension "
-        f"may differ (e.g., second-language English, rural vs urban, different "
+        f"Each persona is 1–2 sentences, max 400 characters. Cover at least:\n"
+        f"  1. The YOUNGER end of the population (early 20s).\n"
+        f"  2. The OLDER end (50s/60s).\n"
+        f"  3. A culturally or linguistically DISTINCT sub-group "
+        f"(e.g., second-language English, rural vs urban, different "
         f"socioeconomic position).\n"
-        f"Personas should expose how SAME ITEMS may be READ DIFFERENTLY.\n\n"
-        f"Return JSON with a 'personas' field containing exactly {n} multi-sentence strings."
+        f"Personas should expose how the SAME items may be READ DIFFERENTLY.\n\n"
+        f"Output JSON only, no prose preamble. Each persona ≤ 400 chars."
     )
     try:
         result, usage = invoke_structured_with_usage(
@@ -245,6 +253,26 @@ def validate_with_personas(
 
     # 2. Rate items per persona, in parallel
     all_ratings: List[PersonaRating] = []
+    truncated_count = 0
+    failed_personas: List[str] = []
+
+    def _safe_persona_label(label: str) -> str:
+        """Defensive truncation: cap persona_label at settings.PERSONA_LABEL_MAX_CHARS.
+
+        LLMs occasionally include preamble or expanded reasoning in the persona
+        descriptor field despite "JSON only" instructions. The schema cap is
+        1500 chars; we truncate to that with an ellipsis so PersonaRating
+        construction never crashes.
+        """
+        if not settings.PERSONA_LABEL_TRUNCATION_ENABLED:
+            return label
+        cap = settings.PERSONA_LABEL_MAX_CHARS
+        if len(label) <= cap:
+            return label
+        # Truncate at last word boundary to avoid breaking mid-word
+        cut = label[: cap - 1].rsplit(" ", 1)[0]
+        return cut + "…"
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(personas), 4)) as ex:
         futures = [
             ex.submit(_rate_items_for_persona, request, p, items) for p in personas
@@ -255,18 +283,51 @@ def validate_with_personas(
                 total_usage.input_tokens += usage.input_tokens
                 total_usage.output_tokens += usage.output_tokens
                 total_usage.total_tokens += usage.total_tokens
+                # Apply defensive truncation BEFORE constructing PersonaRating —
+                # the schema cap is 1500 but we truncate to settings cap (default 1500)
+                safe_label = _safe_persona_label(resp.persona_label)
+                if safe_label != resp.persona_label:
+                    truncated_count += 1
+                    logger.warning(
+                        "PERSONA_TRUNCATED original_chars=%d truncated_chars=%d cap=%d label_prefix=%r",
+                        len(resp.persona_label), len(safe_label),
+                        settings.PERSONA_LABEL_MAX_CHARS,
+                        resp.persona_label[:60],
+                    )
                 for r in resp.ratings:
                     if 0 <= r.item_index < len(items):
-                        all_ratings.append(
-                            PersonaRating(
-                                persona_label=resp.persona_label,
-                                item_index=r.item_index,
-                                rating=int(r.rating),
-                                interpretation=r.interpretation,
+                        try:
+                            all_ratings.append(
+                                PersonaRating(
+                                    persona_label=safe_label,
+                                    item_index=r.item_index,
+                                    rating=int(r.rating),
+                                    interpretation=r.interpretation,
+                                )
                             )
-                        )
+                        except Exception as construct_err:
+                            logger.error(
+                                "PERSONA_RATING_CONSTRUCT_FAIL persona_label_chars=%d item_idx=%d error_type=%s",
+                                len(safe_label), r.item_index,
+                                type(construct_err).__name__,
+                                exc_info=True,
+                            )
             except Exception as e:
-                logger.warning("Persona rating call failed: %s", e)
+                # Persona rating call itself failed — log full traceback so we
+                # know whether it was a network error, schema validation, etc.
+                # Track partial failure count for audit trail.
+                logger.warning(
+                    "PERSONA_RATING_CALL_FAIL error_type=%s error=%s",
+                    type(e).__name__, e,
+                    exc_info=True,
+                )
+                failed_personas.append(type(e).__name__)
+
+    if truncated_count or failed_personas:
+        logger.info(
+            "PERSONA_VALIDATOR_PARTIAL truncated=%d failed_personas=%d total_personas=%d",
+            truncated_count, len(failed_personas), len(personas),
+        )
 
     # 3. Per-item SD across personas → flag items with SD ≥ threshold
     threshold = settings.PERSONA_VALIDATOR_DISAGREEMENT_THRESHOLD

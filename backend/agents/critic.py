@@ -15,6 +15,42 @@ logger = logging.getLogger("lmaig.critic")
 Decision = Literal["accept", "revise", "stop_max_iterations", "needs_human"]
 
 
+def _severity_distribution(comments: List[ReviewComment]) -> dict[int, int]:
+    """Build severity histogram for structured logs."""
+    dist = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    for c in comments:
+        sev = max(1, min(5, int(c.severity)))
+        dist[sev] = dist.get(sev, 0) + 1
+    return dist
+
+
+def _emit_critic_decision(
+    *,
+    iteration: int,
+    mode: str,
+    linguistic: List[ReviewComment],
+    bias: List[ReviewComment],
+    content: List[ReviewComment],
+    thresholds: dict,
+    decision: str,
+    reason: str,
+    path: str,
+) -> None:
+    """One structured log per critic decision — `path` is rule_based|llm|fallback|hard_stop."""
+    all_c = list(linguistic) + list(bias) + list(content)
+    sev_dist = _severity_distribution(all_c)
+    logger.info(
+        "CRITIC_DECISION iteration=%d mode=%s path=%s decision=%s "
+        "linguistic=%d bias=%d content=%d severities=%s "
+        "accept_max_sev=%s medium_plus_max=%s reason=%r",
+        iteration, mode, path, decision,
+        len(linguistic), len(bias), len(content), sev_dist,
+        thresholds.get("accept_max_severity", "?"),
+        thresholds.get("accept_medium_plus_count", "?"),
+        reason[:200],
+    )
+
+
 class CriticResponse(BaseModel):
     """LLM output contract for the critic."""
     model_config = ConfigDict(extra="forbid")
@@ -134,7 +170,12 @@ def _detect_stagnation(
     if not prev_comments:
         return False
     similarity = _comments_similarity(current_comments, prev_comments)
-    if similarity >= 0.7:
+    fired = similarity >= 0.7
+    logger.info(
+        "STAGNATION_CHECK iteration=%d jaccard=%.3f threshold=0.700 fired=%s",
+        iteration, similarity, fired,
+    )
+    if fired:
         logger.info("STAGNATION_DETECTED similarity=%.2f iteration=%d", similarity, iteration)
         return True
     return False
@@ -247,13 +288,26 @@ def decide(
     thresholds = get_adaptive_thresholds(iteration, settings.MAX_ITERATIONS)
     threshold_ctx = _format_threshold_context(iteration, settings.MAX_ITERATIONS, thresholds['mode'])
 
+    def _log_and_return(decision: str, reason: str, path: str) -> Tuple[Decision, str]:
+        _emit_critic_decision(
+            iteration=iteration, mode=thresholds['mode'],
+            linguistic=linguistic_comments, bias=bias_comments, content=content_comments,
+            thresholds=thresholds, decision=decision, reason=reason, path=path,
+        )
+        return decision, reason  # type: ignore[return-value]
+
     # Hard stop is still enforced to prevent infinite looping.
     if iteration >= settings.MAX_ITERATIONS:
-        return "stop_max_iterations", f"Reached MAX_ITERATIONS before all medium+ issues were resolved. {threshold_ctx}"
+        return _log_and_return(
+            "stop_max_iterations",
+            f"Reached MAX_ITERATIONS before all medium+ issues were resolved. {threshold_ctx}",
+            "hard_stop",
+        )
 
     # Mock mode should not call external LLMs.
     if settings.APP_MODE == "mock":
-        return _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration, iteration_history)
+        d, r = _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration, iteration_history)
+        return _log_and_return(d, r, "rule_based_mock")
 
     # Downgrade construct-level bias before threshold checks
     bias_comments = _downgrade_construct_level_bias(list(bias_comments))
@@ -262,11 +316,19 @@ def decide(
 
     # If nothing to review, accept immediately (saves tokens and reduces variability).
     if not all_comments:
-        return "accept", f"No review issues detected. {threshold_ctx}"
+        return _log_and_return(
+            "accept",
+            f"No review issues detected. {threshold_ctx}",
+            "rule_based_no_comments",
+        )
 
     # 1F: Stagnation detection — identical comments despite revision
     if _detect_stagnation(all_comments, iteration_history, iteration):
-        return "accept", f"Stagnation detected: identical issues across iterations — accepting current quality. {threshold_ctx} [rule-based, 0 tokens]"
+        return _log_and_return(
+            "accept",
+            f"Stagnation detected: identical issues across iterations — accepting current quality. {threshold_ctx} [rule-based, 0 tokens]",
+            "stagnation",
+        )
 
     # Rule-based optimization: Handle clear cases without LLM invocation
     if settings.RULE_BASED_CRITIC_ENABLED:
@@ -277,17 +339,35 @@ def decide(
         # This MUST come before the accept check to prevent severity-3 issues from
         # being silently accepted when they happen to match threshold boundaries.
         if thresholds['mode'] in ('strict', 'thorough') and max_sev >= 3:
-            return "revise", f"Medium+ issues detected in {thresholds['mode']} mode (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
+            return _log_and_return(
+                "revise",
+                f"Medium+ issues detected in {thresholds['mode']} mode (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]",
+                "rule_based_force_revise",
+            )
 
         # Clear reject: Issues exceed current adaptive threshold — force revision
         if max_sev > thresholds['accept_max_severity']:
-            return "revise", f"High-severity issues detected (max: {max_sev}, threshold: {thresholds['accept_max_severity']}). Revision required. {threshold_ctx} [rule-based, 0 tokens]"
+            return _log_and_return(
+                "revise",
+                f"High-severity issues detected (max: {max_sev}, threshold: {thresholds['accept_max_severity']}). Revision required. {threshold_ctx} [rule-based, 0 tokens]",
+                "rule_based_high_sev",
+            )
 
         # Clear accept: All feedback below acceptance threshold
         if max_sev <= thresholds['accept_max_severity'] and med_plus <= thresholds['accept_medium_plus_count']:
-            return "accept", f"All feedback within threshold (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]"
+            return _log_and_return(
+                "accept",
+                f"All feedback within threshold (max: {max_sev}, medium+: {med_plus}). {threshold_ctx} [rule-based, 0 tokens]",
+                "rule_based_accept",
+            )
 
         # Borderline case: Fall through to LLM for nuanced judgment
+        logger.info(
+            "RULE_BASED_FAST_PATH iteration=%d max_sev=%d med_plus=%d "
+            "accept_max=%d med_plus_max=%d decision=fall_through_to_llm",
+            iteration, max_sev, med_plus,
+            thresholds['accept_max_severity'], thresholds['accept_medium_plus_count'],
+        )
 
     system_prompt = load_prompt("critic.md")
 
@@ -318,8 +398,16 @@ def decide(
         )
         # Ensure threshold mode is in the reason
         reason_with_mode = f"{resp.reason} {threshold_ctx} [LLM-based]"
-        return resp.decision, reason_with_mode
+        return _log_and_return(resp.decision, reason_with_mode, "llm")
     except Exception as e:
         # If the LLM misbehaves, fall back to deterministic logic so the system keeps running.
+        logger.warning(
+            "CRITIC_LLM_FAILED falling_back_to_rule_based error_type=%s",
+            type(e).__name__, exc_info=True,
+        )
         d, r = _rule_based_fallback(linguistic_comments, bias_comments, content_comments, iteration, iteration_history)
-        return d, f"{r} (LLM critic failed; fallback used: {type(e).__name__})"
+        return _log_and_return(
+            d,
+            f"{r} (LLM critic failed; fallback used: {type(e).__name__})",
+            "llm_failed_fallback",
+        )

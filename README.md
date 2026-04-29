@@ -753,9 +753,6 @@ Proprietary. Personal, academic, and internal research use is permitted. Redistr
 - Varrasi, S., Platania, G. A., Castellano, S., et al. (2026). Expanding psychometrics with pretrained language models: Evaluating pseudo-factor analysis in applied and multilingual contexts. *Methods in Psychology*, 14, 100244.
 - Suárez-Álvarez, J., He, Q., Guenole, N., & D'Urso, D. (2026). Using artificial intelligence in test construction: A practical guide. *Psicothema*, 38(1), 1–12.
 
-**Persona-based validation**
-- Keane, A., & McNaughton, R. B. (2026). AI-supported item generation for an entrepreneurial mindset scale, with persona-based validation (Step 13). *International Journal of Market Research*, 68(2).
-
 **Factor analysis foundations**
 - Mulaik, S. A. (2010). *Foundations of Factor Analysis* (2nd ed.). CRC Press.
 - Lorenzo-Seva, U., & ten Berge, J. M. F. (2006). Tucker's congruence coefficient as a meaningful index of factor similarity. *Methodology*, 2(2), 57–64.
@@ -765,7 +762,7 @@ Proprietary. Personal, academic, and internal research use is permitted. Redistr
 
 **Scale development textbooks**
 - Kline, P. (2015). *A Handbook of Test Construction: Introduction to Psychometric Design*. Routledge.
-- DeVellis, R. F., & Thorpe, C. T. (2016). *Scale Development: Theory and Applications* (4th ed.). SAGE.
+- DeVellis, R. F., & Thorpe, C. T. (2021). Scale development: Theory and applications. Sage publications.
 - AERA, APA, NCME. (2014). *Standards for Educational and Psychological Testing*.
 
 **Methodology**

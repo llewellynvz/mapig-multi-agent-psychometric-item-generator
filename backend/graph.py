@@ -541,10 +541,21 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
             )
 
         rem_sec = _remaining_seconds(state)
-        if attempt >= max_attempts or rem_sec < 60:
+        elapsed = _VERCEL_MAX_DURATION - rem_sec
+        # Earlier bail-out: each validation+regen pair costs ~60-90s. If we've
+        # already burned 150s+ and validation still failed, a third attempt
+        # virtually guarantees a Vercel timeout. Force-accept now and let the
+        # downstream nodes (reviewers + meta-editor + PFA + finalize) run.
+        budget_exhausted = rem_sec < 60 or elapsed > 150
+        if attempt >= max_attempts or budget_exhausted:
             # Max retries exhausted or time budget low; accept best available
             if rem_sec < 60:
                 logger.warning(f"Vercel budget low ({rem_sec:.0f}s left). Skipping item regeneration.")
+            elif elapsed > 150:
+                logger.warning(
+                    f"VALIDATION_BAIL_EARLY elapsed={elapsed:.0f}s remaining={rem_sec:.0f}s "
+                    f"(attempt={attempt}/{max_attempts}). Force-accepting to leave budget for downstream steps."
+                )
             else:
                 logger.warning(f"Validation max retries ({max_attempts}) exhausted. Accepting best-scoring items.")
 
@@ -893,7 +904,9 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
     """Phase 14: Prune over-generated items via PFA.
 
     Drops weakly-loaded items down to user's requested item_count, preserving
-    at least one item per facet. Runs after critic accept, before expert panel.
+    at least one item per facet (multi-dimensional only). Runs after critic
+    accept, before expert panel. Bails early if the Vercel budget has run low
+    so that expert_panel + finalize can still complete.
     """
     with step("pfa_pruning_node", state):
         logger.info("ELAPSED %.0fs at pfa_pruning_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
@@ -907,12 +920,17 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
             logger.info("PFA pruning skipped: have %d items, target=%d", len(items), target)
             return {}
 
+        # Compute deadline: stop pruning when remaining < PFA_PRUNING_MIN_REMAINING_SECS
+        rem = _remaining_seconds(state)
+        deadline = _time.time() + rem  # convert remaining → absolute timestamp
+
         try:
             from backend.agents.pfa_pruning import prune_items
             kept, dropped, pfa_result = prune_items(
                 items,
                 facet_mapping=state.get("facet_mapping"),
                 target_count=target,
+                deadline=deadline,
             )
             return {
                 "draft_items": kept,

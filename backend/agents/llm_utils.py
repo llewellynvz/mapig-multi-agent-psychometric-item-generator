@@ -182,6 +182,38 @@ def invoke_structured_with_usage(
                 lc_messages.append((role, content))
         messages = lc_messages
 
+    # Determine provider for structured logs
+    _model_lower = (model_name or "").lower()
+    if "claude" in _model_lower or "anthropic" in _model_lower:
+        provider = "anthropic"
+    elif "gpt" in _model_lower or "openai" in _model_lower or "o1" in _model_lower:
+        provider = "openai"
+    else:
+        provider = "unknown"
+
+    def _emit_llm_call_log(
+        elapsed: float,
+        usage_obj: TokenUsage,
+        status: str,
+        error_type: Optional[str] = None,
+    ) -> None:
+        """Emit one structured LLM_CALL log line with all observability fields."""
+        logger.info(
+            "LLM_CALL agent=%s provider=%s model=%s elapsed=%.2fs "
+            "input_tokens=%d output_tokens=%d cache_read=%d "
+            "schema=%s status=%s%s",
+            agent_name or "unknown",
+            provider,
+            model_name,
+            elapsed,
+            getattr(usage_obj, "input_tokens", 0) or 0,
+            getattr(usage_obj, "output_tokens", 0) or 0,
+            getattr(usage_obj, "cache_read_input_tokens", 0) or 0,
+            schema.__name__,
+            status,
+            f" error_type={error_type}" if error_type else "",
+        )
+
     # Primary path: provider/tool-based structured output
     try:
         with warnings.catch_warnings():
@@ -198,10 +230,6 @@ def invoke_structured_with_usage(
             _t0 = time.perf_counter()
             result = runnable.invoke(messages)
             _elapsed = time.perf_counter() - _t0
-            logger.info(
-                "LLM_CALL agent=%s model=%s elapsed=%.1fs",
-                agent_name or "unknown", model_name, _elapsed,
-            )
 
         # with_structured_output(include_raw=True) returns dict with 'parsed' and 'raw'
         if isinstance(result, dict) and "parsed" in result and "raw" in result:
@@ -212,27 +240,30 @@ def invoke_structured_with_usage(
                 # LangChain sets parsed=None when schema validation fails silently.
                 # Fall through to JSON fallback by raising.
                 raise ValueError("with_structured_output returned parsed=None")
+            _emit_llm_call_log(_elapsed, usage, status="ok")
             return (parsed, usage)
         else:
             # Fallback: no raw message available
             if result is None:
                 raise ValueError("with_structured_output returned None")
-            return (result, TokenUsage(model_name=model_name))
+            usage_minimal = TokenUsage(model_name=model_name)
+            _emit_llm_call_log(_elapsed, usage_minimal, status="ok_no_raw")
+            return (result, usage_minimal)
 
     except Exception as e:
         # Fallback: validate returned text as JSON
         logger.warning(
-            "STRUCTURED_OUTPUT_FALLBACK agent=%s schema=%s error=%s",
-            agent_name or "unknown", schema.__name__, e,
+            "STRUCTURED_OUTPUT_FALLBACK agent=%s schema=%s error_type=%s error=%s",
+            agent_name or "unknown", schema.__name__, type(e).__name__, e,
+            exc_info=True,
         )
         _t0_fb = time.perf_counter()
         ai_msg = llm.invoke(messages)
         _elapsed_fb = time.perf_counter() - _t0_fb
-        _logger.info(
-            "LLM_CALL agent=%s model=%s elapsed=%.1fs (fallback)",
-            agent_name or "unknown", model_name, _elapsed_fb,
-        )
         usage = _extract_token_usage(ai_msg, model_name)
+        _emit_llm_call_log(
+            _elapsed_fb, usage, status="fallback", error_type=type(e).__name__,
+        )
 
         text = ai_msg.content if isinstance(ai_msg.content, str) else str(ai_msg.content)
 
@@ -241,8 +272,19 @@ def invoke_structured_with_usage(
             cleaned = cleaned.strip("`")
             cleaned = cleaned.replace("json", "", 1).strip()
 
-        if pre_validate:
-            data = json.loads(cleaned)
-            data = pre_validate(data)
-            return (schema.model_validate(data), usage)
-        return (schema.model_validate_json(cleaned), usage)
+        try:
+            if pre_validate:
+                data = json.loads(cleaned)
+                data = pre_validate(data)
+                return (schema.model_validate(data), usage)
+            return (schema.model_validate_json(cleaned), usage)
+        except Exception as parse_err:
+            logger.error(
+                "STRUCTURED_OUTPUT_FALLBACK_PARSE_FAIL agent=%s schema=%s error_type=%s",
+                agent_name or "unknown", schema.__name__, type(parse_err).__name__,
+                exc_info=True,
+            )
+            _emit_llm_call_log(
+                _elapsed_fb, usage, status="fail", error_type=type(parse_err).__name__,
+            )
+            raise

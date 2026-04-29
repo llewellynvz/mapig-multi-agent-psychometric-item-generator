@@ -337,8 +337,16 @@ def run_expert_panel(
     items: List[DraftItem],
     evidence: List[EvidenceChunk],
     pfa_result: Optional[PFAResult] = None,
+    time_budget_seconds: Optional[float] = None,
 ) -> Tuple[ExpertConsensus, TokenUsage]:
     """Run the full expert panel: round 1 → optional debate → consensus.
+
+    When `time_budget_seconds` is provided, the panel degrades gracefully:
+    - If budget < EXPERT_PANEL_DEBATE_MIN_REMAINING (default 15s): skip debate
+      round but still run round 1 (3 parallel calls, ~5s).
+    - If budget < EXPERT_PANEL_PARTIAL_MIN_REMAINING (default 8s): use a hard
+      timeout on round 1 and return partial consensus with whatever evaluations
+      completed by deadline.
 
     Returns:
         (ExpertConsensus, accumulated TokenUsage).
@@ -351,9 +359,30 @@ def run_expert_panel(
             TokenUsage(),
         )
 
+    # Decide degradation level up front for clear logging
+    debate_enabled = settings.EXPERT_PANEL_DEBATE_ROUNDS >= 1
+    partial_mode = False
+    if time_budget_seconds is not None:
+        if time_budget_seconds < settings.EXPERT_PANEL_PARTIAL_MIN_REMAINING:
+            partial_mode = True
+            debate_enabled = False
+            logger.warning(
+                "EXPERT_PANEL_DEGRADED reason=critical_budget time_budget=%.1fs "
+                "decision=partial_round1_only",
+                time_budget_seconds,
+            )
+        elif time_budget_seconds < settings.EXPERT_PANEL_DEBATE_MIN_REMAINING:
+            debate_enabled = False
+            logger.warning(
+                "EXPERT_PANEL_DEGRADED reason=low_budget time_budget=%.1fs "
+                "decision=skip_debate",
+                time_budget_seconds,
+            )
+
     logger.info(
-        "EXPERT_PANEL start n_items=%d debate_rounds=%d",
-        len(items), settings.EXPERT_PANEL_DEBATE_ROUNDS,
+        "EXPERT_PANEL start n_items=%d debate_enabled=%s partial_mode=%s time_budget=%s",
+        len(items), debate_enabled, partial_mode,
+        f"{time_budget_seconds:.1f}s" if time_budget_seconds is not None else "unbounded",
     )
     total_usage = TokenUsage(model_name="expert_panel")
 
@@ -363,14 +392,34 @@ def run_expert_panel(
         ("localization", "Localization Expert"),
     ]
 
-    # Round 1: parallel
+    # Round 1: parallel — uses concurrent.futures.wait with timeout in partial_mode
     round1_results: List[ExpertEvaluation] = []
+    failed_round1_roles: List[str] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(roles)) as ex:
         futures = {
             ex.submit(_run_expert_round1, r, label, request, items, evidence, pfa_result): r
             for r, label in roles
         }
-        for fut in concurrent.futures.as_completed(futures):
+        if partial_mode and time_budget_seconds is not None:
+            # Hard deadline: take whatever completes within the budget minus a 2s
+            # finalize buffer. Pending futures are cancelled below.
+            timeout_per_round = max(2.0, time_budget_seconds - 2.0)
+            done_set, not_done_set = concurrent.futures.wait(
+                list(futures.keys()), timeout=timeout_per_round,
+            )
+            iteration_set = list(done_set)
+            for fut in not_done_set:
+                role = futures[fut]
+                fut.cancel()
+                failed_round1_roles.append(f"{role}:timeout")
+                logger.warning(
+                    "EXPERT_PANEL_PARTIAL_TIMEOUT role=%s timeout=%.1fs",
+                    role, timeout_per_round,
+                )
+        else:
+            iteration_set = list(concurrent.futures.as_completed(futures))
+
+        for fut in iteration_set:
             try:
                 ev, usage = fut.result()
                 round1_results.append(ev)
@@ -379,20 +428,38 @@ def run_expert_panel(
                 total_usage.total_tokens += usage.total_tokens
             except Exception as e:
                 role = futures[fut]
-                logger.warning("Expert panel round-1 call failed for %s: %s", role, e)
+                failed_round1_roles.append(f"{role}:{type(e).__name__}")
+                logger.warning(
+                    "EXPERT_PANEL_ROUND1_FAIL role=%s error_type=%s error=%s",
+                    role, type(e).__name__, e,
+                    exc_info=True,
+                )
 
     if not round1_results:
-        logger.warning("Expert panel: no round-1 results; aborting")
+        logger.warning(
+            "EXPERT_PANEL_ABORT reason=no_round1_results failed_roles=%s",
+            failed_round1_roles,
+        )
         return (
             ExpertConsensus(
                 consensus_revisions=RevisionPlan(summary="Expert panel failed; no evaluations."),
+                irr_warning=(
+                    f"All round-1 evaluations failed ({', '.join(failed_round1_roles)}). "
+                    "Expert panel returned empty consensus."
+                ) if failed_round1_roles else None,
             ),
             total_usage,
         )
 
-    # Round 2: debate
+    if len(round1_results) < len(roles):
+        logger.warning(
+            "EXPERT_PANEL_PARTIAL completed=%d expected=%d failed_roles=%s",
+            len(round1_results), len(roles), failed_round1_roles,
+        )
+
+    # Round 2: debate — gated on debate_enabled (which incorporates budget check)
     debate_results: List[ExpertEvaluation] = []
-    if settings.EXPERT_PANEL_DEBATE_ROUNDS >= 1 and len(round1_results) >= 2:
+    if debate_enabled and len(round1_results) >= 2:
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(round1_results)) as ex:
             futures2 = {}
             for ev in round1_results:
@@ -407,7 +474,11 @@ def run_expert_panel(
                     total_usage.total_tokens += usage.total_tokens
                 except Exception as e:
                     orig = futures2[fut]
-                    logger.warning("Expert panel debate call failed for %s: %s", orig.expert_role, e)
+                    logger.warning(
+                        "EXPERT_PANEL_DEBATE_FAIL role=%s error_type=%s error=%s",
+                        orig.expert_role, type(e).__name__, e,
+                        exc_info=True,
+                    )
                     debate_results.append(orig)  # fall back to round 1
 
     # Use debate-revised evaluations for IRR + consensus when available

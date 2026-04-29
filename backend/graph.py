@@ -624,12 +624,18 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
             )
 
         # Route to regeneration
+        failed_idx_list = [v.item_index for v in failed]
+        failed_scores = [round(v.weighted_score, 2) for v in failed]
+        logger.info(
+            "VALIDATION_RETRY_TRIGGER attempt=%d/%d failed_items=%s failed_scores=%s reason=below_threshold",
+            attempt, max_attempts, failed_idx_list, failed_scores,
+        )
         logger.info(f"Validation failed: {len(failed)} items below threshold. Attempt {attempt}/{max_attempts}")
         return Command(
             update={
                 "validation_results": validation_results,
                 "validation_attempt": attempt + 1,
-                "failed_item_indices": [v.item_index for v in failed],
+                "failed_item_indices": failed_idx_list,
                 **token_update,
             },
             goto="regenerate_items_node"
@@ -982,20 +988,26 @@ def expert_panel_node(state: GraphState) -> GraphState:
             return {}
 
         rem_sec = _remaining_seconds(state)
-        if rem_sec < 60:
+        gate = settings.EXPERT_PANEL_GATE_SECONDS
+        if rem_sec < gate:
             logger.warning(
-                "EXPERT_PANEL_BUDGET remaining=%.0fs (<60s) — skipping to preserve finalize budget",
-                rem_sec,
+                "EXPERT_PANEL_BUDGET remaining=%.0fs (<%ds) — skipping to preserve finalize budget",
+                rem_sec, gate,
             )
             return {}
 
         try:
             from backend.agents.expert_panel import run_expert_panel
+            # Pass remaining budget so the panel can degrade gracefully (skip
+            # debate <15s, partial round-1 <8s) instead of being skipped wholesale.
+            # Reserve ~3s for finalize_node downstream.
+            time_budget = max(0.0, rem_sec - 3.0)
             consensus, usage = run_expert_panel(
                 request=state["user_request"],
                 items=state.get("draft_items", []),
                 evidence=state.get("evidence", []),
                 pfa_result=state.get("pfa_pruning_result"),
+                time_budget_seconds=time_budget,
             )
             token_update = _accumulate_tokens(state, usage)
             return {
@@ -1333,6 +1345,8 @@ def comparison_node(state: GraphState) -> GraphState:
     """
     with step("comparison_node", state):
         logger.info("ELAPSED %.0fs at comparison_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
+        _comparison_phase_start = _time.time()
+        logger.info("COMPARISON_PHASE start")
         try:
             # Extract finalized items from state
             final_output = state.get("final_output")
@@ -1362,8 +1376,14 @@ def comparison_node(state: GraphState) -> GraphState:
             from backend.analytics.similarity_calculator import get_plagiarism_detector
 
             # Search for convergent and discriminant instruments
+            _t_search = _time.time()
             convergent_instrument, discriminant_instrument = search_instruments(
                 construct_name, construct_definition
+            )
+            logger.info(
+                "COMPARISON_SEARCH_INSTRUMENTS elapsed=%.2fs convergent=%s discriminant=%s",
+                _time.time() - _t_search,
+                convergent_instrument.name, discriminant_instrument.name,
             )
 
             logger.info(
@@ -1375,12 +1395,17 @@ def comparison_node(state: GraphState) -> GraphState:
             item_texts = [item.item_text for item in final_items]
 
             # Score convergent validity (embedding-based when items available, LLM fallback)
+            _t_validity = _time.time()
             convergent_score, convergent_method = score_convergent_validity(
                 item_texts,
                 convergent_instrument.name,
                 convergent_instrument.measured_construct,
                 construct_name,
                 published_items=convergent_instrument.items,
+            )
+            logger.info(
+                "COMPARISON_CONVERGENT_VALIDITY elapsed=%.2fs method=%s score=%.3f",
+                _time.time() - _t_validity, convergent_method, convergent_score,
             )
             convergent_instrument = convergent_instrument.model_copy(
                 update={"validity_method": convergent_method}
@@ -1405,11 +1430,16 @@ def comparison_node(state: GraphState) -> GraphState:
                 published_items = lookup_instrument_items(construct_name)
             logger.info(f"Plagiarism check: {len(published_items)} known items for '{convergent_instrument.name}'")
 
+            _t_plag = _time.time()
             plagiarism_detector = get_plagiarism_detector()
             plagiarism_flags = plagiarism_detector.detect_plagiarism(
                 item_texts,
                 published_items,
                 convergent_instrument.name
+            )
+            logger.info(
+                "COMPARISON_PLAGIARISM_CHECK elapsed=%.2fs known_items=%d flags=%d",
+                _time.time() - _t_plag, len(published_items), len(plagiarism_flags),
             )
 
             # Add convergent ceiling warning to plagiarism flags
@@ -1429,11 +1459,19 @@ def comparison_node(state: GraphState) -> GraphState:
                 f"Comparison analysis complete: {len(updated_final_output.comparison_instruments)} instruments, "
                 f"{len(plagiarism_flags)} plagiarism flags"
             )
+            logger.info(
+                "COMPARISON_PHASE done elapsed=%.2fs status=success",
+                _time.time() - _comparison_phase_start,
+            )
 
             return {"final_output": updated_final_output}
 
         except Exception as e:
             logger.error(f"Comparison analysis failed: {e}", exc_info=True)
+            logger.info(
+                "COMPARISON_PHASE done elapsed=%.2fs status=failed error_type=%s",
+                _time.time() - _comparison_phase_start, type(e).__name__,
+            )
             # Graceful failure: return empty dict, comparison fields stay default
             return {}
 

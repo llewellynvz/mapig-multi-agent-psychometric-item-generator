@@ -37,6 +37,13 @@ filterwarnings = [
     # Data parses correctly; warnings are cosmetic. Suppress to keep test output clean.
     "ignore:.*serialized value may not be as expected.*:UserWarning",
     "ignore:.*Pydantic serializer warnings.*:UserWarning",
+    # Pydantic v1 deprecation on Python 3.14+ — comes from langchain_core importing
+    # pydantic.v1 for backward compatibility. Upstream issue.
+    "ignore:.*Core Pydantic V1 functionality isn.t compatible with Python 3.14.*:UserWarning",
+    # joblib serial-mode warning on serverless (Vercel has no shared-memory parallelism).
+    "ignore:.*joblib will operate in serial mode.*:UserWarning",
+    # factor-analyzer's "no rotation" warning when n_factors==1 (correct unidim case).
+    "ignore:.*No rotation will be performed when the number of factors equals 1.*:UserWarning",
 ]
 
 [build-system]

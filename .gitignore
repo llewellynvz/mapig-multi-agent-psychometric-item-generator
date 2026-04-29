@@ -51,6 +51,12 @@ __pycache__/
 # vercel
 .vercel
 
+# Playwright artifacts (the spec files in tests-e2e/ ARE tracked, but
+# generated outputs are not)
+/playwright-report/
+/test-results/
+/playwright/.cache/
+
 # archived files
 _archived/
 

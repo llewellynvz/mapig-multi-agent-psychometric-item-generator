@@ -4,9 +4,7 @@
 
 MAPIG is a research-grade web app that helps researchers, psychometricians, and clinicians draft survey items for new (or existing) psychological constructs. Type in what you want to measure, and a team of specialised AI agents will gather the academic evidence, map the construct's facet structure, draft Likert items, review them for clarity and bias, refine them through multiple rounds, and then estimate the scale's reliability and validity — all before you recruit a single respondent.
 
-> **Important caveat**: MAPIG generates *candidate* items and *estimated* psychometric properties. It supports expert judgment but does **not** replace empirical piloting, factor analysis on respondent data, or formal validation studies. Use it as the first 80% of scale development, and your respondent data as the final 20%.
-
-![MAPIG system architecture — frontend, API, LangGraph orchestration with 17 agents, external services and data stores](./public/mapig_arc.png)
+![MAPIG system architecture — illustrated overview of all 17 agents organised across 7 phases](./public/mapig_arc.png)
 
 ## Video tutorial
 
@@ -20,7 +18,7 @@ A full walkthrough — how to define a construct, run the pipeline, read the res
 
 1. [What MAPIG does](#what-mapig-does)
 2. [Pipeline at a glance](#pipeline-at-a-glance)
-3. [The agents — one by one](#the-agents--one-by-one)
+3. [The agents — at a glance](#the-agents--at-a-glance)
 4. [Pre-calibration analytics](#pre-calibration-analytics)
 5. [LLM allocation & cost](#llm-allocation--cost)
 6. [Observability & audit trail](#observability--audit-trail)
@@ -59,7 +57,7 @@ The output: candidate items + a structural report (factor recovery, reliability,
 
 ## Pipeline at a glance
 
-![MAPIG pipeline flow — six phases from user input through evidence, mapping, drafting, validation, decide-and-revise, to pre-calibration analytics](./public/processflow.svg)
+![MAPIG pipeline flow — six phases from evidence through pre-calibration analytics, with all 17 agents shown in their phase](./public/mapig_arc1.png)
 
 ```
                     ┌─ Retrieval Agent (local sources)
@@ -114,246 +112,88 @@ Evidence gathering ─┤
 
 ---
 
-## The agents — one by one
+## The agents — at a glance
 
-MAPIG has **17 specialised agents** divided into 6 functional groups. Each does one job well; they coordinate through LangGraph state.
+MAPIG runs **17 specialised agents** that pass work down an assembly line. Each one has a single, clear job. Here's what each one does, grouped by phase.
 
-### Group 1: Evidence gathering (the librarians)
+### Phase 1 — Evidence gathering
 
-#### 1. Retrieval Agent — `backend/agents/retrieval_agent.py`
+The librarians. They find the academic grounding so every item is anchored in real research.
 
-- **Job**: Searches your **local research library** in `data/approved_sources/` for theoretical grounding.
-- **Why**: Researchers often have curated PDFs, papers, scale manuals, or field notes they want the system to cite. The retrieval agent makes those first-class evidence sources.
-- **How**: Pure deterministic text matching against the indexed library — no LLM, no API, no cost.
-- **Output**: Evidence chunks tagged with source IDs.
+| Agent | What it does |
+|---|---|
+| 📚 **Retrieval Agent** | Searches your local research library for theoretical grounding. No LLM, no API cost. |
+| 🌐 **Web Surfer** | Searches Perplexity's academic mode for peer-reviewed evidence — restricted to a domain allowlist (DOI, APA, Springer, Wiley, SAGE, Cambridge, etc.). |
 
-#### 2. Web Surfer — `backend/agents/web_surfer.py`
+### Phase 2 — Construct architecture
 
-- **Job**: Searches **Perplexity's academic mode** for peer-reviewed evidence (seminal papers, measurement precedents, definitions, boundary conditions).
-- **Why**: Real scale development requires citing real literature. Perplexity is restricted to a configurable allowlist of academic domains (doi.org, psycnet.apa.org, Springer, Wiley, SAGE, Cambridge, etc.).
-- **How**: Calls `sonar-pro` model with structured output requesting evidence chunks. If a `cultural_group` is set, runs an additional culturally-relevant search. Retries automatically with broader queries if too few sources are found.
-- **Output**: 15–25 typed evidence chunks (theoretical_definition, dimensions, measurement_precedent, boundary_conditions, cultural_context).
+| Agent | What it does |
+|---|---|
+| 🗺️ **Facet Mapper** | Identifies the construct's facets (sub-dimensions) before any items are written. Prevents the classic problem of 10 items that are all paraphrases of each other. |
 
----
+### Phase 3 — Item creation & quality gate
 
-### Group 2: Construct architecture
+| Agent | What it does |
+|---|---|
+| ✍️ **Item Writer** | Drafts Likert items grounded in evidence, following best practices. Over-generates by ~1.3× so weak items can be pruned later. |
+| ✅ **Validator** | Scores every item on 4 weighted dimensions (correspondence, distinctiveness, clarity, specificity). Items below 7/10 get regenerated automatically. |
+| 👥 **Persona Validator** | Three respondent personas read each item like real users would. Items where personas disagree by ≥ 2 points get flagged for ambiguity. |
 
-#### 3. Facet Mapper — `backend/agents/facet_mapper.py`
+### Phase 4 — Triple review (parallel)
 
-- **Job**: The **theoretical architect**. Identifies the construct's facet structure (sub-dimensions) *before* any items are written.
-- **Why**: Without this step, LLMs default to writing 10 paraphrases of the same idea. By forcing the model to pick distinct facets first, items end up structurally diverse.
-- **How**:
-  - **Unidimensional mode** (default): treats the construct as one factor with a strict "negative space fence" (what the construct is NOT). If the literature reveals sub-constructs, they're surfaced as **separate run suggestions**, not split inline.
-  - **Multi-dimensional mode** (user toggle): distributes items across identified facets.
-- **Model**: Claude Sonnet 4.5.
-- **Output**: A `FacetMapperResponse` listing each facet, its description, exclusions, and item allocation.
+Three independent reviewers run at the same time, each looking at a different angle.
 
----
+| Agent | What it does |
+|---|---|
+| 📖 **Linguistic Reviewer** | Catches readability problems: vague quantifiers, idioms, double-barreled items, ambiguous wording. |
+| ⚖️ **Bias Reviewer** | Detects 7 types of differential item functioning bias (cultural, linguistic, socioeconomic, intersectional, …). |
+| 🎯 **Content Reviewer** | Tests construct alignment — does each item really measure what we said? Or is it drifting into a neighbouring construct? |
 
-### Group 3: Item creation & quality gate
+### Phase 5 — Decide & revise
 
-#### 4. Item Writer — `backend/agents/item_writer.py`
+The decision-makers. They run a tight loop: at most 3 rounds, with adaptive thresholds and a stagnation safety net.
 
-- **Job**: The **creative engine**. Writes the actual Likert items.
-- **Why**: This is where psychometric craft matters — items must be unidimensional, positively keyed, free of double-barreled phrasing, and grounded in evidence.
-- **How**: Receives the construct definition, target population, constraints, facet map, and evidence chunks. Each item gets a written rationale tying it to specific evidence sources.
-- **Special behavior — over-generation**: Generates ~1.3× the requested items (capped at +5 extras, disabled when ≥12 items requested) so the downstream PFA Pruning stage can remove weak items. Prevents 10 items from devolving into synonyms.
-- **Definition is authoritative**: If the construct name and definition disagree, items are written for the **definition**. Prior knowledge of the name's typical meaning is not used.
-- **Model**: Claude Sonnet 4.5 (always — quality-critical).
-- **Output**: `DraftItem` objects with `item_text`, `rationale`, `evidence_citations`, `facet_name`, `polarity` (`+` / `-`).
+| Agent | What it does |
+|---|---|
+| 🤔 **Critic** | Decides accept or revise based on all reviewer feedback. 90% of the time it decides without using any LLM tokens (rule-based fast path). |
+| ✂️ **Meta Editor** | Surgically applies the reviewer feedback to fix only the flagged issues — without breaking what's already working. |
 
-#### 5. Validator — `backend/agents/validator.py`
+### Phase 6 — Pre-calibration
 
-- **Job**: The **quality gate**. Scores every item on 4 weighted dimensions.
-- **Why**: Items must clearly measure the construct, distinguish it from neighbors, be readable, and be specific. Anything below 7.0/10 (weighted) gets regenerated.
-- **Dimensions and weights**:
-    - **Correspondence** (50%): Does it match the construct definition?
-    - **Distinctiveness** (25%): Is it clearly *this* construct, not a neighbor?
-    - **Clarity** (15%): Unambiguous, concise, comprehensible?
-    - **Specificity** (10%): Concrete language, no vague quantifiers?
-- **Smart escalation**: Sonnet first (fast & cheap), Opus on retry attempts (more accurate). The escalation is logged as `VALIDATOR_MODEL_ESCALATION`.
-- **Identical-score detection**: If the LLM gives every item the same dimension scores (laziness), it's forced to retry with a different model.
-- **Per-failure logging**: Every failed item emits a `VALIDATOR_FAIL_DETAIL` log with each dimension score, so debugging is grep-friendly.
-- **Output**: `ItemValidation` per item with dimension scores, weighted score, accept/reject decision.
+Once the items are clean, two structural-validity checks run before the final analytics.
 
-#### 6. Persona Validator — `backend/agents/persona_validator.py`
+| Agent | What it does |
+|---|---|
+| 🧮 **PFA Pruning** | Runs factor analysis on item embeddings (Pseudo-Factor Analysis). Drops items that don't load cleanly on their parent factor. |
+| 👨‍🔬 **Expert Panel** | Three experts (psychometric, domain, localization) score the items, debate one round, and agree on any final revisions. |
 
-- **Job**: A **semi-cognitive interview**. Generates respondent personas and asks each to rate items in their voice.
-- **Why**: Catches a different failure mode than bias or linguistic clarity — items that *different respondents read differently* (e.g., a city worker reads "successful" as career, a rural respondent reads it as family).
-- **How**:
-  1. Generates 3 personas covering the youngest end, oldest end, and a culturally distinct sub-group of the target population.
-  2. Each persona rates every item 1–5 + provides a 2–4 sentence cognitive-interview-style reasoning (what they thought it asked, alternatives considered, personal reason for their rating, anything jarring in the wording).
-  3. Items where personas disagree by ≥ 2 Likert points are flagged for ambiguity.
-- **Robustness**: Persona descriptors are length-capped (defensive truncation at 1500 chars) so the LLM can't crash the validator with overlong biographies.
-- **Model**: GPT-5.4-mini (cost-controlled).
-- **Output**: `PersonaValidationResponse` with per-item ratings, interpretations, flagged items, interpretive variance.
+### Phase 7 — Post-finalization analytics (parallel)
+
+The final report card. All four run simultaneously to estimate the scale's quality before you collect any data.
+
+| Agent | What it does |
+|---|---|
+| 📊 **Correlation Estimator** | Estimates inter-item correlations + McDonald's ω from item embeddings — the same statistics you'd compute from real survey data. |
+| 📐 **PFA Analytics** | Reports the final factor structure as a CFA path diagram (η, λ, ε, φ) with full measurement equations. |
+| 🔍 **Instrument Searcher** | Finds published scales for benchmarking — one that measures the same construct (convergent), one that measures a related-but-distinct one (discriminant). |
+| 🧪 **Validity Scorer** | Estimates convergent and discriminant validity against those benchmarks + checks every item for plagiarism against known instruments. |
 
 ---
 
-### Group 4: The triple review (parallel reviewers)
+### Behind the scenes
 
-Three independent reviewers run **at the same time**, each looking at a different angle.
-
-#### 7. Linguistic Reviewer — `backend/agents/linguistic_reviewer.py`
-
-- **Job**: Hunts **readability and language problems**.
-- **What it catches**: Vague quantifiers ("often", "sometimes" without time anchors), absolute terms ("always", "never"), double-barreled items, ambiguous wording, cultural idioms that may not translate.
-- **Polarity guard**: When the user has `"Positively keyed only"` in constraints, the reviewer's `suggested_edit` values are forbidden from introducing negation tokens (`not`, `n't`, `never`, `no`).
-- **Model**: Claude Sonnet 4.5 (or GPT-4o with the ChatGPT-critics toggle).
-- **Output**: Severity-rated comments (1–5) per item with suggested edits.
-
-#### 8. Bias Reviewer — `backend/agents/bias_reviewer.py`
-
-- **Job**: Checks **fairness across groups** — would this item function differently for different respondents?
-- **What it catches** (7 DIF bias types):
-  1. Construct bias (culture-bound meanings)
-  2. Linguistic bias
-  3. Cultural reference bias
-  4. Socioeconomic bias (e.g., assumes a "private workspace at home")
-  5. Context access bias
-  6. Protected attribute bias
-  7. Intersectional bias
-- **Construct-level filter**: If 60%+ of items are flagged with similar (Jaccard ≥ 0.5) bias concerns, those concerns are recognized as *construct-level* (not actionable) and suppressed.
-- **Model**: GPT-5.4-mini (20× cheaper than Sonnet, accuracy-acceptable for fairness signals).
-- **Output**: Severity-rated comments per item.
-
-#### 9. Content Reviewer — `backend/agents/content_reviewer.py`
-
-- **Job**: Tests **construct alignment** — do these items actually measure what we said?
-- **How**: Simulates 5 expert judges rating each item's match to the construct. Checks against common near-neighbor constructs (job satisfaction, engagement, commitment, psychological safety, social support, etc.). Tracks facet-coverage balance.
-- **Model**: Claude Sonnet 4.5 (or GPT-4o with toggle).
-- **Output**: Severity-rated comments per item with `c_mean` (correspondence mean) and `d_mean` (distinctiveness mean) numerics.
-
----
-
-### Group 5: Decision-making & revision
-
-#### 10. Critic — `backend/agents/critic.py`
-
-- **Job**: The **decision-maker**. Reads all reviewer feedback, decides accept or revise.
-- **How**:
-  - **Adaptive thresholds**: Round 1 is "strict" (only minor issues OK); Round 2 is "thorough" (one medium concern allowed); Round 3 is "final" (relaxed safety net).
-  - **Rule-based fast path**: ~90% of accept/reject decisions use 0 LLM tokens via deterministic rules. Borderline cases fall through to LLM.
-  - **Stagnation detection**: Detects when revisions are paraphrasing the same issues (Jaccard word similarity ≥ 0.7 between iterations) and force-accepts to avoid infinite loops.
-  - **Construct-level bias downgrade**: If reviewers' bias comments are nearly identical (Jaccard ≥ 0.6), they're downgraded to severity 1 because they're construct-level, not item-level.
-- **Hard stop**: 3 iterations max.
-- **Model**: GPT-5.4-mini (when LLM path fires).
-- **Output**: `accept` | `revise` | `stop_max_iterations` + reason. Every decision is logged as `CRITIC_DECISION` with severity distribution and threshold context.
-
-#### 11. Meta Editor — `backend/agents/meta_editor.py`
-
-- **Job**: The **surgeon**. Applies reviewer feedback precisely without breaking what's working.
-- **How**:
-  - Smart comment filtering: only severity ≥ 3 comments reach the editor (40–60% token reduction).
-  - Construct fidelity priority: rejects edits that would change the measured construct (e.g., "I am satisfied with my life" → "My community is satisfied" is REJECTED).
-  - **Post-edit polarity check**: If `"Positively keyed only"` is in constraints and the LLM accidentally introduced a negation, the change is reverted.
-  - **Two phases**: `iterative` (in the critic loop) and `expert_revision` (one-shot pass after the Expert Panel produces consensus revisions; does NOT re-trigger the critic).
-- **Model**: Claude Sonnet 4.5 (always).
-- **Output**: `RevisionPlan` (summary + list of edits) + revised items. Iteration history is snapshotted for the audit trail.
-
----
-
-### Group 6: Pre-calibration structural analysis
-
-#### 12. PFA Pruning — `backend/agents/pfa_pruning.py` + `backend/agents/pfa_estimator.py`
-
-- **Job**: Runs **Pseudo-Factor Analysis** (Varrasi et al., 2026) on the over-generated item pool and prunes items that don't load cleanly.
-- **Why**: Catches items that look fine to reviewers but actually cluster together too tightly (redundancy) or drift away from the factor (poor fit).
-- **How**:
-  1. Embed items via OpenAI `text-embedding-3-large` (signs flipped for any reverse-keyed items).
-  2. Build cosine-similarity matrix; treat as a correlation matrix.
-  3. Run EFA via the pure-Python `factor-analyzer` package with **oblimin** rotation.
-  4. **Sign-align factor columns** so dominant loadings are positive (Mulaik 2010 / Lorenzo-Seva & ten Berge 2006 convention).
-  5. Apply the **4-rule retention check** from Suárez-Álvarez et al. (2026):
-     - Item loads on its parent facet
-     - Loads higher on parent than any other factor
-     - Loads higher on parent than the average of cross-loadings
-     - Loads higher than the average of all other items on the parent factor
-  6. Drop items failing the rules — but **never drop the last item of any facet** (preserves coverage).
-- **Time-budget guard**: Stops pruning if remaining Vercel budget falls below 30s.
-- **Output**: Pruned item set + `PFAResult` (loadings, congruence, fit verdict, identifiability).
-
-#### 13. Expert Panel — `backend/agents/expert_panel.py`
-
-- **Job**: Three "expert" agents evaluate **face / content validity** on the cleaned item set.
-- **The experts**:
-  - **Psychometric Expert** (`expert_psychometric.md`): scores face validity, parsimony, redundancy, response-set vulnerability, and scaling appropriateness. **Auto-loads scale-development rules** from `data/approved_sources/item_writing_guidelines.md` and `data/item_style_reference.md` and uses them as the authoritative rule book — drop more rule docs in those locations to extend its reference base. References Kline (2015), DeVellis & Thorpe (2016), AERA/APA/NCME *Standards*.
-  - **Domain Expert** (`expert_domain.md`): construct fidelity, theoretical alignment, evidence anchoring (receives top 5 evidence chunks).
-  - **Localization Expert** (`expert_localization.md`): cultural fit, idiom risk, reading level, inclusivity, translatability.
-- **Process**:
-  1. Round 1: 3 parallel evaluations (1–5 score per item + comment for low scores).
-  2. Round 2 (debate): each expert sees peers' anonymized scores and may revise items where they disagreed by ≥ 2 points. Capped at 1 round.
-  3. Inter-rater reliability is computed in a way that respects the fact that **the experts use different rubrics** (see "How to read IRR" below).
-- **How to read the IRR metrics**:
-  - The three experts are *designed to disagree* on absolute scores. The Psychometric Expert grades face validity; the Domain Expert grades construct fidelity; the Localization Expert grades cultural fit. An item can score 5/5 from one and 2/5 from another and *both be correct*. So we don't compute a single agreement number on raw scores — we compute three signals:
-  - **Verdict-level Krippendorff's α** (the headline metric): nominal α on whether each expert's bottom-line outcome is `accept` / `revise` / `reject_set`. This asks "do they agree on what to *do* with the items?" High here = the panel reaches consensus on the action even when rubrics differ. **This is the metric used to trigger warnings.**
-  - **Pairwise Spearman ρ**: rank correlation between expert pairs. Asks "do they agree on which items are the best vs. worst?" — robust to rubric scale differences.
-  - **Per-item Krippendorff's α** + **Cohen's κ** (legacy/informational): kept for backward compatibility, but low values are *expected* with differing rubrics and no longer flagged as quality issues.
-- **Graceful degradation**: If the Vercel budget is tight, the panel skips the debate round (< 15s remaining) or returns partial consensus from whatever round-1 evals completed (< 8s remaining) — never fails wholesale.
-- **Models**: GPT-5.4-mini for all three experts (cost-controlled).
-- **Output**: `ExpertConsensus` with per-expert evaluations, debate revisions, all four IRR metrics, dissent flags (items with cross-rubric SD ≥ 1.0), and a `RevisionPlan` for the Meta Editor's final pass. The UI displays each expert's full per-item ratings + comments in expandable sections; the markdown export includes everything.
-
----
-
-### Group 7: Post-finalization analytics
-
-After the items are locked, four analytics agents run **in parallel** to estimate scale-level psychometric properties.
-
-#### 14. Correlation Estimator — `backend/agents/correlation_estimator.py`
-
-- **Job**: Estimates **inter-item correlations** without empirical data.
-- **How**: Embeds items via `text-embedding-3-small`, computes pairwise cosine similarity. Validated by Hommel & Arslan (2024): r = .71 vs. real items, r = .89 vs. real scales, r = .86 vs. reliability estimates.
-- **Computes**: McDonald's omega total (via `analytics/omega_calculator.py`), mean inter-item correlation, internal-consistency flag (optimal range / too low / too high), pairwise redundancy flags.
-- **Output**: `CorrelationMatrix` with pair-level cells, omega, guidance.
-
-#### 15. PFA Analytics — `backend/analytics/pfa_analytics.py`
-
-- **Job**: Reports the **post-prune factor structure** for the UI.
-- **How**: Same pipeline as PFA Pruning but on the *final* item set. Computes Tucker's congruence vs. expected facet pattern, factor recovery rate, RMSR + CAF model-free fit indices, eigenvalues, DAAL factor labels.
-- **UI display — a proper CFA path diagram, not just a heatmap**:
-  - **Latent factors** drawn as ellipses on the left, labelled `η` (eta) with the factor name and Tucker's congruence shown as `φ` (phi).
-  - **Item indicators** drawn as rectangles in the middle, labelled `x₁`, `x₂`, … `xₙ`.
-  - **Loading paths** drawn as arrows from each factor to each item, labelled with `λ = 0.73` (etc.). Strong primary loadings (≥ 0.30) are thick green; cross-loadings are thin grey.
-  - **Residual variance circles** drawn to the right of each item, labelled `ε₁`, `ε₂`, … with the item's uniqueness (1 − λ²) shown below.
-  - Below the diagram, a **measurement equations** block prints every item's standardized form: `x₁ = 0.732 · η + ε₁ (Var(ε) ≈ 0.464)`. This is the textbook CFA representation researchers expect to see in publications.
-- **Output**: `PFAResult` consumed by `PFAPanel.tsx` which renders the diagram, the equations, the fit-index summary cards, and the eigenvalue badges (Kaiser cutoff highlighted).
-
-#### 16. Instrument Searcher — `backend/agents/instrument_searcher.py`
-
-- **Job**: Finds **published instruments** to benchmark against.
-- **How**: Queries Perplexity's academic search for two instruments:
-  - **Convergent**: measures the same construct (e.g., SWLS for life satisfaction)
-  - **Discriminant**: measures a related-but-distinct construct (e.g., Flourishing Scale)
-- **Filters out commercial publishers** (Pearson, PAR, MHS, WPS, Hogrefe, Mind Garden, etc.) since their instruments can't be freely compared.
-- **Hardcoded fallbacks**: 5 psychological domains (wellbeing, burnout, resilience, engagement, belonging) have known open-access instruments.
-- **Output**: `ComparisonInstrument` objects with name, citation, items (when available), psychometric properties.
-
-#### 17. Validity Scorer — `backend/agents/validity_scorer.py`
-
-- **Job**: Estimates **convergent + discriminant validity** + runs **plagiarism detection**.
-- **How**:
-  - **Embedding-based** (preferred when published items available): cosine similarity of item-set centroids.
-  - **LLM-as-judge fallback** (when only the construct name is known): GPT-5.2 with high reasoning, dual-direction averaging (forward + reverse scoring) to mitigate position bias.
-  - **Plagiarism**: `analytics/similarity_calculator.py` uses sentence-transformers (`all-mpnet-base-v2`, threshold 0.85) to flag items semantically similar to known instrument items.
-- **Convergent validity > 0.85** triggers a **derivative warning** (items may be too close to the comparison instrument).
-- **Output**: `convergent_validity_score`, plagiarism flags, `ConstructPairAnalysis` for cross-construct discriminant validity.
-
----
-
-### Infrastructure & utilities
-
-These aren't "agents" in the LLM sense, but are critical to the system.
+These aren't "agents" in the LLM sense, but they're what makes the rest work cleanly.
 
 | Module | Job |
 |---|---|
-| `backend/agents/sanitizer.py` | **Prompt-injection defense** + **construct/definition coherence check** (cosine similarity between name and definition; flags if the user typed `Cognitive Flexibility` with a definition that describes Curiosity). |
-| `backend/agents/llm_factory.py` | Model selection per agent: validator → Sonnet/Opus, item writer → Sonnet, bias reviewer / critic / persona / experts → GPT-5.4-mini, validity scorer → GPT-5.2 reasoning. |
-| `backend/agents/llm_utils.py` | `invoke_structured_with_usage`: structured output + token tracking + cache metrics. Emits the `LLM_CALL` log line for every call (provider, model, agent, elapsed, tokens, schema, status). |
-| `backend/agents/prompt_loader.py` | Loads `.md` prompt files from `backend/prompts/` with shared system-prompt prefix. |
-| `backend/analytics/krippendorff.py` | Pure-NumPy implementations of Krippendorff's α (ordinal) + Cohen's κ (linear-weighted). Used by the Expert Panel. |
-| `backend/analytics/omega_calculator.py` | McDonald's omega from a synthetic correlation matrix. |
-| `backend/analytics/similarity_calculator.py` | Sentence-transformer-based plagiarism detection. |
-| `backend/checkpoint_config.py` | LangGraph in-memory checkpointer with all custom Pydantic types pre-registered. |
+| `sanitizer` | Prompt-injection defense + flags when your construct name and definition seem to describe different things. |
+| `llm_factory` | Routes each agent to the right model (Sonnet, Opus, GPT-5.4-mini, GPT-5.2) based on the task. |
+| `llm_utils` | Wraps every LLM call with structured-output parsing, token tracking, prompt caching, and one structured `LLM_CALL` log line per call. |
+| `prompt_loader` | Loads each agent's `.md` system prompt with a shared prefix. |
+| `krippendorff` | Pure-NumPy Krippendorff's α + Cohen's κ + Spearman ρ — used by the Expert Panel for inter-rater reliability. |
+| `omega_calculator` | McDonald's ω from a synthetic correlation matrix. |
+| `similarity_calculator` | Sentence-transformer plagiarism detection. |
+| `checkpoint_config` | LangGraph in-memory checkpointer with all custom types pre-registered. |
 
 ---
 

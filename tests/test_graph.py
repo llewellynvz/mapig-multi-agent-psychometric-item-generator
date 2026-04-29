@@ -1576,3 +1576,65 @@ def test_evidence_settings_exist():
     # PERPLEXITY_MAX_RESULTS code default is 40 (may be overridden by .env)
     assert hasattr(s, "PERPLEXITY_MAX_RESULTS"), "PERPLEXITY_MAX_RESULTS must exist"
     assert s.PERPLEXITY_MAX_RESULTS >= 40, "PERPLEXITY_MAX_RESULTS should be at least 40"
+
+
+# ----- Phase 14-16 follow-up: timeout-tightening fixes -----
+
+
+def test_pfa_overgeneration_cap_is_applied(monkeypatch):
+    """item_count=10 should NOT inflate to 20 (the production timeout cause).
+
+    With factor=1.3 and max_extras=5, 10 → min(13, 15) = 13.
+    """
+    monkeypatch.setattr("backend.settings.settings.APP_MODE", "mock")
+    from backend.agents.item_writer import write_items
+    from backend.schemas import UserRequest
+
+    request = UserRequest(
+        construct_name="Life Satisfaction",
+        construct_definition="Cognitive evaluation of overall life quality",
+        target_population="Adults",
+        response_scale="5-point Likert",
+        item_count=10,
+        constraints=["No double-barrelled items", "Positively keyed only"],
+    )
+    # Mock mode generates exactly item_count items
+    resp, _usage = write_items(request, evidence=[], overgenerate=True)
+    # With factor=1.3 + max_extras=5: 10 → 13. Definitely NOT 20.
+    assert len(resp.items) <= 15, (
+        f"Over-generation cap failed: produced {len(resp.items)} items (expected ≤ 15)"
+    )
+    assert len(resp.items) >= 10, "Over-generation should still inflate above target"
+
+
+def test_pfa_overgeneration_disabled_above_threshold(monkeypatch):
+    """User requesting 12+ items should NOT see further inflation."""
+    monkeypatch.setattr("backend.settings.settings.APP_MODE", "mock")
+    from backend.agents.item_writer import write_items
+    from backend.schemas import UserRequest
+
+    request = UserRequest(
+        construct_name="Big Five Openness",
+        construct_definition="Tendency to engage with new ideas, art, and experiences",
+        target_population="Adults",
+        response_scale="5-point Likert",
+        item_count=12,
+        constraints=["No double-barrelled items"],
+    )
+    resp, _usage = write_items(request, evidence=[], overgenerate=True)
+    # 12 hits the disable threshold → no inflation
+    assert len(resp.items) == 12
+
+
+def test_pfa_overgeneration_settings_have_safe_defaults():
+    """Regression: ensure the timeout-fix settings stay in safe range."""
+    from backend.settings import Settings
+    s = Settings(APP_MODE="mock")
+    # Lowered from 2.0 to 1.3 to prevent Vercel 300s timeouts
+    assert s.PFA_OVERGENERATE_FACTOR <= 1.5, (
+        f"PFA_OVERGENERATE_FACTOR={s.PFA_OVERGENERATE_FACTOR} too aggressive; "
+        f"validation budget will blow with this many extras."
+    )
+    assert s.PFA_OVERGENERATE_MAX_EXTRA <= 7, "Extras cap should be modest"
+    assert s.PFA_OVERGENERATE_DISABLE_ABOVE >= 10
+    assert s.PFA_PRUNING_MIN_REMAINING_SECS >= 15

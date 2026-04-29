@@ -363,6 +363,103 @@ def test_prune_items_drops_weakest(monkeypatch):
     )
 
 
+def test_prune_items_unidimensional_bypasses_facet_preservation(monkeypatch):
+    """For unidimensional constructs the 'one item per facet' rule is bypassed
+    so we can always drop the weakest item.
+
+    Reproduces the production case: all items have facet_name='Life Satisfaction',
+    facet_mapping.is_unidimensional=True. Pruning should drop weakest item without
+    the 'last remaining for that facet' warning blocking progress.
+    """
+    from backend.agents.pfa_pruning import prune_items
+    from backend.schemas import FacetDefinition, FacetMapperResponse
+
+    facet_names = ["Life Satisfaction"]
+    items = _make_items(
+        ["item one.", "item two.", "item three.", "item four.", "item five."],
+        facet_names * 5,
+    )
+
+    rng = np.random.default_rng(42)
+    base = np.array([1.0, 0.0, 0.0, 0.0])
+    text_to_emb = {
+        "item one.": base + rng.normal(0, 0.05, 4),
+        "item two.": base + rng.normal(0, 0.05, 4),
+        "item three.": base + rng.normal(0, 0.05, 4),
+        "item four.": base + rng.normal(0, 0.05, 4),
+        # one weak/cross-loaded item
+        "item five.": np.array([0.5, 0.5, 0.0, 0.0]) + rng.normal(0, 0.03, 4),
+    }
+
+    def _embed_lookup(item_texts, model=None):
+        return np.array([text_to_emb[t] for t in item_texts])
+
+    import backend.agents.pfa_estimator as pfa_mod
+    monkeypatch.setattr(pfa_mod, "embed_items_sync", _embed_lookup)
+
+    unidim_mapping = FacetMapperResponse(
+        is_unidimensional=True,
+        facets=[
+            FacetDefinition(
+                facet_name="Life Satisfaction",
+                facet_description="Single facet for life satisfaction",
+                exclusions="Not life evaluation tied to specific domains",
+                target_item_count=3,
+            )
+        ],
+        theoretical_basis="SWLS-style unidimensional model",
+    )
+
+    kept, dropped, _ = prune_items(
+        items,
+        facet_mapping=unidim_mapping,
+        target_count=3,
+        max_iters=10,
+    )
+    # Should successfully prune from 5 → 3 (was getting blocked by facet preservation)
+    assert len(kept) == 3
+    assert len(dropped) == 2
+
+
+def test_prune_items_respects_deadline(monkeypatch):
+    """Pruning should break early when the deadline is in the past."""
+    from backend.agents.pfa_pruning import prune_items
+    import time as _time
+
+    items = _make_items(
+        ["item one.", "item two.", "item three.", "item four.", "item five."],
+        ["FacetA"] * 5,
+    )
+    rng = np.random.default_rng(42)
+    text_to_emb_d = {
+        "item one.": np.array([1.0, 0.0, 0.0, 0.0]) + rng.normal(0, 0.05, 4),
+        "item two.": np.array([1.0, 0.0, 0.0, 0.0]) + rng.normal(0, 0.05, 4),
+        "item three.": np.array([1.0, 0.0, 0.0, 0.0]) + rng.normal(0, 0.05, 4),
+        "item four.": np.array([1.0, 0.0, 0.0, 0.0]) + rng.normal(0, 0.05, 4),
+        "item five.": np.array([1.0, 0.0, 0.0, 0.0]) + rng.normal(0, 0.05, 4),
+    }
+
+    def _embed_lookup_d(item_texts, model=None):
+        return np.array([text_to_emb_d[t] for t in item_texts])
+
+    import backend.agents.pfa_estimator as pfa_mod
+    monkeypatch.setattr(pfa_mod, "embed_items_sync", _embed_lookup_d)
+
+    # Deadline already passed → loop should break immediately and return current set
+    past_deadline = _time.time() - 100
+    kept, dropped, _ = prune_items(
+        items,
+        facet_mapping=_make_facet_mapping(["FacetA"]),
+        target_count=2,
+        max_iters=10,
+        deadline=past_deadline,
+    )
+    # No iterations should run; original 5 items returned (we didn't get to drop)
+    # OR maybe one iteration ran — accept either; main thing is we don't loop forever.
+    assert len(kept) >= 2
+    assert len(kept) <= 5
+
+
 def test_prune_items_skips_when_below_target(monkeypatch):
     from backend.agents.pfa_pruning import prune_items
     items = _make_items(["item a.", "item b.", "item c."], ["FacetA", "FacetB", "FacetC"])

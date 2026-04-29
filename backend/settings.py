@@ -97,10 +97,18 @@ class Settings(BaseSettings):
     # Phase 14: Pseudo-Factor Analysis (Varrasi et al., 2026)
     PFA_ENABLED: bool = True
     PFA_EMBEDDING_MODEL: str = "text-embedding-3-large"  # Higher quality for PFA (correlation_estimator keeps 3-small)
-    PFA_OVERGENERATE_FACTOR: float = 2.0  # Multiply requested item_count by this for initial pool, prune via PFA
+    # Multiply requested item_count by this for initial pool. Lowered from 2.0 to 1.3
+    # so validation+regen passes don't blow the 300s Vercel budget.
+    PFA_OVERGENERATE_FACTOR: float = 1.3
+    # Absolute cap on extra items added by over-generation (prevents 20+-item validation slowdowns).
+    PFA_OVERGENERATE_MAX_EXTRA: int = 5
+    # Skip over-generation entirely when item_count is already this high (e.g., 12+).
+    PFA_OVERGENERATE_DISABLE_ABOVE: int = 12
     PFA_TUCKERS_THRESHOLD_FAIR: float = 0.85
     PFA_TUCKERS_THRESHOLD_EXCELLENT: float = 0.95
     PFA_PRUNING_MAX_ITERS: int = 5
+    # Time guard for the pruning loop (in seconds) — break if remaining budget below this.
+    PFA_PRUNING_MIN_REMAINING_SECS: int = 30
     PFA_RMSR_GOOD: float = 0.05
     PFA_RECOVERY_GOOD: float = 0.80
     PFA_RECOVERY_ACCEPTABLE: float = 0.60

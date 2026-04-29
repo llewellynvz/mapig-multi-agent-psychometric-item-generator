@@ -25,7 +25,9 @@ from backend.agents.llm_utils import TokenUsage, invoke_structured_with_usage
 from backend.agents.prompt_loader import load_prompt
 from backend.analytics.krippendorff import (
     krippendorff_alpha,
+    krippendorff_alpha_nominal,
     pairwise_kappa_matrix,
+    pairwise_spearman_matrix,
 )
 from backend.schemas import (
     DraftItem,
@@ -101,6 +103,49 @@ def _to_evaluation(out: _ExpertPanelOutput) -> ExpertEvaluation:
     )
 
 
+def _load_psychometric_reference_content() -> str:
+    """Load item-writing guidelines + style reference for the Psychometric Expert.
+
+    These files live in `data/` and are user-editable: researchers can add
+    domain-specific rules (e.g., from APA Standards, DeVellis & Thorpe, or
+    custom organizational style guides). The Psychometric Expert receives
+    this content verbatim so its critique is grounded in the same rules the
+    Item Writer was instructed to follow.
+
+    Returns the concatenated content, or empty string if no files found.
+    """
+    import pathlib
+    repo_root = pathlib.Path(__file__).resolve().parent.parent.parent
+    parts: List[str] = []
+    candidates = [
+        repo_root / "data" / "approved_sources" / "item_writing_guidelines.md",
+        repo_root / "data" / "item_style_reference.md",
+    ]
+    for path in candidates:
+        try:
+            if path.exists():
+                content = path.read_text(encoding="utf-8")
+                # Cap at 8000 chars per file to keep prompt size sane
+                if len(content) > 8000:
+                    content = content[:8000] + "\n…(truncated)…"
+                parts.append(f"## {path.name}\n\n{content.strip()}")
+        except Exception as e:
+            logger.warning(
+                "Could not read psychometric reference %s: %s", path.name, e,
+            )
+    return "\n\n---\n\n".join(parts)
+
+
+# Cache the reference content at module load — files don't change during a run
+_PSYCHOMETRIC_REFERENCE = _load_psychometric_reference_content()
+if _PSYCHOMETRIC_REFERENCE:
+    logger.info(
+        "EXPERT_PANEL_PSYCHOMETRIC_REF loaded chars=%d sources=%d",
+        len(_PSYCHOMETRIC_REFERENCE),
+        _PSYCHOMETRIC_REFERENCE.count("---"),
+    )
+
+
 def _expert_payload(
     role: ExpertRole,
     request: UserRequest,
@@ -108,7 +153,14 @@ def _expert_payload(
     evidence: List[EvidenceChunk],
     pfa_result: Optional[PFAResult],
 ) -> dict:
-    """Build LLM input payload for a single expert. Domain expert gets evidence."""
+    """Build LLM input payload for a single expert.
+
+    Each role gets:
+    - Common context (construct + items)
+    - Domain expert: top-5 evidence chunks
+    - Psychometric expert: PFA summary + scale-development reference content
+      (item_writing_guidelines.md + item_style_reference.md from data/)
+    """
     base = {
         "construct_name": request.construct_name,
         "construct_definition": request.construct_definition,
@@ -131,15 +183,20 @@ def _expert_payload(
             }
             for e in evidence[:5]
         ]
-    if pfa_result and role == "psychometric":
-        base["pfa_summary"] = {
-            "factor_recovery_rate": pfa_result.factor_recovery_rate,
-            "rmsr": pfa_result.rmsr,
-            "verdict": pfa_result.fit_verdict,
-            "items_with_loading_issues": [
-                fl.item_index for fl in pfa_result.loadings if not fl.is_well_loaded
-            ],
-        }
+    if role == "psychometric":
+        # Always inject the reference content so the expert evaluates against
+        # the SAME rules the item writer was instructed to follow.
+        if _PSYCHOMETRIC_REFERENCE:
+            base["scale_development_reference"] = _PSYCHOMETRIC_REFERENCE
+        if pfa_result:
+            base["pfa_summary"] = {
+                "factor_recovery_rate": pfa_result.factor_recovery_rate,
+                "rmsr": pfa_result.rmsr,
+                "verdict": pfa_result.fit_verdict,
+                "items_with_loading_issues": [
+                    fl.item_index for fl in pfa_result.loadings if not fl.is_well_loaded
+                ],
+            }
     return base
 
 
@@ -485,33 +542,98 @@ def run_expert_panel(
     final_evals = debate_results if debate_results else round1_results
     matrix, role_labels = _build_rating_matrix(final_evals, len(items))
 
-    # IRR
+    # ---- IRR computation ----
+    # NOTE: experts use DIFFERENT rubrics, so per-item score-level α is
+    # conceptually wrong (it assumes parallel ratings of the same construct).
+    # We compute three signals and treat verdict-level α as the meaningful one:
+    #
+    # 1. Verdict α (nominal):  do experts agree on the BOTTOM-LINE OUTCOME?
+    #    This is what we should warn on.
+    # 2. Pairwise Spearman ρ:  do experts agree on RELATIVE ITEM ORDERING?
+    #    Robust to differing rubric scales.
+    # 3. Per-item α + κ:        kept for backward-compat / informational only.
+    #    Often LOW BY DESIGN — that's the point of having different lenses.
+
+    # Legacy ordinal α + κ on per-item scores (informational only)
     try:
         irr_alpha = krippendorff_alpha(matrix, level="ordinal")
     except Exception as e:
-        logger.warning("Krippendorff's α computation failed: %s", e)
+        logger.warning("Krippendorff's α (per-item) failed: %s", e)
         irr_alpha = float("nan")
 
     irr_pairwise = pairwise_kappa_matrix(matrix, role_labels)
 
+    # New: Spearman rank correlation per pair — robust to differing rubrics
+    irr_pairwise_spearman = pairwise_spearman_matrix(matrix, role_labels)
+
+    # New: verdict-level α — the meaningful agreement metric
+    verdict_ratings: List[List[str]] = [[ev.overall_verdict for ev in final_evals]]
+    # Reshape: krippendorff_alpha_nominal expects (n_raters, n_items)
+    # Each expert is a "rater"; each "item" is the verdict on the item set as a whole.
+    # Since each expert produces ONE verdict for the full set, we treat the verdict
+    # as a single-item rating across n raters. To make α meaningful we need at least
+    # 2 items — so we additionally rate the "majority severity" of each item as a
+    # nominal high/medium/low to give α more data.
+    #
+    # Simpler approach: for each item, take each expert's score and bucket into
+    # accept (≥4) / revise (3) / reject (≤2). Then compute nominal α on this
+    # bucketed rating per item. This actually measures "do they agree on the
+    # actionable judgment for each item?"
+    bucketed_per_item: List[List[str]] = []
+    for r_idx in range(matrix.shape[0]):
+        row: List[str] = []
+        for c_idx in range(matrix.shape[1]):
+            v = matrix[r_idx, c_idx]
+            if np.isnan(v):
+                row.append(None)  # type: ignore[arg-type]
+            elif v >= 4:
+                row.append("accept")
+            elif v >= 3:
+                row.append("revise")
+            else:
+                row.append("reject")
+        bucketed_per_item.append(row)
+
+    try:
+        irr_verdict_alpha = krippendorff_alpha_nominal(bucketed_per_item)
+    except Exception as e:
+        logger.warning("Verdict-level α failed: %s", e)
+        irr_verdict_alpha = float("nan")
+
     irr_warning: Optional[str] = None
-    if not np.isnan(irr_alpha) and irr_alpha < settings.EXPERT_PANEL_IRR_MIN:
+    # Warn only when the verdict-level agreement is low — this is the
+    # meaningful signal. Per-item α can be low BY DESIGN with differing rubrics.
+    if not np.isnan(irr_verdict_alpha) and irr_verdict_alpha < settings.EXPERT_PANEL_IRR_MIN:
         irr_warning = (
-            f"Krippendorff's α = {irr_alpha:.2f} < threshold {settings.EXPERT_PANEL_IRR_MIN:.2f}. "
-            "Experts disagree substantially; consider redrafting or recruiting human experts."
+            f"Verdict-level Krippendorff's α = {irr_verdict_alpha:.2f} (threshold {settings.EXPERT_PANEL_IRR_MIN:.2f}). "
+            f"Experts disagree on whether items should be accepted, revised, or rejected — "
+            f"consider redrafting or recruiting human reviewers. "
+            f"(Per-item score α was {irr_alpha:.2f}, but score-level disagreement is expected "
+            f"with differing rubrics and is informational only.)"
         )
         logger.warning("EXPERT_PANEL_LOW_IRR %s", irr_warning)
+    elif not np.isnan(irr_alpha) and irr_alpha < 0:
+        # Per-item α negative — log as info (not a warning) so we have audit trail
+        # but don't alarm the user.
+        logger.info(
+            "EXPERT_PANEL_PER_ITEM_α_LOW alpha=%.3f — expected with differing rubrics; "
+            "see verdict α (%.3f) for actionable agreement signal",
+            irr_alpha, irr_verdict_alpha if not np.isnan(irr_verdict_alpha) else float("nan"),
+        )
 
-    # Dissent flags
+    # Dissent flags — items where score SD is high. Still useful even with
+    # differing rubrics: tells us which items provoke the strongest cross-rubric
+    # disagreement.
     dissent = _dissent_flags(matrix, settings.EXPERT_PANEL_DISSENT_SD)
 
     # Consensus revisions
     consensus_plan = synthesize_consensus(final_evals, items)
 
     logger.info(
-        "EXPERT_PANEL done irr_alpha=%s pairwise=%s dissent=%d revisions=%d",
+        "EXPERT_PANEL done verdict_α=%s per_item_α=%s spearman=%s dissent=%d revisions=%d",
+        f"{irr_verdict_alpha:.3f}" if not np.isnan(irr_verdict_alpha) else "nan",
         f"{irr_alpha:.3f}" if not np.isnan(irr_alpha) else "nan",
-        irr_pairwise, len(dissent), len(consensus_plan.edits),
+        irr_pairwise_spearman, len(dissent), len(consensus_plan.edits),
     )
 
     return (
@@ -519,7 +641,9 @@ def run_expert_panel(
             evaluations=round1_results,
             debate_revisions=debate_results,
             irr_alpha=None if np.isnan(irr_alpha) else float(round(irr_alpha, 4)),
+            irr_verdict_alpha=None if np.isnan(irr_verdict_alpha) else float(round(irr_verdict_alpha, 4)),
             irr_pairwise=irr_pairwise,
+            irr_pairwise_spearman=irr_pairwise_spearman,
             consensus_revisions=consensus_plan,
             dissent_flags=dissent,
             irr_warning=irr_warning,

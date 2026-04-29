@@ -208,3 +208,181 @@ def pairwise_kappa_matrix(
             key = f"{labels[i]}|{labels[j]}"
             out[key] = round(float(k), 3) if not np.isnan(k) else 0.0
     return out
+
+
+def spearman_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    """Compute Spearman rank-correlation between two rating vectors.
+
+    Robust to differences in absolute scale — measures whether two raters
+    agree on the RELATIVE ORDERING of items even when their score
+    distributions differ. This is the right metric for inter-rater
+    reliability when raters use DIFFERENT rubrics (e.g., MAPIG's
+    psychometric / domain / localization experts), because their absolute
+    scores are not expected to match but their item rankings often should.
+
+    Args:
+        a, b: 1D arrays of equal length. NaN entries are treated as missing
+            (pairs with NaN in either vector are dropped before ranking).
+
+    Returns:
+        Spearman ρ in [-1, 1]. NaN if too few valid pairs (< 3) or zero
+        variance in either rank vector.
+    """
+    a_arr = np.asarray(a, dtype=float)
+    b_arr = np.asarray(b, dtype=float)
+    if a_arr.shape != b_arr.shape:
+        raise ValueError(
+            f"Spearman shape mismatch: {a_arr.shape} vs {b_arr.shape}"
+        )
+
+    mask = ~(np.isnan(a_arr) | np.isnan(b_arr))
+    a_v = a_arr[mask]
+    b_v = b_arr[mask]
+    if len(a_v) < 3:
+        return float("nan")
+
+    # Convert raw values to ranks (average ranking for ties — standard Spearman)
+    a_ranks = _average_ranks(a_v)
+    b_ranks = _average_ranks(b_v)
+
+    # Pearson correlation on ranks = Spearman ρ
+    a_mean = a_ranks.mean()
+    b_mean = b_ranks.mean()
+    a_dev = a_ranks - a_mean
+    b_dev = b_ranks - b_mean
+    num = float(np.sum(a_dev * b_dev))
+    den = float(np.sqrt(np.sum(a_dev**2) * np.sum(b_dev**2)))
+    if den == 0.0:
+        return float("nan")
+    return float(np.clip(num / den, -1.0, 1.0))
+
+
+def _average_ranks(values: np.ndarray) -> np.ndarray:
+    """Convert values to average ranks (ties get the mean of their rank slots).
+
+    Pure-NumPy alternative to scipy.stats.rankdata to avoid adding scipy as a
+    direct dependency in the IRR module.
+    """
+    n = len(values)
+    order = np.argsort(values, kind="stable")
+    sorted_vals = values[order]
+    ranks = np.zeros(n, dtype=float)
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and sorted_vals[j + 1] == sorted_vals[i]:
+            j += 1
+        # Items from i..j (inclusive) are tied — assign average of ranks i+1..j+1
+        avg = (i + 1 + j + 1) / 2.0
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg
+        i = j + 1
+    return ranks
+
+
+def pairwise_spearman_matrix(
+    ratings: np.ndarray,
+    role_labels: Iterable[str],
+) -> dict[str, float]:
+    """Spearman ρ for every pair of raters. Same shape contract as
+    pairwise_kappa_matrix.
+    """
+    arr = np.asarray(ratings, dtype=float)
+    labels = list(role_labels)
+    out: dict[str, float] = {}
+    n_raters = arr.shape[0]
+    for i in range(n_raters):
+        for j in range(i + 1, n_raters):
+            try:
+                rho = spearman_correlation(arr[i], arr[j])
+            except Exception as e:
+                logger.warning(
+                    "Spearman ρ failed for %s vs %s: %s",
+                    labels[i], labels[j], e,
+                )
+                rho = float("nan")
+            key = f"{labels[i]}|{labels[j]}"
+            out[key] = round(float(rho), 3) if not np.isnan(rho) else 0.0
+    return out
+
+
+def krippendorff_alpha_nominal(ratings: list[list[str | int]]) -> float:
+    """Krippendorff's α for nominal categorical data (strings or ints).
+
+    Use this for verdict-level agreement (accept/revise/reject_set) where
+    raters' categorical decisions are the unit of analysis, not numeric scores.
+
+    Args:
+        ratings: 2D list of shape (n_raters, n_items). Use None for missing.
+
+    Returns:
+        α in [-∞, 1]. NaN if insufficient data.
+    """
+    if not ratings or len(ratings) < 2:
+        return float("nan")
+    n_items = len(ratings[0])
+    if n_items < 2:
+        return float("nan")
+
+    # Map categories to ints
+    all_values: list[str | int] = []
+    for row in ratings:
+        for v in row:
+            if v is not None:
+                all_values.append(v)
+    if not all_values:
+        return float("nan")
+    cats = sorted(set(all_values), key=str)
+    cat_to_int = {c: i for i, c in enumerate(cats)}
+
+    # Build numeric array with NaN for missing
+    n_raters = len(ratings)
+    arr = np.full((n_raters, n_items), np.nan, dtype=float)
+    for r in range(n_raters):
+        for c in range(n_items):
+            v = ratings[r][c]
+            if v is not None:
+                arr[r, c] = float(cat_to_int[v])
+
+    # Nominal distance: 0 if equal, 1 if different
+    items_with_pairs: list[np.ndarray] = []
+    for j in range(n_items):
+        col = arr[:, j]
+        valid = col[~np.isnan(col)]
+        if len(valid) >= 2:
+            items_with_pairs.append(valid)
+    if not items_with_pairs:
+        return float("nan")
+
+    # Observed disagreement
+    observed_num = 0.0
+    pair_count_total = 0
+    for valid in items_with_pairs:
+        m = len(valid)
+        weight = 1.0 / (m - 1) if m > 1 else 1.0
+        for a in range(m):
+            for b in range(m):
+                if a == b:
+                    continue
+                if valid[a] != valid[b]:
+                    observed_num += weight
+        pair_count_total += m
+
+    # Expected disagreement (nominal)
+    all_valid = np.concatenate(items_with_pairs)
+    n_total = len(all_valid)
+    if n_total < 2:
+        return float("nan")
+    unique_values, counts = np.unique(all_valid, return_counts=True)
+    expected_sum = 0.0
+    for ci, c in enumerate(unique_values):
+        for ki, k in enumerate(unique_values):
+            if ci == ki:
+                continue
+            expected_sum += counts[ci] * counts[ki]  # nominal distance = 1
+
+    Do = observed_num / max(pair_count_total, 1)
+    De = expected_sum / max(n_total * (n_total - 1), 1)
+    if De == 0:
+        return 1.0
+    return float(1.0 - Do / De)

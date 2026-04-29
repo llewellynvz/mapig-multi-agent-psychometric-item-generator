@@ -53,24 +53,27 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
     const items = pfa.loadings;
 
     // Layout constants
-    const factorBoxW = 180;
-    const factorBoxH = 60;
-    const itemBoxW = 360;
-    const itemBoxH = 38;
-    const itemGap = 14;
-    const factorGap = 80;
-    const colGap = 240; // space for the arrows
-    const padX = 24;
-    const padY = 24;
+    const factorBoxW = 200;
+    const factorBoxH = 70;
+    const itemBoxW = 340;
+    const itemBoxH = 42;
+    const itemGap = 20;
+    const factorGap = 100;
+    const colGap = 280; // space for the loading arrows (factor → item)
+    const residualGap = 60; // space for residual circles to the right of items
+    const residualR = 22;
+    const padX = 30;
+    const padY = 36;
 
     const factorColX = padX;
     const itemColX = padX + factorBoxW + colGap;
+    const residualColX = itemColX + itemBoxW + residualGap;
 
     const totalH = Math.max(
       padY * 2 + factors.length * (factorBoxH + factorGap) - factorGap,
       padY * 2 + items.length * (itemBoxH + itemGap) - itemGap,
     );
-    const totalW = itemColX + itemBoxW + padX;
+    const totalW = residualColX + residualR * 2 + padX;
 
     // Y positions
     const factorYs = factors.map((_, i) => {
@@ -91,8 +94,10 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
       factorBoxH,
       itemBoxW,
       itemBoxH,
+      residualR,
       factorColX,
       itemColX,
+      residualColX,
       factorYs,
       itemYs,
       totalW,
@@ -108,7 +113,9 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
       <svg
         viewBox={`0 0 ${layout.totalW} ${layout.totalH}`}
         width="100%"
-        style={{ minWidth: 600, maxWidth: layout.totalW, height: "auto" }}
+        style={{ minWidth: 720, maxWidth: layout.totalW, height: "auto" }}
+        role="img"
+        aria-label="CFA-style measurement model with latent factor, item indicators, and residual variances"
       >
         <defs>
           <marker
@@ -120,7 +127,7 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
             markerHeight="6"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#a7d12b" opacity="0.65" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#a7d12b" opacity="0.85" />
           </marker>
           <marker
             id="arrow-weak"
@@ -133,9 +140,20 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" opacity="0.55" />
           </marker>
+          <marker
+            id="arrow-residual"
+            viewBox="0 0 10 10"
+            refX="2"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" opacity="0.7" />
+          </marker>
         </defs>
 
-        {/* Arrows: factor → item (drawn first so boxes overlap them at endpoints) */}
+        {/* === LOADING ARROWS (η → x_i, labeled with λ) === */}
         {layout.items.map((fl, itemIdx) => {
           const itemY = layout.itemYs[itemIdx] + layout.itemBoxH / 2;
           return fl.loadings.map((load, fi) => {
@@ -147,14 +165,14 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
             const isPrimary = fi === fl.primary_factor && abs >= 0.30;
             const stroke = isPrimary ? "#a7d12b" : "#475569";
             const strokeWidth = isPrimary
-              ? Math.min(1 + abs * 3, 4)
+              ? Math.min(1.2 + abs * 3, 4.2)
               : Math.min(0.5 + abs * 1.5, 2);
-            const opacity = isPrimary ? 0.85 : 0.45;
+            const opacity = isPrimary ? 0.9 : 0.5;
             const marker = isPrimary ? "url(#arrow)" : "url(#arrow-weak)";
 
-            // Place loading label slightly above the midpoint of the line
-            const midX = (x1 + x2) / 2;
-            const midY = (factorY + itemY) / 2;
+            // Place loading label at ~35% from factor (avoid clutter at item end)
+            const midX = x1 + (x2 - x1) * 0.42;
+            const midY = factorY + (itemY - factorY) * 0.42;
 
             return (
               <g key={`${itemIdx}-${fi}`}>
@@ -169,30 +187,92 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
                   markerEnd={marker}
                 />
                 {isPrimary && (
-                  <text
-                    x={midX}
-                    y={midY - 4}
-                    fill="#a7d12b"
-                    fontSize="11"
-                    fontWeight="600"
-                    textAnchor="middle"
-                    style={{ paintOrder: "stroke", stroke: "#0f172a", strokeWidth: 3 }}
-                  >
-                    {load.toFixed(2)}
-                  </text>
+                  <g>
+                    {/* λ label with stroke halo for legibility */}
+                    <text
+                      x={midX}
+                      y={midY - 6}
+                      fill="#a7d12b"
+                      fontSize="12"
+                      fontWeight="700"
+                      textAnchor="middle"
+                      style={{ paintOrder: "stroke", stroke: "#0f172a", strokeWidth: 4 }}
+                    >
+                      λ = {load.toFixed(2)}
+                    </text>
+                  </g>
                 )}
               </g>
             );
           });
         })}
 
-        {/* Factor ellipses (latent variables) */}
+        {/* === RESIDUAL ARROWS (ε_i → x_i, drawn going right-to-left into item) === */}
+        {layout.items.map((fl, itemIdx) => {
+          const itemY = layout.itemYs[itemIdx] + layout.itemBoxH / 2;
+          const itemRightX = layout.itemColX + layout.itemBoxW;
+          const residualCx = layout.residualColX + layout.residualR;
+          const residualCy = itemY;
+          // Uniqueness = 1 - λ^2 (assumes standardized solution)
+          const primaryLoad = fl.primary_loading;
+          const uniqueness = Math.max(0, 1 - primaryLoad * primaryLoad);
+          return (
+            <g key={`residual-${itemIdx}`}>
+              {/* Arrow from residual circle back to item */}
+              <line
+                x1={residualCx - layout.residualR}
+                y1={residualCy}
+                x2={itemRightX}
+                y2={residualCy}
+                stroke="#94a3b8"
+                strokeWidth="1.2"
+                opacity="0.7"
+                markerEnd="url(#arrow-residual)"
+              />
+              {/* Residual circle */}
+              <circle
+                cx={residualCx}
+                cy={residualCy}
+                r={layout.residualR}
+                fill="rgba(148, 163, 184, 0.08)"
+                stroke="#94a3b8"
+                strokeWidth="1.2"
+              />
+              {/* ε_n notation */}
+              <text
+                x={residualCx}
+                y={residualCy + 4}
+                textAnchor="middle"
+                fill="#cbd5e1"
+                fontSize="13"
+                fontStyle="italic"
+                fontWeight="600"
+              >
+                ε{fl.item_index + 1}
+              </text>
+              {/* Uniqueness label below */}
+              <text
+                x={residualCx}
+                y={residualCy + layout.residualR + 12}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize="9"
+              >
+                {uniqueness.toFixed(2)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* === LATENT FACTOR ELLIPSES (η) === */}
         {layout.factors.map((label, fi) => {
           const cx = layout.factorColX + layout.factorBoxW / 2;
           const cy = layout.factorYs[fi] + layout.factorBoxH / 2;
           const rx = layout.factorBoxW / 2 - 4;
           const ry = layout.factorBoxH / 2 - 4;
           const cong = pfa.tuckers_congruence[fi];
+          // Truncate long labels for fit
+          const displayLabel = label.length > 22 ? label.slice(0, 22) + "…" : label;
           return (
             <g key={`factor-${fi}`}>
               <ellipse
@@ -200,41 +280,53 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
                 cy={cy}
                 rx={rx}
                 ry={ry}
-                fill="rgba(167, 209, 43, 0.10)"
+                fill="rgba(167, 209, 43, 0.12)"
                 stroke="#a7d12b"
-                strokeWidth="1.5"
+                strokeWidth="2"
               />
+              {/* η_n notation top-left of ellipse */}
+              <text
+                x={cx - rx + 12}
+                y={cy - ry + 16}
+                fill="#a7d12b"
+                fontSize="14"
+                fontStyle="italic"
+                fontWeight="700"
+              >
+                η{layout.factors.length > 1 ? fi + 1 : ""}
+              </text>
+              {/* Factor label centered */}
               <text
                 x={cx}
-                y={cy - 4}
+                y={cy - 2}
                 textAnchor="middle"
                 fill="#a7d12b"
                 fontSize="13"
                 fontWeight="600"
               >
-                F{fi + 1}: {label.length > 18 ? label.slice(0, 18) + "…" : label}
+                {displayLabel}
               </text>
               {cong !== undefined && (
                 <text
                   x={cx}
-                  y={cy + 12}
+                  y={cy + 14}
                   textAnchor="middle"
                   fill="#94a3b8"
                   fontSize="10"
                 >
-                  congruence {cong.toFixed(2)}
+                  φ = {Math.abs(cong).toFixed(2)}
                 </text>
               )}
             </g>
           );
         })}
 
-        {/* Item rectangles (manifest variables) */}
+        {/* === ITEM RECTANGLES (manifest indicators x_i) === */}
         {layout.items.map((fl, itemIdx) => {
           const x = layout.itemColX;
           const y = layout.itemYs[itemIdx];
           const isWell = fl.is_well_loaded;
-          const trimmed = fl.item_text.length > 50 ? fl.item_text.slice(0, 50) + "…" : fl.item_text;
+          const trimmed = fl.item_text.length > 46 ? fl.item_text.slice(0, 46) + "…" : fl.item_text;
           return (
             <g key={`item-${itemIdx}`}>
               <rect
@@ -244,12 +336,24 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
                 height={layout.itemBoxH}
                 rx="4"
                 ry="4"
-                fill="rgba(15, 23, 42, 0.7)"
+                fill="rgba(15, 23, 42, 0.85)"
                 stroke={isWell ? "#a7d12b" : "#f59e0b"}
-                strokeWidth="1.5"
+                strokeWidth="1.6"
               />
+              {/* x_n notation top-left */}
               <text
                 x={x + 8}
+                y={y + 14}
+                fill={isWell ? "#a7d12b" : "#f59e0b"}
+                fontSize="11"
+                fontStyle="italic"
+                fontWeight="700"
+              >
+                x{fl.item_index + 1}
+              </text>
+              {/* Item text */}
+              <text
+                x={x + 36}
                 y={y + 14}
                 fill="#cbd5e1"
                 fontSize="10"
@@ -259,7 +363,7 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
               </text>
               <text
                 x={x + 8}
-                y={y + 28}
+                y={y + 32}
                 fill="#e2e8f0"
                 fontSize="11"
               >
@@ -272,24 +376,81 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
           );
         })}
       </svg>
-      <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-0.5 bg-[#a7d12b]"></span>
-          primary loading (≥ 0.30)
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-5 h-3 rounded-full border-2 border-[#a7d12b] bg-[#a7d12b]/10"></span>
+          <em>η</em> latent factor
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded border border-[#a7d12b] bg-slate-950/85"></span>
+          <em>x<sub>i</sub></em> item indicator
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-full border border-slate-400 bg-slate-400/10"></span>
+          <em>ε<sub>i</sub></em> residual (uniqueness = 1 − λ²)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-4 h-0.5 bg-[#a7d12b]"></span>
+          λ ≥ 0.30 (primary loading)
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-0.5 bg-slate-500"></span>
           cross-loading
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-full border-2 border-[#a7d12b]"></span>
-          item passed retention
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full border-2 border-[#a7d12b]"></span>
+          retained
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-full border-2 border-amber-500"></span>
-          retention violation
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full border-2 border-amber-500"></span>
+          retention flag
         </span>
       </div>
+    </div>
+  );
+}
+
+
+/** Measurement equations as a textual companion to the path diagram.
+ * Renders one equation per item: x_i = λ_i · η + ε_i with concrete values. */
+function MeasurementEquations({ pfa }: { pfa: PFAResult }) {
+  if (pfa.loadings.length === 0) return null;
+  return (
+    <div className="mt-4 rounded-lg border border-border/40 bg-slate-950/40 p-3">
+      <h4 className="text-xs font-semibold text-slate-50 mb-2 uppercase tracking-wide">
+        Measurement equations
+      </h4>
+      <div className="space-y-1 font-mono text-[11px] leading-relaxed">
+        {pfa.loadings.map((fl) => {
+          const lambda = fl.primary_loading;
+          const uniqueness = Math.max(0, 1 - lambda * lambda);
+          const factorLabel =
+            pfa.factor_labels.length > 1
+              ? `η${fl.primary_factor + 1}`
+              : "η";
+          return (
+            <div key={fl.item_index} className="text-slate-200">
+              <span className="text-[#a7d12b]">x{fl.item_index + 1}</span>
+              <span className="text-muted-foreground"> = </span>
+              <span className="text-[#a7d12b]">{lambda.toFixed(3)}</span>
+              <span className="text-muted-foreground"> · </span>
+              <span className="text-[#a7d12b]">{factorLabel}</span>
+              <span className="text-muted-foreground"> + </span>
+              <span className="text-slate-400 italic">ε{fl.item_index + 1}</span>
+              <span className="text-muted-foreground"> </span>
+              <span className="text-muted-foreground/60 text-[10px]">
+                (Var(ε) ≈ {uniqueness.toFixed(3)})
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[10px] italic text-muted-foreground/70">
+        Standardized solution: each item is the latent factor weighted by its
+        loading λ, plus a residual ε with variance 1 − λ². Loadings ≥ 0.30 are
+        meaningful indicators; uniqueness {">"} 0.70 means the item is mostly
+        unique noise relative to the factor.
+      </p>
     </div>
   );
 }
@@ -333,13 +494,24 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
           </div>
         )}
 
-        {/* SEM-style path diagram (centerpiece) */}
+        {/* SEM/CFA-style path diagram (centerpiece) */}
         {pfa.loadings.length > 0 && (
-          <div className="mb-6 rounded-lg border border-border/40 bg-slate-950/60 p-3">
-            <h4 className="text-sm font-semibold text-slate-50 mb-2">
-              Measurement model
-            </h4>
+          <div className="mb-6 rounded-lg border border-border/40 bg-slate-950/60 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-slate-50">
+                CFA Measurement Model
+              </h4>
+              <span className="text-[10px] uppercase text-muted-foreground/70 tracking-wide">
+                pre-calibration estimate
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground/80 mb-3 leading-relaxed">
+              Latent factor (<em>η</em>) → item indicators (<em>x<sub>i</sub></em>)
+              ← residuals (<em>ε<sub>i</sub></em>). Standardized loadings (λ)
+              shown on each path. Tucker&apos;s congruence (φ) inside each ellipse.
+            </p>
             <PathDiagram pfa={pfa} />
+            <MeasurementEquations pfa={pfa} />
           </div>
         )}
 

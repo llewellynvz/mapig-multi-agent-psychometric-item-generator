@@ -175,8 +175,17 @@ export interface ExpertEvaluation {
 export interface ExpertConsensus {
   evaluations: ExpertEvaluation[];
   debate_revisions: ExpertEvaluation[];
+  /** [Legacy] Per-item ordinal Krippendorff's α — often low because experts use
+   *  different rubrics. See `irr_verdict_alpha` for the meaningful metric. */
   irr_alpha?: number | null;
+  /** Krippendorff's α (nominal) on bucketed verdicts — measures whether
+   *  experts agree on the bottom-line accept/revise/reject decision. */
+  irr_verdict_alpha?: number | null;
+  /** [Legacy] Pairwise Cohen's κ on per-item scores. */
   irr_pairwise: Record<string, number>;
+  /** Pairwise Spearman rank correlation — robust to differing rubrics;
+   *  measures whether experts agree on relative item ordering. */
+  irr_pairwise_spearman?: Record<string, number>;
   consensus_revisions: {
     summary: string;
     edits: Array<{

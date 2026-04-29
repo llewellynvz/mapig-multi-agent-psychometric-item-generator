@@ -681,7 +681,23 @@ class ExpertEvaluation(BaseModel):
 
 
 class ExpertConsensus(BaseModel):
-    """Aggregated expert panel output: round 1 + optional debate + IRR + consensus revisions."""
+    """Aggregated expert panel output: round 1 + optional debate + IRR + consensus revisions.
+
+    NOTE on IRR: experts use DIFFERENT rubrics (psychometric / domain / localization),
+    so per-item score-level α is conceptually wrong (it assumes parallel ratings of
+    the same construct). We compute three IRR signals:
+
+    - `irr_verdict_alpha`: Krippendorff's α on `overall_verdict` (3 raters × 1 nominal
+      decision per rater). This is the meaningful aggregate-agreement metric — "do the
+      experts agree on the bottom-line outcome?"
+    - `irr_pairwise_spearman`: Spearman rank correlation between expert pairs on
+      per-item scores. Robust to differing rubric scales — measures "do experts agree
+      on which items are best/worst?"
+    - `irr_alpha` (legacy / informational): per-item ordinal α. Often low here BY
+      DESIGN because rubrics differ; retained for backward-compat but not used as
+      a quality flag.
+    - `irr_pairwise`: pairwise Cohen's κ on per-item scores (legacy, same caveat).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -692,11 +708,31 @@ class ExpertConsensus(BaseModel):
     )
     irr_alpha: Optional[float] = Field(
         default=None,
-        description="Krippendorff's α across experts on item scores (ordinal). None if too few items/experts.",
+        description=(
+            "[Legacy] Per-item ordinal Krippendorff's α across experts. Often low "
+            "because experts use different rubrics — see irr_verdict_alpha for the "
+            "meaningful agreement metric."
+        ),
+    )
+    irr_verdict_alpha: Optional[float] = Field(
+        default=None,
+        description=(
+            "Krippendorff's α (nominal) on the experts' overall_verdict decisions. "
+            "This is the right inter-rater metric for differing-rubric experts — "
+            "asks 'do they agree on the bottom-line outcome?'"
+        ),
     )
     irr_pairwise: Dict[str, float] = Field(
         default_factory=dict,
-        description="Map 'role_a|role_b' → Cohen's κ (ordinal weighted) for each expert pair",
+        description="[Legacy] Map 'role_a|role_b' → Cohen's κ (ordinal weighted) for per-item scores",
+    )
+    irr_pairwise_spearman: Dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Pairwise Spearman rank correlation between experts on per-item scores. "
+            "Measures whether experts agree on RELATIVE ITEM ORDERING — robust to "
+            "differing rubrics."
+        ),
     )
     consensus_revisions: RevisionPlan = Field(
         default_factory=RevisionPlan,
@@ -708,7 +744,7 @@ class ExpertConsensus(BaseModel):
     )
     irr_warning: Optional[str] = Field(
         default=None,
-        description="Warning emitted when irr_alpha falls below EXPERT_PANEL_IRR_MIN",
+        description="Warning emitted when expert agreement is genuinely low (verdict α < threshold)",
     )
 
 

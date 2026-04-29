@@ -282,17 +282,35 @@ export function exportToMarkdown(fullOutput: FinalOutput): string {
   if (fullOutput.expert_consensus && fullOutput.expert_consensus.evaluations.length > 0) {
     const ec = fullOutput.expert_consensus;
     md += `## Expert Panel — Face/Content Validity\n\n`;
+    md += `_Note: the three experts use different rubrics (psychometric / domain / `;
+    md += `localization), so per-item score disagreement is expected and informative. `;
+    md += `The verdict-level α below measures whether they agree on the bottom-line `;
+    md += `accept/revise/reject decision; Spearman ρ measures whether they agree on `;
+    md += `which items are best vs. worst._\n\n`;
+
+    if (ec.irr_verdict_alpha != null) {
+      md += `**Verdict-level Krippendorff's α (nominal):** ${ec.irr_verdict_alpha.toFixed(3)}\n\n`;
+    }
     if (ec.irr_alpha != null) {
-      md += `**Inter-rater reliability (Krippendorff's α):** ${ec.irr_alpha.toFixed(3)}\n\n`;
+      md += `**[Legacy] Per-item Krippendorff's α (ordinal):** ${ec.irr_alpha.toFixed(3)} `;
+      md += `_(low values expected with differing rubrics)_\n\n`;
     }
     if (ec.irr_warning) {
       md += `> ⚠ ${ec.irr_warning}\n\n`;
     }
 
+    if (ec.irr_pairwise_spearman && Object.keys(ec.irr_pairwise_spearman).length > 0) {
+      md += `**Pairwise Spearman ρ** (relative item ordering — robust to rubric differences):\n\n`;
+      Object.entries(ec.irr_pairwise_spearman).forEach(([pair, rho]) => {
+        md += `- ${pair.replace('|', ' ↔ ')}: ρ = ${rho.toFixed(3)}\n`;
+      });
+      md += '\n';
+    }
+
     if (Object.keys(ec.irr_pairwise).length > 0) {
-      md += `**Pairwise Cohen's κ:**\n\n`;
+      md += `**[Legacy] Pairwise Cohen's κ on raw scores:**\n\n`;
       Object.entries(ec.irr_pairwise).forEach(([pair, kappa]) => {
-        md += `- ${pair.replace('|', ' ↔ ')}: ${kappa.toFixed(3)}\n`;
+        md += `- ${pair.replace('|', ' ↔ ')}: κ = ${kappa.toFixed(3)}\n`;
       });
       md += '\n';
     }

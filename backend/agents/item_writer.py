@@ -33,15 +33,27 @@ def write_items(
     """
     item_count = request.item_count
     if overgenerate and settings.PFA_OVERGENERATE_FACTOR > 1.0:
-        inflated = int(round(item_count * settings.PFA_OVERGENERATE_FACTOR))
-        # Cap inflation at 50 (UserRequest.item_count Pydantic max) to keep payload sane
-        inflated = max(item_count, min(50, inflated))
-        if inflated != item_count:
+        # Skip entirely when the user already wants a lot of items — extra
+        # validation cost isn't worth it and risks the Vercel timeout.
+        if item_count >= settings.PFA_OVERGENERATE_DISABLE_ABOVE:
             logger.info(
-                "ITEM_WRITER over-generating items=%d (target=%d × factor=%.1f) for PFA pruning",
-                inflated, item_count, settings.PFA_OVERGENERATE_FACTOR,
+                "ITEM_WRITER skipping over-generation (item_count=%d >= disable threshold=%d)",
+                item_count, settings.PFA_OVERGENERATE_DISABLE_ABOVE,
             )
-            item_count = inflated
+        else:
+            inflated = int(round(item_count * settings.PFA_OVERGENERATE_FACTOR))
+            # Hard cap on extras: prevents 10 items inflating to 20 (was the
+            # production timeout cause). 10 → 13 with default factor 1.3.
+            max_extras = settings.PFA_OVERGENERATE_MAX_EXTRA
+            inflated = min(inflated, item_count + max_extras)
+            # Cap inflation at 50 (UserRequest.item_count Pydantic max) to keep payload sane
+            inflated = max(item_count, min(50, inflated))
+            if inflated != item_count:
+                logger.info(
+                    "ITEM_WRITER over-generating items=%d (target=%d × factor=%.1f, max_extras=%d) for PFA pruning",
+                    inflated, item_count, settings.PFA_OVERGENERATE_FACTOR, max_extras,
+                )
+                item_count = inflated
     typed_count = sum(1 for e in evidence if e.evidence_type)
     dim_count = sum(1 for e in evidence if e.evidence_type == "dimensions")
     logger.info(

@@ -220,7 +220,161 @@ export function exportToMarkdown(fullOutput: FinalOutput): string {
   }
   md += '\n';
 
-  // Section 6: Audit Trail
+  // Section 6: Pseudo-Factor Analysis (Phase 14)
+  if (fullOutput.pfa_result && fullOutput.pfa_result.loadings.length > 0) {
+    const pfa = fullOutput.pfa_result;
+    md += `## Pseudo-Factor Analysis\n\n`;
+    md += `Embedding-based pre-calibration factor structure (Varrasi et al., 2026). `;
+    md += `Embedding model: \`${pfa.embedding_model}\`.\n\n`;
+    md += `**Fit verdict:** ${pfa.fit_verdict.toUpperCase()}\n\n`;
+    if (pfa.model_identifiability) {
+      md += `**Model identifiability:** ${pfa.model_identifiability}`;
+      if (pfa.model_identifiability === 'saturated') {
+        md += ` (RMSR / CAF are uninformative — model is exactly identified)`;
+      }
+      md += `\n\n`;
+    }
+    md += `**Summary statistics:**\n\n`;
+    md += `| Metric | Value |\n|---|---|\n`;
+    md += `| Items | ${pfa.n_items} |\n`;
+    md += `| Factors | ${pfa.n_factors} |\n`;
+    md += `| Factor recovery rate | ${(pfa.factor_recovery_rate * 100).toFixed(0)}% |\n`;
+    md += `| RMSR | ${pfa.rmsr.toFixed(4)} |\n`;
+    md += `| CAF | ${pfa.caf.toFixed(4)} |\n`;
+    if (pfa.tuckers_congruence.length > 0) {
+      const meanCong = pfa.tuckers_congruence.reduce((a, b) => a + b, 0) / pfa.tuckers_congruence.length;
+      md += `| Mean Tucker's congruence | ${meanCong.toFixed(3)} |\n`;
+    }
+    if (pfa.items_dropped.length > 0) {
+      md += `| Items dropped (PFA pruning) | ${pfa.items_dropped.length} |\n`;
+    }
+    md += '\n';
+
+    if (pfa.factor_labels.length > 0) {
+      md += `**Factor labels (DAAL):**\n\n`;
+      pfa.factor_labels.forEach((label, idx) => {
+        const cong = pfa.tuckers_congruence[idx];
+        md += `- **F${idx + 1}: ${label}**`;
+        if (cong !== undefined) md += ` — Tucker's congruence ${cong.toFixed(3)}`;
+        md += `\n`;
+      });
+      md += '\n';
+    }
+
+    md += `**Item × Factor loadings:**\n\n`;
+    md += `| Item | Facet | ${pfa.factor_labels.map((_, i) => `F${i + 1}`).join(' | ')} | Retention |\n`;
+    md += `|---|---|${pfa.factor_labels.map(() => '---').join('|')}|---|\n`;
+    pfa.loadings.forEach(fl => {
+      const loadStr = fl.loadings.map(l => l.toFixed(2)).join(' | ');
+      const retention = fl.is_well_loaded ? 'OK' : `flag (${fl.retention_rule_violations.join(', ')})`;
+      md += `| ${fl.item_index + 1} | ${fl.facet_name ?? '—'} | ${loadStr} | ${retention} |\n`;
+    });
+    md += '\n';
+
+    if (pfa.eigenvalues.length > 0) {
+      md += `**Eigenvalues:** ${pfa.eigenvalues.map(e => e.toFixed(2)).join(', ')}\n\n`;
+    }
+
+    md += `*${pfa.disclaimer}*\n\n`;
+  }
+
+  // Section 7: Expert Panel (Phase 15)
+  if (fullOutput.expert_consensus && fullOutput.expert_consensus.evaluations.length > 0) {
+    const ec = fullOutput.expert_consensus;
+    md += `## Expert Panel — Face/Content Validity\n\n`;
+    if (ec.irr_alpha != null) {
+      md += `**Inter-rater reliability (Krippendorff's α):** ${ec.irr_alpha.toFixed(3)}\n\n`;
+    }
+    if (ec.irr_warning) {
+      md += `> ⚠ ${ec.irr_warning}\n\n`;
+    }
+
+    if (Object.keys(ec.irr_pairwise).length > 0) {
+      md += `**Pairwise Cohen's κ:**\n\n`;
+      Object.entries(ec.irr_pairwise).forEach(([pair, kappa]) => {
+        md += `- ${pair.replace('|', ' ↔ ')}: ${kappa.toFixed(3)}\n`;
+      });
+      md += '\n';
+    }
+
+    const finalEvals = ec.debate_revisions.length > 0 ? ec.debate_revisions : ec.evaluations;
+    md += `**Per-expert evaluations:**\n\n`;
+    md += `| Expert | Verdict | Mean score | Item-level concerns |\n|---|---|---|---|\n`;
+    finalEvals.forEach(ev => {
+      const scores = Object.values(ev.item_scores);
+      const mean = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      const concernCount = Object.values(ev.item_comments).filter(c => c && c.length > 0).length;
+      md += `| ${ev.expert_label} | ${ev.overall_verdict} | ${mean.toFixed(2)} / 5 | ${concernCount} flagged |\n`;
+    });
+    md += '\n';
+
+    finalEvals.forEach(ev => {
+      const concerns = Object.entries(ev.item_comments).filter(([_, c]) => c && c.length > 0);
+      if (concerns.length > 0) {
+        md += `**${ev.expert_label} — flagged items:**\n\n`;
+        concerns.forEach(([idx, comment]) => {
+          md += `- Item ${parseInt(idx, 10) + 1} (score ${ev.item_scores[parseInt(idx, 10)]}): ${comment}\n`;
+        });
+        md += '\n';
+      }
+      if (ev.overall_summary) {
+        md += `*${ev.expert_label}:* ${ev.overall_summary}\n\n`;
+      }
+    });
+
+    if (ec.dissent_flags.length > 0) {
+      md += `**Items with inter-expert disagreement (SD ≥ 1.0):** ${ec.dissent_flags.map(i => i + 1).join(', ')}\n\n`;
+    }
+
+    if (ec.consensus_revisions.edits.length > 0) {
+      md += `**Consensus revisions applied:**\n\n`;
+      ec.consensus_revisions.edits.forEach(edit => {
+        md += `- Item ${edit.item_index + 1}: ${edit.reason}\n`;
+      });
+      md += '\n';
+    } else {
+      md += `*${ec.consensus_revisions.summary}*\n\n`;
+    }
+  }
+
+  // Section 8: Persona Validation (Phase 16)
+  if (fullOutput.persona_validation && fullOutput.persona_validation.ratings.length > 0) {
+    const pv = fullOutput.persona_validation;
+    md += `## Persona-Based Conceptual Alignment (Step 13)\n\n`;
+    md += `${pv.summary}\n\n`;
+    md += `**Interpretive variance** (mean cross-persona SD): ${pv.interpretive_variance.toFixed(2)}\n\n`;
+
+    if (pv.personas.length > 0) {
+      md += `**Personas used:**\n\n`;
+      pv.personas.forEach((p, idx) => {
+        md += `${idx + 1}. ${p}\n`;
+      });
+      md += '\n';
+    }
+
+    // Group ratings by item for a readable table
+    const byItem = new Map<number, Array<{ persona: string; rating: number; interpretation: string }>>();
+    pv.ratings.forEach(r => {
+      const arr = byItem.get(r.item_index) ?? [];
+      arr.push({ persona: r.persona_label, rating: r.rating, interpretation: r.interpretation });
+      byItem.set(r.item_index, arr);
+    });
+
+    md += `**Per-item persona ratings + reasoning:**\n\n`;
+    Array.from(byItem.entries()).sort((a, b) => a[0] - b[0]).forEach(([itemIdx, ratings]) => {
+      md += `**Item ${itemIdx + 1}**\n\n`;
+      ratings.forEach(r => {
+        md += `- *${r.persona}* — rated ${r.rating}/5: "${r.interpretation}"\n`;
+      });
+      md += '\n';
+    });
+
+    if (pv.flagged_items.length > 0) {
+      md += `**Items flagged for ambiguity** (SD ≥ 2 across personas): ${pv.flagged_items.map(i => i + 1).join(', ')}\n\n`;
+    }
+  }
+
+  // Section 9: Audit Trail
   md += `## Audit Trail\n\n`;
   md += `- **Thread ID:** ${fullOutput.audit.thread_id}\n`;
   md += `- **Run ID:** ${fullOutput.audit.run_id}\n`;
@@ -230,6 +384,19 @@ export function exportToMarkdown(fullOutput: FinalOutput): string {
   }
   if (fullOutput.audit.validation_failures !== undefined) {
     md += `- **Validation Failures:** ${fullOutput.audit.validation_failures}\n`;
+  }
+  if (fullOutput.audit.force_accepted_below_threshold) {
+    md += `- **Force-accept fallback:** YES`;
+    if (fullOutput.audit.forced_scores && fullOutput.audit.forced_scores.length > 0) {
+      md += ` (scores: ${fullOutput.audit.forced_scores.map(s => s.toFixed(2)).join(', ')})`;
+    }
+    md += `\n`;
+  }
+  if (fullOutput.audit.warnings && fullOutput.audit.warnings.length > 0) {
+    md += `\n**Setup warnings:**\n`;
+    fullOutput.audit.warnings.forEach(w => {
+      md += `- ${w}\n`;
+    });
   }
 
   return md;

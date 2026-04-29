@@ -901,12 +901,17 @@ def meta_editor_node(state: GraphState) -> GraphState:
 
 
 def pfa_pruning_node(state: GraphState) -> GraphState:
-    """Phase 14: Prune over-generated items via PFA.
+    """Phase 14: Prune over-generated items via PFA, always emit a structural report.
 
     Drops weakly-loaded items down to user's requested item_count, preserving
     at least one item per facet (multi-dimensional only). Runs after critic
     accept, before expert panel. Bails early if the Vercel budget has run low
     so that expert_panel + finalize can still complete.
+
+    Even when no pruning is needed (items already at target), this node runs a
+    PFA pass on the kept set so the UI always receives a structural report —
+    pruning skip used to leave `pfa_pruning_result` unset and the PFA panel
+    never rendered.
     """
     with step("pfa_pruning_node", state):
         logger.info("ELAPSED %.0fs at pfa_pruning_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
@@ -916,16 +921,37 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
 
         items = state.get("draft_items", [])
         target = state["user_request"].item_count
-        if len(items) <= target:
-            logger.info("PFA pruning skipped: have %d items, target=%d", len(items), target)
-            return {}
 
         # Compute deadline: stop pruning when remaining < PFA_PRUNING_MIN_REMAINING_SECS
         rem = _remaining_seconds(state)
         deadline = _time.time() + rem  # convert remaining → absolute timestamp
 
+        # Skip embedding work entirely if budget is critically low — preserves
+        # finalize budget. analytics_dispatch_node will retry PFA later if it
+        # still has time.
+        if rem < 20:
+            logger.warning(
+                "PFA_PRUNING_NODE_BUDGET remaining=%.0fs (<20s) — skipping pruning + structural report",
+                rem,
+            )
+            return {}
+
         try:
+            from backend.agents.pfa_estimator import run_pfa
             from backend.agents.pfa_pruning import prune_items
+
+            if len(items) <= target:
+                # No pruning needed but still emit a structural report so the UI shows the panel
+                logger.info(
+                    "PFA pruning skipped: have %d items, target=%d — running PFA pass for structural report",
+                    len(items), target,
+                )
+                pfa_result = run_pfa(items, facet_mapping=state.get("facet_mapping"))
+                return {
+                    "pfa_pruning_result": pfa_result,
+                    "pfa_dropped_indices": [],
+                }
+
             kept, dropped, pfa_result = prune_items(
                 items,
                 facet_mapping=state.get("facet_mapping"),
@@ -1175,6 +1201,31 @@ def finalize_node(state: GraphState) -> GraphState:
         bias_feedback.extend(state.get("bias_comments", []))
         content_feedback.extend(state.get("content_comments", []))
 
+        # Last-resort PFA fallback: if pfa_pruning_node was skipped (e.g., due
+        # to budget), run PFA inline here so the panel always has data to show.
+        # This is the third safety net — pruning, parallel-analytics, and
+        # finalize all attempt to populate pfa_result.
+        pfa_result_for_output = state.get("pfa_pruning_result")
+        if (
+            pfa_result_for_output is None
+            and settings.PFA_ENABLED
+            and len(enriched_items) >= 3
+        ):
+            try:
+                from backend.agents.pfa_estimator import run_pfa
+                pfa_result_for_output = run_pfa(
+                    enriched_items,
+                    facet_mapping=state.get("facet_mapping"),
+                )
+                logger.info(
+                    "FINALIZE_PFA_FALLBACK ran inline PFA — verdict=%s recovery=%.3f",
+                    pfa_result_for_output.fit_verdict,
+                    pfa_result_for_output.factor_recovery_rate,
+                )
+            except Exception as e:
+                logger.warning("FINALIZE_PFA_FALLBACK failed: %s", e)
+                pfa_result_for_output = None
+
         out = FinalOutput(
             final_items=enriched_items,
             audit=audit,
@@ -1185,7 +1236,7 @@ def finalize_node(state: GraphState) -> GraphState:
             iteration_history=iteration_history,
             persona_validation=state.get("persona_validation"),
             expert_consensus=state.get("expert_consensus"),
-            pfa_result=state.get("pfa_pruning_result"),
+            pfa_result=pfa_result_for_output,
         )
 
         # Phase 10: Extract GPT-5.2 analytics toggle
@@ -1503,12 +1554,48 @@ def cross_construct_node(state: GraphState) -> GraphState:
             return {}
 
 
+def _run_pfa_analytics_safe(state: GraphState) -> dict:
+    """Synchronous PFA analytics for use inside asyncio.to_thread.
+
+    Returns a dict with key 'pfa_result' on success, empty dict on failure or
+    when prerequisites are missing. Designed to run in parallel with the slower
+    comparison_node so PFA never gets time-starved.
+    """
+    if not settings.PFA_ENABLED:
+        return {}
+    final_output = state.get("final_output")
+    if not final_output or len(final_output.final_items) < 3:
+        return {}
+    try:
+        from backend.analytics.pfa_analytics import compute_pfa_analytics
+        pfa_result = compute_pfa_analytics(
+            final_items=final_output.final_items,
+            facet_mapping=state.get("facet_mapping"),
+            items_dropped=state.get("pfa_dropped_indices", []),
+        )
+        logger.info(
+            "PFA_ANALYTICS done (parallel) verdict=%s recovery=%.3f rmsr=%.3f",
+            pfa_result.fit_verdict,
+            pfa_result.factor_recovery_rate,
+            pfa_result.rmsr,
+        )
+        return {"pfa_result": pfa_result}
+    except Exception as e:
+        logger.error(f"PFA analytics (parallel) failed: {e}", exc_info=True)
+        return {}
+
+
 async def analytics_dispatch_node(state: GraphState) -> GraphState:
     """Run analytics in parallel using asyncio.gather, then merge results.
 
-    Correlation and comparison run concurrently. Cross-construct runs after
-    comparison completes because it depends on comparison_instruments.
-    Budget check runs at the end.
+    Correlation, comparison, AND Pseudo-Factor Analysis run concurrently in
+    Phase 1. Cross-construct runs after comparison completes because it
+    depends on comparison_instruments.
+
+    PFA is in the parallel batch (not sequential after comparison) because
+    correlation+comparison can take 30-40s, and running PFA after them
+    starves it of time. Since PFA only takes ~1-2s, it completes alongside
+    the slower comparison_node and is essentially free time-wise.
     """
     with step("analytics_dispatch_node", state):
         logger.info("ELAPSED %.0fs at analytics_dispatch_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
@@ -1526,18 +1613,22 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
 
         updated = final_output.model_copy(deep=True)
 
-        # Phase 1: correlation + comparison in parallel
+        # Phase 1: correlation + comparison + PFA in parallel.
+        # PFA runs in this batch because it's fast (~1-2s) and would otherwise
+        # be time-starved by the slower comparison_node (30-40s).
         results = await asyncio.gather(
             correlation_node(state),
             asyncio.to_thread(comparison_node, state),
+            asyncio.to_thread(_run_pfa_analytics_safe, state),
             return_exceptions=True,
         )
 
-        correlation_result, comparison_result = results
+        correlation_result, comparison_result, pfa_result_dict = results
         logger.info(
-            "ANALYTICS_RESULTS correlation=%s comparison=%s",
+            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s",
             "ok" if isinstance(correlation_result, dict) else type(correlation_result).__name__,
             "ok" if isinstance(comparison_result, dict) else type(comparison_result).__name__,
+            "ok" if isinstance(pfa_result_dict, dict) and pfa_result_dict.get("pfa_result") else "missing",
         )
 
         if isinstance(correlation_result, dict) and "final_output" in correlation_result:
@@ -1565,6 +1656,17 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
         elif isinstance(comparison_result, Exception):
             logger.error(f"Comparison analysis failed: {comparison_result}")
 
+        # Apply PFA result from the parallel run
+        if isinstance(pfa_result_dict, dict) and pfa_result_dict.get("pfa_result"):
+            updated.pfa_result = pfa_result_dict["pfa_result"]
+        elif isinstance(pfa_result_dict, Exception):
+            logger.error(f"PFA analytics (parallel) raised: {pfa_result_dict}")
+
+        # Fallback chain: if PFA still missing, use pruning result
+        if not updated.pfa_result and state.get("pfa_pruning_result"):
+            logger.info("PFA_ANALYTICS using pruning_result as fallback")
+            updated.pfa_result = state.get("pfa_pruning_result")
+
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
         # Time-budget check: cross-construct requires 2 GPT-5.2 calls (~30-60s).
         # Skip if insufficient time to prevent hard Vercel timeout.
@@ -1585,32 +1687,6 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
                     updated.cross_construct_analysis = cross_result["final_output"].cross_construct_analysis
             except Exception as e:
                 logger.error(f"Cross-construct analysis failed: {e}")
-
-        # Phase 14: Pseudo-Factor Analysis (post-final structure report for the UI)
-        if settings.PFA_ENABLED:
-            remaining = _remaining_seconds(state)
-            if remaining < 25:
-                logger.warning(
-                    "PFA_ANALYTICS_BUDGET remaining=%.0fs (<25s) — skipping post-final PFA",
-                    remaining,
-                )
-            else:
-                try:
-                    from backend.analytics.pfa_analytics import compute_pfa_analytics
-                    pfa_result = compute_pfa_analytics(
-                        final_items=updated.final_items,
-                        facet_mapping=state.get("facet_mapping"),
-                        items_dropped=state.get("pfa_dropped_indices", []),
-                    )
-                    updated.pfa_result = pfa_result
-                    logger.info(
-                        "PFA_ANALYTICS done verdict=%s recovery=%.3f rmsr=%.3f",
-                        pfa_result.fit_verdict,
-                        pfa_result.factor_recovery_rate,
-                        pfa_result.rmsr,
-                    )
-                except Exception as e:
-                    logger.error(f"PFA analytics failed: {e}", exc_info=True)
 
         # Budget check
         if gpt52_enabled:

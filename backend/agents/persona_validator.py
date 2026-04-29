@@ -38,7 +38,7 @@ class _PersonaItemRating(BaseModel):
     model_config = ConfigDict(extra="forbid")
     item_index: int = Field(..., ge=0)
     rating: conint(ge=1, le=5)  # type: ignore[valid-type]
-    interpretation: str = Field(..., min_length=3, max_length=350)
+    interpretation: str = Field(..., min_length=3, max_length=1000)
 
 
 class _PersonaValidatorAgentOutput(BaseModel):
@@ -60,23 +60,34 @@ def _build_persona_prompts(
     target_population: str,
     cultural_group: str | None,
 ) -> List[str]:
-    """Generate `n_personas` deterministic persona descriptors.
+    """Generate `n_personas` deterministic, richer persona descriptors.
 
-    Falls back to a heuristic mix of age + cultural-group personas if no LLM
-    call is desired. The plan calls for one cheap LLM call to produce these,
-    but in mock mode we synthesize templates directly.
+    Mock-mode fallback only. In production, `_generate_personas_via_llm` writes
+    far more detailed personas via gpt-5.4-mini.
     """
     cg = cultural_group or "general"
-    # Deterministic stub personas covering young / older / cultural sub-group
     base = [
-        f"Younger respondent (early 20s) from {target_population} ({cg})",
-        f"Older respondent (50s-60s) from {target_population} ({cg})",
-        f"Mid-career respondent (30s-40s) from {target_population}, {cg} sub-group",
+        (
+            f"22-year-old early-career {target_population} member (junior level), "
+            f"some tertiary education, English as a second language, {cg} background, "
+            f"living with extended family in an urban township; uses English at work "
+            f"but mixes with home language socially."
+        ),
+        (
+            f"58-year-old experienced {target_population} member (senior level), "
+            f"completed secondary school, fluent reader, {cg} background, "
+            f"raised in a rural area before relocating, navigates work life with traditional values."
+        ),
+        (
+            f"34-year-old mid-career {target_population} member from a {cg} sub-group, "
+            f"university degree, second-generation urban professional, juggles "
+            f"family obligations and work pressure, comfortable with both global and local norms."
+        ),
     ]
-    # If user wants more, append generic descriptors
     while len(base) < n_personas:
         base.append(
-            f"Additional respondent from {target_population} ({cg}) variant {len(base) + 1}"
+            f"Additional respondent variant {len(base) + 1} from {target_population} ({cg}) "
+            f"with mid-level literacy and a focus on work-family balance."
         )
     return base[:n_personas]
 
@@ -92,17 +103,27 @@ def _generate_personas_via_llm(
         )
 
     system = (
-        "You generate concise respondent personas for survey item validation. "
-        "Each persona is one sentence describing age band, occupation/role, and "
-        "one culturally relevant detail. Personas must be DISTINCT (cover age "
-        "range and any cultural sub-groups)."
+        "You generate detailed respondent personas for cognitive-interview-style "
+        "survey item validation. Each persona is a 2-3 sentence biographical sketch "
+        "covering: age + life stage, occupation/role with seniority, education + "
+        "literacy level, primary language(s) and English fluency, cultural "
+        "reference frame, current life context (family, work pressure, health, "
+        "geography). The personas must be DISTINCT — they should produce DIFFERENT "
+        "interpretations of the same item. Avoid generic descriptions."
     )
     human = (
-        f"Generate exactly {n} distinct one-sentence respondent persona descriptors "
-        f"for a survey targeted at: target_population={request.target_population!r} "
+        f"Generate exactly {n} richly detailed respondent personas for a survey "
+        f"targeted at: target_population={request.target_population!r} "
         f"cultural_group={request.cultural_group!r}.\n\n"
-        f"Cover the youngest end, oldest end, and a culturally distinct sub-group. "
-        f"Return JSON with a 'personas' field containing exactly {n} strings."
+        f"Each persona should be 2–3 sentences with concrete biographical detail. "
+        f"Cover at least:\n"
+        f"  - The YOUNGER end of the population (early 20s, less life experience).\n"
+        f"  - The OLDER end (50s/60s, different cultural reference frame).\n"
+        f"  - A culturally or linguistically DISTINCT sub-group whose comprehension "
+        f"may differ (e.g., second-language English, rural vs urban, different "
+        f"socioeconomic position).\n"
+        f"Personas should expose how SAME ITEMS may be READ DIFFERENTLY.\n\n"
+        f"Return JSON with a 'personas' field containing exactly {n} multi-sentence strings."
     )
     try:
         result, usage = invoke_structured_with_usage(
@@ -127,13 +148,19 @@ def _rate_items_for_persona(
 ) -> Tuple[_PersonaValidatorAgentOutput, TokenUsage]:
     """Single-persona LLM call: rate every item + interpretation."""
     if settings.APP_MODE == "mock":
-        # Deterministic mock: rating cycles over 1..5 to produce disagreement
+        # Deterministic mock: rating cycles over 1..5 to produce disagreement.
+        # Use a short label snippet in the interpretation to stay well under
+        # the 1000-char schema limit regardless of how long the persona is.
+        label_snippet = persona_label[:60].rsplit(" ", 1)[0]
         offset = abs(hash(persona_label)) % 5
         ratings = [
             _PersonaItemRating(
                 item_index=i,
                 rating=((i + offset) % 5) + 1,
-                interpretation=f"As {persona_label}, I read item {i} as a self-report query.",
+                interpretation=(
+                    f"Mock interpretation for {label_snippet}: "
+                    f"item {i} reads as a self-report query in this persona's voice."
+                ),
             )
             for i in range(len(items))
         ]
@@ -156,7 +183,17 @@ def _rate_items_for_persona(
         ],
     }
     human = (
-        f"Rate every item as the persona would. Return all {len(items)} ratings.\n\n"
+        f"You are this persona, embodying their biography fully:\n\n"
+        f"PERSONA: {persona_label}\n\n"
+        f"For EACH of the {len(items)} items below, produce a rating (1-5) AND a "
+        f"2-4 sentence cognitive-interview-style interpretation that:\n"
+        f"  1. States what you (as the persona) thought the item was asking.\n"
+        f"  2. Mentions any alternative reading you considered.\n"
+        f"  3. Gives a concrete personal reason for the rating you chose.\n"
+        f"  4. Flags any wording that was unclear or culturally jarring for you.\n\n"
+        f"Different items should produce DIFFERENT ratings — vary based on your "
+        f"persona's specific life context. Identical ratings across all items "
+        f"will be flagged as a failure.\n\n"
         f"INPUT:\n{payload}"
     )
 

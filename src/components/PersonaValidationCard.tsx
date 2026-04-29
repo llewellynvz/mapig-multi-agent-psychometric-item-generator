@@ -117,6 +117,55 @@ export function PersonaValidationCard({ validation }: PersonaValidationCardProps
               </p>
             </div>
           )}
+
+          {/* Persona descriptors (rich biographies) */}
+          {validation.personas.length > 0 && (
+            <details className="mt-4 rounded-lg border border-border/40 bg-slate-900/30 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-50">
+                Persona descriptors
+              </summary>
+              <div className="mt-2 space-y-2">
+                {validation.personas.map((p, idx) => (
+                  <p key={idx} className="text-[11px] text-muted-foreground/90 leading-relaxed">
+                    <span className="text-[#a7d12b] font-medium">{idx + 1}.</span> {p}
+                  </p>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Per-item cognitive interview verbatim */}
+          {validation.ratings.length > 0 && (
+            <details className="mt-3 rounded-lg border border-border/40 bg-slate-900/30 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-50">
+                Cognitive interview verbatim ({validation.ratings.length} ratings)
+              </summary>
+              <div className="mt-2 space-y-3">
+                {Array.from(
+                  validation.ratings.reduce((acc, r) => {
+                    const list = acc.get(r.item_index) ?? [];
+                    list.push(r);
+                    acc.set(r.item_index, list);
+                    return acc;
+                  }, new Map<number, typeof validation.ratings>())
+                )
+                  .sort((a, b) => a[0] - b[0])
+                  .map(([itemIdx, ratings]) => (
+                    <div key={itemIdx} className="border-t border-border/20 pt-2">
+                      <p className="text-[11px] font-semibold text-slate-100 mb-1">
+                        Item {itemIdx + 1}
+                      </p>
+                      {ratings.map((r, i) => (
+                        <div key={i} className="text-[11px] text-muted-foreground/90 mb-1.5">
+                          <span className="text-[#a7d12b]">[{r.rating}/5]</span>{" "}
+                          <em>{r.persona_label}</em>: &ldquo;{r.interpretation}&rdquo;
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            </details>
+          )}
         </CardContent>
       )}
     </SurfaceCard>

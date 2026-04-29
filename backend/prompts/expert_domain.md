@@ -32,17 +32,22 @@ Combine into a single 1-5 score:
 
 ## Output
 
-Return JSON matching the `ExpertPanelOutput` schema (string keys for item indices):
+Return JSON matching this exact shape — `item_scores` is an array of objects:
 
 ```json
 {
   "expert_role": "domain",
   "expert_label": "Domain Expert",
-  "item_scores": {"0": 5, "1": 3, ...},
-  "item_comments": {"1": "Drifts into self-efficacy — emphasizes capability rather than worth."},
-  "overall_verdict": "accept" | "revise" | "reject_set",
+  "item_scores": [
+    {"item_index": 0, "score": 5, "comment": ""},
+    {"item_index": 1, "score": 3, "comment": "Drifts into self-efficacy — emphasizes capability rather than worth."}
+  ],
+  "overall_verdict": "revise",
   "overall_summary": "<one paragraph>"
 }
 ```
 
-Comment only on items scored ≤ 3 (≤30 words each).
+- Include EVERY item from the input list with its `item_index` and `score`.
+- `comment` is required as a string (use empty string `""` when no comment).
+- Only fill in `comment` (≤30 words) for items scored ≤ 3.
+- `overall_verdict` must be one of: `"accept"`, `"revise"`, or `"reject_set"`.

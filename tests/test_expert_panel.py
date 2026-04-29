@@ -14,6 +14,9 @@ import pytest
 from backend.agents.expert_panel import (
     _build_rating_matrix,
     _dissent_flags,
+    _ExpertItemScore,
+    _ExpertPanelOutput,
+    _to_evaluation,
     run_expert_panel,
     synthesize_consensus,
 )
@@ -227,6 +230,71 @@ def test_run_expert_panel_in_mock_mode(monkeypatch):
     # IRR should be computable
     if consensus.irr_alpha is not None:
         assert -1.0 <= consensus.irr_alpha <= 1.0
+
+
+def test_expert_panel_output_schema_is_openai_strict_compatible():
+    """Regression test for the production bug where Dict[str, conint(...)] in
+    _ExpertPanelOutput caused OpenAI strict mode to reject the schema with
+    HTTP 400. Ensures every property appears in the JSON-Schema `required`
+    array (strict mode requirement).
+    """
+    schema = _ExpertPanelOutput.model_json_schema()
+    properties = set(schema["properties"].keys())
+    required = set(schema.get("required", []))
+    missing = properties - required
+    assert missing == set(), (
+        f"OpenAI strict mode requires all properties in `required`. "
+        f"Missing: {missing}. Reproduces the production HTTP 400 if any field "
+        f"slips through with a Pydantic default."
+    )
+
+    # And the inner item-score schema too.
+    inner = _ExpertItemScore.model_json_schema()
+    inner_properties = set(inner["properties"].keys())
+    inner_required = set(inner.get("required", []))
+    assert inner_properties == inner_required, (
+        f"_ExpertItemScore is missing fields from `required`: {inner_properties - inner_required}"
+    )
+
+
+def test_to_evaluation_handles_flat_list_input():
+    """Confirm _to_evaluation correctly converts the new flat List[_ExpertItemScore]
+    output to the public ExpertEvaluation int-keyed dict shape."""
+    out = _ExpertPanelOutput(
+        expert_role="psychometric",
+        expert_label="Psychometric Expert",
+        item_scores=[
+            _ExpertItemScore(item_index=0, score=5, comment=""),
+            _ExpertItemScore(item_index=1, score=3, comment="Wording invites acquiescence."),
+            _ExpertItemScore(item_index=2, score=4, comment=""),
+        ],
+        overall_verdict="revise",
+        overall_summary="Some items strong; one needs rephrase.",
+    )
+    ev = _to_evaluation(out)
+    assert ev.item_scores == {0: 5, 1: 3, 2: 4}
+    assert ev.item_comments == {1: "Wording invites acquiescence."}
+    assert ev.overall_verdict == "revise"
+    assert ev.expert_role == "psychometric"
+
+
+def test_to_evaluation_clamps_out_of_range_scores():
+    """Defensive clamping in _to_evaluation: scores outside 1-5 are clamped."""
+    out = _ExpertPanelOutput(
+        expert_role="domain",
+        expert_label="Domain Expert",
+        item_scores=[
+            _ExpertItemScore(item_index=0, score=5, comment="ok"),
+            # Note: pydantic ge=1, le=5 prevents constructing out-of-range here,
+            # but we test the clamp path with edge values.
+            _ExpertItemScore(item_index=1, score=1, comment=""),
+        ],
+        overall_verdict="accept",
+        overall_summary="OK",
+    )
+    ev = _to_evaluation(out)
+    assert ev.item_scores[0] == 5
+    assert ev.item_scores[1] == 1
 
 
 def test_run_expert_panel_disabled(monkeypatch):

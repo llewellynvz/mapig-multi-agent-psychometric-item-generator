@@ -13,7 +13,10 @@ from typing_extensions import TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
-from backend.agents.sanitizer import sanitize_user_request
+from backend.agents.sanitizer import (
+    check_construct_definition_coherence,
+    sanitize_user_request,
+)
 from backend.agents.bias_reviewer import review_bias
 from backend.agents.critic import decide as critic_decide
 from backend.agents.item_writer import write_items
@@ -189,6 +192,12 @@ class GraphState(TypedDict, total=False):
     pfa_dropped_indices: List[int]
     expert_consensus: Optional[ExpertConsensus]
 
+    # Non-fatal user-facing warnings (e.g., construct/definition mismatch)
+    audit_warnings: List[str]
+    # Whether the validator force-accepted items below threshold (for UI banner)
+    force_accepted_below_threshold: bool
+    forced_scores: List[float]
+
     # Output
     final_output: FinalOutput
 
@@ -283,6 +292,17 @@ def init_run(state: GraphState) -> GraphState:
         # Sanitize user inputs before any prompt interpolation
         sanitize_user_request(state["user_request"])
 
+        # Detect construct name vs. definition coherence; surface as a warning.
+        # Cheap (1 OpenAI embedding call); skipped silently in mock mode or when
+        # API key is absent.
+        warnings_list: List[str] = []
+        try:
+            mismatch_warning = check_construct_definition_coherence(state["user_request"])
+            if mismatch_warning:
+                warnings_list.append(mismatch_warning)
+        except Exception as e:
+            logger.debug("Construct coherence check raised: %s", e)
+
         return {
             "iteration": 0,
             "stop_reason": "",
@@ -294,6 +314,9 @@ def init_run(state: GraphState) -> GraphState:
             "validation_results": [],
             "validation_attempt": 1,
             "failed_item_indices": [],
+            "audit_warnings": warnings_list,
+            "force_accepted_below_threshold": False,
+            "forced_scores": [],
             "timestamp_utc": state.get("timestamp_utc") or _utc_now(),
             "run_id": state.get("run_id") or str(uuid.uuid4()),
             "_start_time": _time.time(),
@@ -528,17 +551,28 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
             # Quality gate: filter out items with weighted_score < 5.0
             # These are too poor to send through the review pipeline
             _MIN_FORCE_ACCEPT_SCORE = 5.0
+            _PASS_THRESHOLD = 7.0  # the validator's accept threshold; informational
             passing = [v for v in validation_results if v.weighted_score >= _MIN_FORCE_ACCEPT_SCORE]
             filtered_count = len(validation_results) - len(passing)
+            force_accepted_below_threshold = False
+            forced_scores: List[float] = []
             if filtered_count > 0:
                 logger.warning(
-                    "QUALITY_GATE_FILTERED dropped=%d items below %.1f threshold (kept %d)",
+                    "QUALITY_GATE_FILTERED dropped=%d items below %.1f threshold (kept %d) all_scores=%s",
                     filtered_count, _MIN_FORCE_ACCEPT_SCORE, len(passing),
+                    [round(v.weighted_score, 2) for v in validation_results],
                 )
                 # If too few survive, keep the top-3 by score
                 if len(passing) < 3:
                     passing = sorted(validation_results, key=lambda v: v.weighted_score, reverse=True)[:3]
-                    logger.warning("QUALITY_GATE_FALLBACK keeping top-%d items by score", len(passing))
+                    forced_scores = [round(v.weighted_score, 2) for v in passing]
+                    force_accepted_below_threshold = any(
+                        s < _PASS_THRESHOLD for s in forced_scores
+                    )
+                    logger.warning(
+                        "QUALITY_GATE_FALLBACK forced top-%d items below threshold scores=%s pass_threshold=%.1f",
+                        len(passing), forced_scores, _PASS_THRESHOLD,
+                    )
                 # Update draft_items to only include surviving items
                 surviving_indices = {v.item_index for v in passing}
                 draft_items = state.get("draft_items", [])
@@ -552,14 +586,27 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                     update={
                         "draft_items": filtered_items,
                         "validation_results": reindexed_validations,
+                        "force_accepted_below_threshold": force_accepted_below_threshold,
+                        "forced_scores": forced_scores,
                         **token_update,
                     },
                     goto="reviewers_fanout_node"
                 )
 
+            # No items below 5.0 but some are still below 7.0 — flag them
+            below_threshold = [v for v in validation_results if v.weighted_score < _PASS_THRESHOLD]
+            force_accepted_below_threshold = bool(below_threshold)
+            forced_scores = [round(v.weighted_score, 2) for v in below_threshold]
+            if force_accepted_below_threshold:
+                logger.warning(
+                    "QUALITY_GATE_BELOW_THRESHOLD %d items below pass threshold %.1f scores=%s",
+                    len(below_threshold), _PASS_THRESHOLD, forced_scores,
+                )
             return Command(
                 update={
                     "validation_results": validation_results,
+                    "force_accepted_below_threshold": force_accepted_below_threshold,
+                    "forced_scores": forced_scores,
                     **token_update,
                 },
                 goto="reviewers_fanout_node"
@@ -1088,6 +1135,9 @@ def finalize_node(state: GraphState) -> GraphState:
             analytics_budget_exceeded=budget_exceeded if total_gpt52_cost > 0 else None,
             cache_read_tokens=cache_read if cache_read > 0 else None,
             cache_savings_usd=round(cache_savings, 4) if cache_savings > 0 else None,
+            force_accepted_below_threshold=bool(state.get("force_accepted_below_threshold")),
+            forced_scores=list(state.get("forced_scores", [])),
+            warnings=list(state.get("audit_warnings", [])),
         )
 
         # Phase 03.1: Extract review feedback from GraphState for complete metadata export

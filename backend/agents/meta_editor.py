@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
@@ -51,6 +52,65 @@ def _clamp_rationales(data: dict) -> dict:
                     len(item["rationale"]),
                 )
     return data
+
+
+_NEGATION_PATTERN = re.compile(
+    r"\b(not|never|no)\b|n['’]t\b",
+    flags=re.IGNORECASE,
+)
+
+
+def _contains_negation(text: str) -> bool:
+    """Return True if the text contains negation tokens (not/never/no/n't)."""
+    return bool(_NEGATION_PATTERN.search(text or ""))
+
+
+def _enforce_positive_keying(
+    request: UserRequest,
+    original_items: List[DraftItem],
+    revised_items: List[DraftItem],
+) -> List[DraftItem]:
+    """If `request.constraints` includes "Positively keyed only", revert any
+    revised item that introduces negation tokens (not/never/no/n't) when the
+    corresponding original item did NOT contain them.
+
+    The original item may itself be a system-generated mock and could contain
+    "not" innocently — only revert when the LLM ADDED a negation.
+    """
+    if not any("Positively keyed only" in c for c in (request.constraints or [])):
+        return revised_items
+
+    out: List[DraftItem] = []
+    leaks = 0
+    for idx, rev in enumerate(revised_items):
+        orig = original_items[idx] if idx < len(original_items) else None
+        if (
+            orig is not None
+            and _contains_negation(rev.item_text)
+            and not _contains_negation(orig.item_text)
+        ):
+            logger.warning(
+                "META_EDITOR_NEGATION_LEAK item_index=%d original=%r revised=%r — reverting to original",
+                idx, orig.item_text, rev.item_text,
+            )
+            # Preserve any other revision metadata (rationale/citations) from the
+            # LLM, but restore the original item_text + construct_name so the
+            # polarity constraint is honored.
+            try:
+                reverted = rev.model_copy(update={
+                    "item_text": orig.item_text,
+                    "construct_name": orig.construct_name,
+                })
+            except Exception:
+                reverted = orig
+            out.append(reverted)
+            leaks += 1
+        else:
+            out.append(rev)
+
+    if leaks:
+        logger.warning("META_EDITOR_NEGATION_LEAKS_TOTAL count=%d", leaks)
+    return out
 
 
 def revise_items(
@@ -147,10 +207,18 @@ def revise_items(
         ("human", human_msg),
     ]
 
-    return invoke_structured_with_usage(
+    resp, usage = invoke_structured_with_usage(
         MetaEditorResponse,
         messages,
         agent_name="meta_editor",
         model_provider=request.model_provider,
         pre_validate=_clamp_rationales,
     )
+
+    # Post-edit polarity enforcement: revert any item where the LLM introduced
+    # a negation despite a "Positively keyed only" constraint.
+    enforced_items = _enforce_positive_keying(request, items, resp.revised_items)
+    if enforced_items is not resp.revised_items:
+        resp = resp.model_copy(update={"revised_items": enforced_items})
+
+    return resp, usage

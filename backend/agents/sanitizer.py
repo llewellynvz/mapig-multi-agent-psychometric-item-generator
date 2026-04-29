@@ -114,3 +114,61 @@ def sanitize_user_request(request) -> None:
         ]
         if cleaned_previous != request.previous_items:
             object.__setattr__(request, "previous_items", cleaned_previous)
+
+
+def check_construct_definition_coherence(
+    request,
+    threshold: float = 0.40,
+) -> str | None:
+    """Compute embedding similarity between construct_name and construct_definition.
+
+    Returns a human-readable warning string when cosine similarity falls below
+    `threshold` — meaning the definition probably describes a different
+    construct from what the name suggests (e.g., name='Cognitive Flexibility'
+    with definition='drive to seek new knowledge'). Returns None when coherent
+    or when the check cannot be run (no OpenAI key, etc.).
+
+    The warning surfaces in AuditMetadata.warnings and the UI so the user can
+    correct mismatches that drive low correspondence scores.
+    """
+    from backend.settings import settings
+
+    name = (getattr(request, "construct_name", None) or "").strip()
+    definition = (getattr(request, "construct_definition", None) or "").strip()
+
+    if not name or not definition or len(definition.split()) < 3:
+        return None
+
+    if settings.APP_MODE == "mock" or not settings.OPENAI_API_KEY:
+        # Can't embed without OpenAI; skip silently.
+        return None
+
+    try:
+        import numpy as np
+        from backend.agents.correlation_estimator import embed_items_sync
+
+        emb = embed_items_sync([name, definition], model="text-embedding-3-small")
+        norms = np.linalg.norm(emb, axis=1, keepdims=True)
+        norms = np.where(norms == 0, 1, norms)
+        normed = emb / norms
+        cosine = float(np.clip(normed[0] @ normed[1], -1.0, 1.0))
+
+        if cosine < threshold:
+            logger.warning(
+                "CONSTRUCT_NAME_DEFINITION_MISMATCH name=%r cos=%.3f threshold=%.2f",
+                name, cosine, threshold,
+            )
+            return (
+                f"Construct name '{name}' and the supplied definition appear to describe "
+                f"different constructs (semantic similarity {cosine:.2f} < {threshold:.2f}). "
+                f"Items will be written for the DEFINITION; if that is not what you meant, "
+                f"edit the construct definition before running again."
+            )
+        else:
+            logger.info(
+                "CONSTRUCT_COHERENCE_OK name=%r cos=%.3f", name, cosine,
+            )
+            return None
+    except Exception as e:
+        logger.debug("Construct coherence check skipped: %s", e)
+        return None

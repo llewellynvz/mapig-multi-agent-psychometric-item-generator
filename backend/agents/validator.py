@@ -357,15 +357,22 @@ def validate_items(
 
         # Server-side weighted_score recalculation — LLMs often miscalculate
         _WEIGHTS = {"correspondence": 0.5, "distinctiveness": 0.25, "clarity": 0.15, "specificity": 0.10}
+        mismatches: List[Tuple[int, float, float]] = []
         for v in result.validations:
             recalc = sum(ds.score * _WEIGHTS.get(ds.dimension, 0) for ds in v.dimension_scores)
+            # Small mismatches (<0.30) are LLM rounding noise; the recalc value
+            # is the ground truth and is what we use. Aggregate into one INFO
+            # log line instead of warning per item to reduce log noise.
             if abs(v.weighted_score - recalc) > 0.01:
-                logger.warning(
-                    "VALIDATOR_SCORE_MISMATCH item=%d llm=%.2f recalc=%.2f",
-                    v.item_index, v.weighted_score, recalc,
-                )
+                mismatches.append((v.item_index, v.weighted_score, recalc))
             v.weighted_score = round(recalc, 2)
             v.accept = recalc >= 7.0
+        if mismatches:
+            logger.info(
+                "VALIDATOR_SCORES_RECALCULATED %d items differed from LLM output (recalc is canonical): %s",
+                len(mismatches),
+                [(i, round(llm, 2), round(rc, 2)) for i, llm, rc in mismatches],
+            )
 
         # Detect lazy identical scores — all items get same dimension scores.
         # Always retry (up to attempt 3) regardless of whether fallback parsing was used,

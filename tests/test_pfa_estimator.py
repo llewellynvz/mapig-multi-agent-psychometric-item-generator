@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from backend.agents.pfa_estimator import (
+    _compute_identifiability,
     build_expected_pattern,
     compute_model_fit,
     compute_retention_flags,
@@ -124,6 +125,55 @@ def test_label_factors_via_daal_uses_facet_labels():
     # Factor 1 should be labeled "Anxiety"
     assert labels[0] == "Depression"
     assert labels[1] == "Anxiety"
+
+
+def test_compute_identifiability_saturated_with_3_items_1_factor():
+    """3 items / 1 factor: dof = (3*2/2) - (3*1 - 0) = 3 - 3 = 0 → saturated."""
+    assert _compute_identifiability(3, 1) == "saturated"
+
+
+def test_compute_identifiability_over_identified_with_5_items_1_factor():
+    """5 items / 1 factor: dof = 10 - 5 = 5 → over_identified."""
+    assert _compute_identifiability(5, 1) == "over_identified"
+
+
+def test_compute_identifiability_saturated_with_2_items():
+    """Tiny sets are saturated/under-identified."""
+    assert _compute_identifiability(2, 1) == "saturated"
+
+
+def test_compute_identifiability_over_identified_typical_case():
+    """10 items / 2 factors: dof = 45 - (20 - 1) = 26 → over_identified."""
+    assert _compute_identifiability(10, 2) == "over_identified"
+
+
+def test_run_pfa_marks_saturated_on_3_items(monkeypatch):
+    """End-to-end: PFAResult.model_identifiability should be 'saturated' with 3 items / 1 factor.
+
+    This is the user's reported case (Cognitive Flexibility, 3 final items, 1 factor)
+    where RMSR=0 was confusing.
+    """
+    facet_names = ["Single Factor"]
+    items = _make_items(["item one.", "item two.", "item three."], facet_names * 3)
+    fake_embeddings = np.array([
+        [1.0, 0.05, 0.0, 0.0],
+        [0.95, 0.06, 0.0, 0.0],
+        [0.92, 0.04, 0.0, 0.0],
+    ])
+
+    import backend.agents.pfa_estimator as pfa_mod
+    monkeypatch.setattr(pfa_mod, "embed_items_sync", lambda item_texts, model: fake_embeddings)
+
+    result = run_pfa(
+        items,
+        facet_mapping=_make_facet_mapping(facet_names),
+        n_factors=1,
+    )
+    assert result.model_identifiability == "saturated"
+    # Disclaimer should mention saturation
+    assert "saturated" in result.disclaimer.lower()
+    # Verdict cannot claim "good" when saturated (no diagnostic dof)
+    assert result.fit_verdict in {"acceptable", "poor"}
 
 
 def test_compute_model_fit_perfect_reproduction():

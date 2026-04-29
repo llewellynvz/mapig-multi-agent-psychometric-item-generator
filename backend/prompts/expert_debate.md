@@ -17,19 +17,23 @@ This is a single debate round — do not anticipate further rounds.
 
 ## Output Format
 
-Return JSON matching the `ExpertPanelOutput` schema. Include ALL items
-(unchanged ones too) so we have a complete revised view:
+Return JSON with `item_scores` as an **array** (NOT a dict). Include ALL items —
+both the ones you revised and the ones you kept the same — so we get a
+complete revised view:
 
 ```json
 {
   "expert_role": "<your same role>",
   "expert_label": "<your same label>",
-  "item_scores": {"0": 5, "1": 4, ...},
-  "item_comments": {"1": "Revised down: Domain expert's concern about construct slippage is salient."},
-  "overall_verdict": "accept" | "revise" | "reject_set",
+  "item_scores": [
+    {"item_index": 0, "score": 5, "comment": ""},
+    {"item_index": 1, "score": 4, "comment": "Revised down: Domain expert's concern about construct slippage is salient."}
+  ],
+  "overall_verdict": "revise",
   "overall_summary": "<one paragraph reflecting any updated view>"
 }
 ```
 
-Add `item_comments` only for items where your score CHANGED in this round
-(one short sentence each, ≤30 words). For items unchanged, omit from comments.
+- `comment` is required as a string. Use `""` when unchanged from round 1.
+- Only fill in `comment` (≤30 words) for items where your score CHANGED in this round.
+- `overall_verdict` must be one of: `"accept"`, `"revise"`, or `"reject_set"`.

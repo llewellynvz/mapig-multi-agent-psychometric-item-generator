@@ -239,7 +239,7 @@ export function GeneratedItemsTable({ items, fullOutput, onItemsChange }: Genera
             </InsetPanel>
           ))}
         </div>
-        <QualityChecksPanel items={displayItems} />
+        <QualityChecksPanel items={displayItems} audit={fullOutput?.audit} />
         {fullOutput?.audit?.validation_attempts && fullOutput.audit.validation_attempts > 0 && (
           <InsetPanel className="rounded-2xl p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

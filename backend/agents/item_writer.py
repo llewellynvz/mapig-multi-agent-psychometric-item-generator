@@ -16,6 +16,7 @@ def write_items(
     request: UserRequest,
     evidence: List[EvidenceChunk],
     facet_mapping: FacetMapperResponse | None = None,
+    overgenerate: bool = False,
 ) -> Tuple[ItemWriterResponse, TokenUsage]:
     """Generate initial draft items, optionally guided by facet mapping.
 
@@ -23,11 +24,24 @@ def write_items(
         request: User construct specification
         evidence: Retrieved evidence chunks
         facet_mapping: Optional facet structure from Facet Mapper agent
+        overgenerate: If True, multiply request.item_count by settings.PFA_OVERGENERATE_FACTOR
+            so the downstream PFA pruning step can trim weak items. Initial draft path
+            sets this True; regeneration path keeps the user's exact item_count.
 
     Returns:
         Tuple of (ItemWriterResponse, TokenUsage)
     """
     item_count = request.item_count
+    if overgenerate and settings.PFA_OVERGENERATE_FACTOR > 1.0:
+        inflated = int(round(item_count * settings.PFA_OVERGENERATE_FACTOR))
+        # Cap inflation at 50 (UserRequest.item_count Pydantic max) to keep payload sane
+        inflated = max(item_count, min(50, inflated))
+        if inflated != item_count:
+            logger.info(
+                "ITEM_WRITER over-generating items=%d (target=%d × factor=%.1f) for PFA pruning",
+                inflated, item_count, settings.PFA_OVERGENERATE_FACTOR,
+            )
+            item_count = inflated
     typed_count = sum(1 for e in evidence if e.evidence_type)
     dim_count = sum(1 for e in evidence if e.evidence_type == "dimensions")
     logger.info(

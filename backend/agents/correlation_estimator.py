@@ -19,10 +19,18 @@ from backend.settings import settings
 logger = logging.getLogger("lmaig")
 
 
-async def embed_items(items: List[str]) -> np.ndarray:
-    """Get embeddings for all items in a single API call."""
+async def embed_items(items: List[str], model: str = "text-embedding-3-small") -> np.ndarray:
+    """Get embeddings for all items in a single API call.
+
+    Args:
+        items: List of item texts to embed
+        model: OpenAI embedding model name. Defaults to "text-embedding-3-small"
+            for backward compatibility. PFA uses "text-embedding-3-large" via
+            settings.PFA_EMBEDDING_MODEL for higher congruence.
+    """
     logger.info(
-        "EMBED_ITEMS calling OpenAI embeddings api_key_set=%s base_url=%s",
+        "EMBED_ITEMS calling OpenAI embeddings model=%s api_key_set=%s base_url=%s",
+        model,
         bool(settings.OPENAI_API_KEY),
         settings.OPENAI_BASE_URL or "default",
     )
@@ -31,10 +39,28 @@ async def embed_items(items: List[str]) -> np.ndarray:
         base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
     )
     response = await client.embeddings.create(
-        model="text-embedding-3-small",
+        model=model,
         input=items,
     )
     # Sort by index to ensure order matches input
+    sorted_data = sorted(response.data, key=lambda x: x.index)
+    return np.array([e.embedding for e in sorted_data])
+
+
+def embed_items_sync(items: List[str], model: str = "text-embedding-3-small") -> np.ndarray:
+    """Synchronous version of embed_items for use in non-async paths.
+
+    Used by PFA estimator when called from sync graph nodes.
+    """
+    logger.info(
+        "EMBED_ITEMS_SYNC calling OpenAI embeddings model=%s items=%d",
+        model, len(items),
+    )
+    client = OpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
+    )
+    response = client.embeddings.create(model=model, input=items)
     sorted_data = sorted(response.data, key=lambda x: x.index)
     return np.array([e.embedding for e in sorted_data])
 

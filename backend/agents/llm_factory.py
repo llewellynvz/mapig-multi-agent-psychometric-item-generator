@@ -14,6 +14,11 @@ from backend.settings import settings
 AGENT_MODEL_OVERRIDES = {
     "bias_reviewer": ("openai", "gpt-5.4-mini"),  # Cost-effective for fairness detection
     "critic": ("openai", "gpt-5.4-mini"),  # Cost-effective, has rule fallback (90% zero-token)
+    # Phase 14-16: PFA + Expert Panel + Persona Validator
+    "persona_validator": ("openai", "gpt-5.4-mini"),  # Lightweight ambiguity detection
+    "expert_panel_psychometric": ("openai", "gpt-5.4-mini"),  # Cost-controlled face validity
+    "expert_panel_domain": ("openai", "gpt-5.4-mini"),  # Cost-controlled construct fidelity
+    "expert_panel_localization": ("openai", "gpt-5.4-mini"),  # Cost-controlled cultural fit
 }
 
 

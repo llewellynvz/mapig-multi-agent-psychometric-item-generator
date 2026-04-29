@@ -94,6 +94,28 @@ class Settings(BaseSettings):
     # Phase 10: GPT-5.2 analytics budget cap
     ANALYTICS_BUDGET_CAP: float = 2.00  # Maximum USD per analytics run (correlation + comparison + cross-construct)
 
+    # Phase 14: Pseudo-Factor Analysis (Varrasi et al., 2026)
+    PFA_ENABLED: bool = True
+    PFA_EMBEDDING_MODEL: str = "text-embedding-3-large"  # Higher quality for PFA (correlation_estimator keeps 3-small)
+    PFA_OVERGENERATE_FACTOR: float = 2.0  # Multiply requested item_count by this for initial pool, prune via PFA
+    PFA_TUCKERS_THRESHOLD_FAIR: float = 0.85
+    PFA_TUCKERS_THRESHOLD_EXCELLENT: float = 0.95
+    PFA_PRUNING_MAX_ITERS: int = 5
+    PFA_RMSR_GOOD: float = 0.05
+    PFA_RECOVERY_GOOD: float = 0.80
+    PFA_RECOVERY_ACCEPTABLE: float = 0.60
+
+    # Phase 15: Expert Panel
+    EXPERT_PANEL_ENABLED: bool = True
+    EXPERT_PANEL_DEBATE_ROUNDS: int = 1  # 0 disables debate; 1 = single revision round
+    EXPERT_PANEL_IRR_MIN: float = 0.6  # Below this, log warning + surface in UI
+    EXPERT_PANEL_DISSENT_SD: float = 1.0  # Item-level dissent flag threshold
+
+    # Phase 16: Persona Validator
+    PERSONA_VALIDATOR_ENABLED: bool = True
+    PERSONA_VALIDATOR_PERSONAS: int = 3  # Set 0 to disable
+    PERSONA_VALIDATOR_DISAGREEMENT_THRESHOLD: int = 2  # Likert points; SD ≥ this flags item
+
     def publisher_blocklist_domains(self) -> list[str]:
         """Return blocked publisher domains for copyright protection."""
         raw = (self.PUBLISHER_BLOCKLIST or "").strip()

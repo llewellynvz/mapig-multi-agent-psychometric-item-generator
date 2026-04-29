@@ -35,12 +35,15 @@ const NODE_DISPLAY_NAMES: Record<string, string> = {
   item_writer_node: "Drafting survey items",
   validation_node: "Validating item quality",
   regenerate_items_node: "Improving failed items",
-  reviewers_fanout_node: "Running expert review panel",
+  reviewers_fanout_node: "Running review panel",
   content_review_node: "Reviewing construct alignment",
   linguistic_review_node: "Reviewing language clarity",
   bias_review_node: "Reviewing bias and fairness",
   critic_node: "Evaluating review outcomes",
   meta_editor_node: "Applying reviewer feedback",
+  pfa_pruning_node: "Pruning items via PFA",
+  expert_panel_node: "Expert panel review",
+  expert_revision_node: "Applying expert revisions",
   finalize_node: "Finalizing results",
   correlation_node: "Estimating inter-item correlations",
   comparison_node: "Comparing with published instruments",
@@ -59,6 +62,7 @@ const LATER_ITER_NODES = [
   "bias_review_node", "critic_node", "meta_editor_node",
 ];
 const POST_ITER_NODES = [
+  "pfa_pruning_node", "expert_panel_node", "expert_revision_node",
   "finalize_node", "correlation_node", "comparison_node", "cross_construct_node",
 ];
 

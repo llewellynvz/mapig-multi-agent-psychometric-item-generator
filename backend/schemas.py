@@ -231,6 +231,10 @@ class DraftItem(BaseModel):
         default=None,
         description="Facet this item targets (from Facet Mapper agent).",
     )
+    polarity: Literal["+", "-"] = Field(
+        default="+",
+        description="Item polarity for sign-aware embeddings during PFA. '+' positively keyed, '-' reverse-keyed.",
+    )
     validation_result: Optional["ItemValidation"] = Field(
         default=None,
         description="Optional validation result if item has been validated.",
@@ -575,6 +579,177 @@ class FinalOutput(BaseModel):
         ge=0.0,
         le=1.0,
         description="Convergent validity score (0-1) from dual-direction LLM-as-judge comparison with convergent instrument (INST-04)"
+    )
+
+    # Phase 14: Pseudo-Factor Analysis (Varrasi et al., 2026)
+    pfa_result: Optional["PFAResult"] = Field(
+        default=None,
+        description="Pseudo-Factor Analysis on cosine-similarity of item embeddings: factor recovery, Tucker's congruence, DAAL labels, fit indices."
+    )
+
+    # Phase 15: Expert Panel face/content validity
+    expert_consensus: Optional["ExpertConsensus"] = Field(
+        default=None,
+        description="Multi-expert face/content validity panel: psychometric, domain, and localization expert evaluations with IRR and consensus revisions."
+    )
+
+    # Phase 16: Persona-based ambiguity detection
+    persona_validation: Optional["PersonaValidationResponse"] = Field(
+        default=None,
+        description="Persona-based conceptual alignment check: respondent persona ratings and inter-persona divergence flags."
+    )
+
+
+# --- Phase 14-16 Schemas: PFA, Expert Panel, Persona Validation ---
+
+
+class PersonaRating(BaseModel):
+    """A single rating from a respondent persona on one item."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    persona_label: str = Field(..., min_length=2, description="Persona descriptor (e.g., '32-year-old township nurse in Cape Town')")
+    item_index: int = Field(..., ge=0, description="0-based item index")
+    rating: conint(ge=1, le=5) = Field(..., description="1-5 Likert rating from this persona")
+    interpretation: str = Field(..., min_length=3, max_length=300, description="One-sentence interpretation in the persona's voice")
+
+
+class PersonaValidationResponse(BaseModel):
+    """Output of the lightweight persona validator (Keane & McNaughton 2026, Step 13)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    personas: List[str] = Field(default_factory=list, description="Generated persona descriptors used for rating")
+    ratings: List[PersonaRating] = Field(default_factory=list, description="All persona × item ratings")
+    flagged_items: List[int] = Field(
+        default_factory=list,
+        description="Indices of items where inter-persona disagreement is ≥ PERSONA_VALIDATOR_DISAGREEMENT_THRESHOLD Likert points",
+    )
+    interpretive_variance: float = Field(
+        default=0.0,
+        description="Mean across-persona standard deviation of ratings (higher = more interpretive ambiguity)",
+    )
+    summary: str = Field(default="", description="One-line human-readable summary")
+
+
+ExpertRole = Literal["psychometric", "domain", "localization", "custom"]
+
+
+class ExpertEvaluation(BaseModel):
+    """Single expert agent's per-item ratings + verdict."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expert_role: ExpertRole = Field(..., description="Role of this expert agent")
+    expert_label: str = Field(..., min_length=2, description="Display label (e.g., 'Psychometric Expert')")
+    item_scores: Dict[int, conint(ge=1, le=5)] = Field(
+        default_factory=dict,
+        description="Map of item_index → 1-5 quality score on this expert's rubric",
+    )
+    item_comments: Dict[int, str] = Field(
+        default_factory=dict,
+        description="Map of item_index → short comment (≤30 words) explaining a low score or specific concern",
+    )
+    overall_verdict: Literal["accept", "revise", "reject_set"] = Field(
+        ..., description="Aggregate verdict on the full item set"
+    )
+    overall_summary: str = Field(default="", max_length=500, description="One-paragraph rationale for the verdict")
+
+
+class ExpertConsensus(BaseModel):
+    """Aggregated expert panel output: round 1 + optional debate + IRR + consensus revisions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evaluations: List[ExpertEvaluation] = Field(default_factory=list, description="Round 1 expert evaluations")
+    debate_revisions: List[ExpertEvaluation] = Field(
+        default_factory=list,
+        description="Round 2 (debate) revised evaluations. Empty if debate disabled or no revisions.",
+    )
+    irr_alpha: Optional[float] = Field(
+        default=None,
+        description="Krippendorff's α across experts on item scores (ordinal). None if too few items/experts.",
+    )
+    irr_pairwise: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Map 'role_a|role_b' → Cohen's κ (ordinal weighted) for each expert pair",
+    )
+    consensus_revisions: RevisionPlan = Field(
+        default_factory=RevisionPlan,
+        description="RevisionPlan handed to meta-editor for one final pass",
+    )
+    dissent_flags: List[int] = Field(
+        default_factory=list,
+        description="Item indices where inter-expert SD ≥ 1.0",
+    )
+    irr_warning: Optional[str] = Field(
+        default=None,
+        description="Warning emitted when irr_alpha falls below EXPERT_PANEL_IRR_MIN",
+    )
+
+
+class FactorLoading(BaseModel):
+    """Factor loadings for a single item from PFA."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_index: int = Field(..., ge=0, description="0-based item index")
+    item_text: str = Field(..., description="The item text (for display)")
+    facet_name: Optional[str] = Field(default=None, description="Facet from facet_mapping (parent factor name)")
+    loadings: List[float] = Field(..., description="Loading on each factor, length = n_factors")
+    parent_factor: int = Field(..., ge=0, description="Expected factor index for this item (from facet_mapping)")
+    primary_loading: float = Field(..., description="Maximum |loading| across factors")
+    primary_factor: int = Field(..., ge=0, description="Index of factor with maximum |loading|")
+    is_well_loaded: bool = Field(
+        ...,
+        description="True iff all 4 retention rules pass (loads on parent, > others, > avg of others, > avg items on factor)",
+    )
+    retention_rule_violations: List[str] = Field(
+        default_factory=list,
+        description="Names of any retention rules this item failed",
+    )
+
+
+class PFAResult(BaseModel):
+    """Result of running Pseudo-Factor Analysis on item embeddings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    embedding_model: str = Field(..., description="Embedding model used (e.g., 'text-embedding-3-large')")
+    n_items: int = Field(..., ge=1, description="Number of items analyzed")
+    n_factors: int = Field(..., ge=1, description="Number of factors extracted")
+    factor_labels: List[str] = Field(default_factory=list, description="Factor labels via DAAL (Dominant Average Absolute Loading)")
+    loadings: List[FactorLoading] = Field(..., description="Per-item loadings + retention check")
+    tuckers_congruence: List[float] = Field(
+        default_factory=list,
+        description="Per-factor Tucker's congruence vs expected pattern. >0.85 fair, >0.95 excellent.",
+    )
+    factor_recovery_rate: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of expected factors recovered (loading > 0.4 majority)",
+    )
+    rmsr: float = Field(default=0.0, description="Root Mean Square Residual (lower is better; <0.05 good)")
+    caf: float = Field(default=0.0, description="Common Part Accounted For (higher is better; >0.7 good)")
+    eigenvalues: List[float] = Field(default_factory=list, description="Eigenvalues of the cosine-similarity matrix")
+    residual_correlation_matrix: List[List[float]] = Field(
+        default_factory=list,
+        description="Item × item residual correlation matrix (similarity − reproduced)",
+    )
+    items_dropped: List[int] = Field(
+        default_factory=list,
+        description="Original item indices dropped during pruning (empty for analytics-only PFA)",
+    )
+    fit_verdict: Literal["good", "acceptable", "poor"] = Field(
+        default="acceptable", description="Overall fit verdict"
+    )
+    disclaimer: str = Field(
+        default=(
+            "Pseudo-Factor Analysis on sentence-embedding cosine similarity (Varrasi et al., 2026). "
+            "Pre-calibration heuristic; not a substitute for empirical EFA on respondent data."
+        ),
+        description="Standard disclaimer for embedding-based factor analysis",
     )
 
 

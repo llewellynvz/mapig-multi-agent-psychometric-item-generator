@@ -94,3 +94,5 @@ test_pipeline.py
 article_*.pdf
 network_psychometrics_skill.md
 comparison_report.md
+*.pdf
+*.ipynb

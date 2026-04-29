@@ -511,6 +511,20 @@ class AuditMetadata(BaseModel):
     cache_read_tokens: Optional[int] = Field(default=None, description="Total cached input tokens (Anthropic + OpenAI)")
     cache_savings_usd: Optional[float] = Field(default=None, description="Estimated savings from prompt caching in USD")
 
+    # Phase 14-16 follow-up: surface quality-gate fallback + non-fatal warnings to UI
+    force_accepted_below_threshold: bool = Field(
+        default=False,
+        description="True when the validator force-accepted items below the 7.0 weighted_score threshold (top-N fallback fired). Surfaces in UI as a banner.",
+    )
+    forced_scores: List[float] = Field(
+        default_factory=list,
+        description="Weighted scores of items shipped via the quality-gate fallback (only populated when force_accepted_below_threshold is True).",
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Non-fatal warnings (e.g., construct name vs. definition mismatch) to surface to the user.",
+    )
+
 
 class FinalOutput(BaseModel):
     """Final items plus audit metadata.
@@ -743,6 +757,14 @@ class PFAResult(BaseModel):
     )
     fit_verdict: Literal["good", "acceptable", "poor"] = Field(
         default="acceptable", description="Overall fit verdict"
+    )
+    model_identifiability: Literal["saturated", "identified", "over_identified"] = Field(
+        default="over_identified",
+        description=(
+            "Degrees-of-freedom check on the EFA model. 'saturated' = 0 dof (n_items too small for meaningful fit "
+            "indices; RMSR=0 / CAF=1 trivially). 'identified' = exactly enough dof. 'over_identified' = positive dof "
+            "(typical case; fit indices informative)."
+        ),
     )
     disclaimer: str = Field(
         default=(

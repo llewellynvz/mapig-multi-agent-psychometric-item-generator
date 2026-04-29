@@ -46,6 +46,13 @@ ALLOWED_CHECKPOINT_TYPES: list[tuple[str, str]] = [
     ("backend.schemas", "AuditMetadata"),
     # Token tracking
     ("backend.agents.llm_utils", "TokenUsage"),
+    # Phase 14-16: PFA, Expert Panel, Persona Validator
+    ("backend.schemas", "FactorLoading"),
+    ("backend.schemas", "PFAResult"),
+    ("backend.schemas", "ExpertEvaluation"),
+    ("backend.schemas", "ExpertConsensus"),
+    ("backend.schemas", "PersonaRating"),
+    ("backend.schemas", "PersonaValidationResponse"),
 ]
 
 

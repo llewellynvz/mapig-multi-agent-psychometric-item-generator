@@ -127,6 +127,79 @@ export interface CrossConstructComparison {
   disclaimer: string;
 }
 
+// Phase 14-16: PFA, Expert Panel, Persona Validator types
+
+export interface FactorLoading {
+  item_index: number;
+  item_text: string;
+  facet_name?: string | null;
+  loadings: number[];
+  parent_factor: number;
+  primary_loading: number;
+  primary_factor: number;
+  is_well_loaded: boolean;
+  retention_rule_violations: string[];
+}
+
+export interface PFAResult {
+  embedding_model: string;
+  n_items: number;
+  n_factors: number;
+  factor_labels: string[];
+  loadings: FactorLoading[];
+  tuckers_congruence: number[];
+  factor_recovery_rate: number;
+  rmsr: number;
+  caf: number;
+  eigenvalues: number[];
+  residual_correlation_matrix: number[][];
+  items_dropped: number[];
+  fit_verdict: "good" | "acceptable" | "poor";
+  disclaimer: string;
+}
+
+export interface ExpertEvaluation {
+  expert_role: "psychometric" | "domain" | "localization" | "custom";
+  expert_label: string;
+  item_scores: Record<number, number>;
+  item_comments: Record<number, string>;
+  overall_verdict: "accept" | "revise" | "reject_set";
+  overall_summary: string;
+}
+
+export interface ExpertConsensus {
+  evaluations: ExpertEvaluation[];
+  debate_revisions: ExpertEvaluation[];
+  irr_alpha?: number | null;
+  irr_pairwise: Record<string, number>;
+  consensus_revisions: {
+    summary: string;
+    edits: Array<{
+      item_index: number;
+      reason: string;
+      before: string;
+      after: string;
+    }>;
+  };
+  dissent_flags: number[];
+  irr_warning?: string | null;
+}
+
+export interface PersonaRating {
+  persona_label: string;
+  item_index: number;
+  rating: number;
+  interpretation: string;
+}
+
+export interface PersonaValidationResponse {
+  personas: string[];
+  ratings: PersonaRating[];
+  flagged_items: number[];
+  interpretive_variance: number;
+  summary: string;
+}
+
 export interface FinalOutput {
   final_items: FinalItem[];
   audit: AuditMetadata;
@@ -143,6 +216,11 @@ export interface FinalOutput {
   cross_construct_analysis?: CrossConstructComparison;
   plagiarism_flags?: Record<number, string>;
   convergent_validity_score?: number;
+
+  // Phase 14-16: PFA, Expert Panel, Persona Validator
+  pfa_result?: PFAResult;
+  expert_consensus?: ExpertConsensus;
+  persona_validation?: PersonaValidationResponse;
 }
 
 export interface HealthResponse {

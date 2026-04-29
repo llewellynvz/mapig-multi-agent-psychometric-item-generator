@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
@@ -16,6 +16,8 @@ from backend.schemas import (
 from backend.settings import settings
 
 logger = logging.getLogger("lmaig.meta_editor")
+
+MetaEditorPhase = Literal["iterative", "expert_revision"]
 
 _RATIONALE_MAX = 350
 
@@ -58,13 +60,28 @@ def revise_items(
     bias_comments: List[ReviewComment],
     content_comments: List[ReviewComment],
     iteration: int,
+    phase: MetaEditorPhase = "iterative",
+    expert_consensus_revisions: Optional[RevisionPlan] = None,
 ) -> Tuple[MetaEditorResponse, TokenUsage]:
 
-    """Apply reviewer feedback and produce revised items + a revision plan."""
+    """Apply reviewer feedback and produce revised items + a revision plan.
+
+    Args:
+        request: User construct specification.
+        items: Current draft items.
+        linguistic_comments: Comments from linguistic reviewer.
+        bias_comments: Comments from bias reviewer.
+        content_comments: Comments from content reviewer.
+        iteration: 0-based iteration number.
+        phase: "iterative" (default — runs in critic loop) or "expert_revision"
+            (one-shot pass after expert panel; uses expert_consensus_revisions).
+        expert_consensus_revisions: Required when phase="expert_revision". Lists
+            items the expert panel flagged for refinement.
+    """
     total_comments = len(linguistic_comments) + len(bias_comments) + len(content_comments)
     logger.info(
-        "META_EDITOR start items=%d iteration=%d comments=%d",
-        len(items), iteration, total_comments,
+        "META_EDITOR start items=%d iteration=%d comments=%d phase=%s",
+        len(items), iteration, total_comments, phase,
     )
     if settings.APP_MODE == "mock":
 
@@ -107,16 +124,27 @@ def revise_items(
 
     system_prompt = load_prompt("meta_editor.md")
 
-    payload = {
+    payload: Dict[str, Any] = {
         "user_request": request.model_dump(),
         "items": [it.model_dump() for it in items],
         "linguistic_comments": [c.model_dump() for c in linguistic_comments],
         "bias_comments": [c.model_dump() for c in bias_comments],
         "content_comments": [c.model_dump() for c in content_comments],
+        "phase": phase,
     }
+    if phase == "expert_revision" and expert_consensus_revisions is not None:
+        payload["expert_consensus_revisions"] = expert_consensus_revisions.model_dump()
+        human_msg = (
+            "Apply the expert panel's consensus revisions in ONE pass. "
+            "Do not re-architect items. The critic loop will NOT re-run.\n\n"
+            f"INPUT:\n{payload}"
+        )
+    else:
+        human_msg = f"Revise the items using the reviewer feedback.\n\nINPUT:\n{payload}"
+
     messages = [
         ("system", system_prompt),
-        ("human", f"Revise the items using the reviewer feedback.\n\nINPUT:\n{payload}"),
+        ("human", human_msg),
     ]
 
     return invoke_structured_with_usage(

@@ -277,16 +277,21 @@ Three independent reviewers run **at the same time**, each looking at a differen
 
 - **Job**: Three "expert" agents evaluate **face / content validity** on the cleaned item set.
 - **The experts**:
-  - **Psychometric Expert** (`expert_psychometric.md`): face validity, parsimony, redundancy, response-set vulnerability, scaling appropriateness. References Kline (2015), DeVellis & Thorpe (2016), AERA/APA/NCME *Standards*.
+  - **Psychometric Expert** (`expert_psychometric.md`): scores face validity, parsimony, redundancy, response-set vulnerability, and scaling appropriateness. **Auto-loads scale-development rules** from `data/approved_sources/item_writing_guidelines.md` and `data/item_style_reference.md` and uses them as the authoritative rule book — drop more rule docs in those locations to extend its reference base. References Kline (2015), DeVellis & Thorpe (2016), AERA/APA/NCME *Standards*.
   - **Domain Expert** (`expert_domain.md`): construct fidelity, theoretical alignment, evidence anchoring (receives top 5 evidence chunks).
   - **Localization Expert** (`expert_localization.md`): cultural fit, idiom risk, reading level, inclusivity, translatability.
 - **Process**:
   1. Round 1: 3 parallel evaluations (1–5 score per item + comment for low scores).
   2. Round 2 (debate): each expert sees peers' anonymized scores and may revise items where they disagreed by ≥ 2 points. Capped at 1 round.
-  3. **Krippendorff's α** (overall ordinal agreement) + pairwise **Cohen's κ** are computed.
+  3. Inter-rater reliability is computed in a way that respects the fact that **the experts use different rubrics** (see "How to read IRR" below).
+- **How to read the IRR metrics**:
+  - The three experts are *designed to disagree* on absolute scores. The Psychometric Expert grades face validity; the Domain Expert grades construct fidelity; the Localization Expert grades cultural fit. An item can score 5/5 from one and 2/5 from another and *both be correct*. So we don't compute a single agreement number on raw scores — we compute three signals:
+  - **Verdict-level Krippendorff's α** (the headline metric): nominal α on whether each expert's bottom-line outcome is `accept` / `revise` / `reject_set`. This asks "do they agree on what to *do* with the items?" High here = the panel reaches consensus on the action even when rubrics differ. **This is the metric used to trigger warnings.**
+  - **Pairwise Spearman ρ**: rank correlation between expert pairs. Asks "do they agree on which items are the best vs. worst?" — robust to rubric scale differences.
+  - **Per-item Krippendorff's α** + **Cohen's κ** (legacy/informational): kept for backward compatibility, but low values are *expected* with differing rubrics and no longer flagged as quality issues.
 - **Graceful degradation**: If the Vercel budget is tight, the panel skips the debate round (< 15s remaining) or returns partial consensus from whatever round-1 evals completed (< 8s remaining) — never fails wholesale.
 - **Models**: GPT-5.4-mini for all three experts (cost-controlled).
-- **Output**: `ExpertConsensus` with per-expert evaluations, debate revisions, IRR metrics, dissent flags, and a `RevisionPlan` for the Meta Editor's final pass.
+- **Output**: `ExpertConsensus` with per-expert evaluations, debate revisions, all four IRR metrics, dissent flags (items with cross-rubric SD ≥ 1.0), and a `RevisionPlan` for the Meta Editor's final pass. The UI displays each expert's full per-item ratings + comments in expandable sections; the markdown export includes everything.
 
 ---
 
@@ -305,7 +310,13 @@ After the items are locked, four analytics agents run **in parallel** to estimat
 
 - **Job**: Reports the **post-prune factor structure** for the UI.
 - **How**: Same pipeline as PFA Pruning but on the *final* item set. Computes Tucker's congruence vs. expected facet pattern, factor recovery rate, RMSR + CAF model-free fit indices, eigenvalues, DAAL factor labels.
-- **Output**: `PFAResult` rendered in the UI as an SEM-style measurement-model diagram (latent factors as ellipses, items as rectangles, arrows labeled with loadings).
+- **UI display — a proper CFA path diagram, not just a heatmap**:
+  - **Latent factors** drawn as ellipses on the left, labelled `η` (eta) with the factor name and Tucker's congruence shown as `φ` (phi).
+  - **Item indicators** drawn as rectangles in the middle, labelled `x₁`, `x₂`, … `xₙ`.
+  - **Loading paths** drawn as arrows from each factor to each item, labelled with `λ = 0.73` (etc.). Strong primary loadings (≥ 0.30) are thick green; cross-loadings are thin grey.
+  - **Residual variance circles** drawn to the right of each item, labelled `ε₁`, `ε₂`, … with the item's uniqueness (1 − λ²) shown below.
+  - Below the diagram, a **measurement equations** block prints every item's standardized form: `x₁ = 0.732 · η + ε₁ (Var(ε) ≈ 0.464)`. This is the textbook CFA representation researchers expect to see in publications.
+- **Output**: `PFAResult` consumed by `PFAPanel.tsx` which renders the diagram, the equations, the fit-index summary cards, and the eigenvalue badges (Kaiser cutoff highlighted).
 
 #### 16. Instrument Searcher — `backend/agents/instrument_searcher.py`
 
@@ -366,13 +377,23 @@ EFA on the embedding-based correlation matrix using `factor-analyzer`:
 
 | Metric | What it tells you |
 |---|---|
-| **Tucker's congruence** | How well factors match the expected facet structure. > 0.85 fair, > 0.95 excellent (Lorenzo-Seva & ten Berge 2006). |
+| **Tucker's congruence** (`φ`) | How well factors match the expected facet structure. > 0.85 fair, > 0.95 excellent (Lorenzo-Seva & ten Berge 2006). |
 | **Factor recovery rate** | % of expected factors successfully recovered (≥ 50% of expected items load on the right factor at ≥ 0.30). |
 | **RMSR** (Root Mean Square Residual) | Lower is better. < 0.05 = good fit. |
 | **CAF** (Common-Part Accounted For) | Higher is better. > 0.70 = good. |
 | **Identifiability** | `over_identified` (typical) / `identified` / `saturated` (when n_items ≤ n_factors + 2; fit indices uninformative). |
 
-Displayed in the UI as a **measurement-model path diagram** (latent factors as ellipses on the left, items as rectangles on the right, loading-labelled arrows between them).
+**UI rendering: a CFA path diagram in the textbook style.** The PFA Panel shows your factor structure exactly the way you'd draw it on a whiteboard for a methods paper:
+
+- **`η`** (eta) ellipses for latent factors, labelled with the factor name + φ
+- **`xᵢ`** rectangles for item indicators
+- **`λ`** loading paths from η to each xᵢ (thick green for primary loadings ≥ 0.30; thin grey for cross-loadings)
+- **`εᵢ`** residual circles to the right of each item, with uniqueness `1 − λ²` shown
+- A **measurement equations** block underneath: one line per item in the form `x₁ = 0.73 · η + ε₁ (Var(ε) ≈ 0.47)`
+
+This makes the structural model interpretable at a glance — both for psychometricians (who get the standardized solution they expect) and for non-specialists (who can read what each item is "doing" in the model).
+
+The **factor sign indeterminacy** problem is handled automatically: after EFA converges, each factor column is reflected so that its dominant loading is positive (Mulaik 2010 / Lorenzo-Seva & ten Berge 2006 convention). This means loadings on `Wellbeing` items always come out positive when items measure wellbeing — no more confusing all-negative loadings just because `oblimin` picked the reflected solution.
 
 ### Convergent / discriminant / cross-construct validity
 

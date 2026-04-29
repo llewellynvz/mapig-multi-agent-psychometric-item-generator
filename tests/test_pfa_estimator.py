@@ -478,6 +478,44 @@ def test_prune_items_skips_when_below_target(monkeypatch):
     assert dropped == []
 
 
+def test_prune_items_returns_pfa_result_when_no_pruning_needed(monkeypatch):
+    """Regression: even when items ≤ target (no pruning to do), the function
+    must return a non-empty PFAResult so the UI can render the panel.
+
+    This was the user-reported bug where the PFA panel disappeared on a run
+    where items were already at target_count.
+    """
+    from backend.agents.pfa_pruning import prune_items
+    items = _make_items(
+        ["item alpha.", "item bravo.", "item charlie.", "item delta."],
+        ["FacetA"] * 4,
+    )
+    rng = np.random.default_rng(42)
+    text_to_emb_n = {
+        f"item {name}.": np.array([1.0, 0.0, 0.0, 0.0]) + rng.normal(0, 0.05, 4)
+        for name in ["alpha", "bravo", "charlie", "delta"]
+    }
+
+    def _embed_lookup_n(item_texts, model=None):
+        return np.array([text_to_emb_n[t] for t in item_texts])
+
+    import backend.agents.pfa_estimator as pfa_mod
+    monkeypatch.setattr(pfa_mod, "embed_items_sync", _embed_lookup_n)
+
+    kept, dropped, pfa_result = prune_items(
+        items,
+        facet_mapping=_make_facet_mapping(["FacetA"]),
+        target_count=10,  # already below target → no pruning happens
+        max_iters=2,
+    )
+    assert len(kept) == 4
+    assert dropped == []
+    assert pfa_result is not None
+    assert pfa_result.n_items == 4
+    # The PFA pass should produce loadings for the UI
+    assert len(pfa_result.loadings) == 4
+
+
 # ----- Live API replication test (gated) -----
 
 

@@ -13,7 +13,9 @@ import numpy as np
 import pytest
 
 from backend.agents.pfa_estimator import (
+    _align_factor_signs,
     _compute_identifiability,
+    _decide_verdict,
     build_expected_pattern,
     compute_model_fit,
     compute_retention_flags,
@@ -125,6 +127,120 @@ def test_label_factors_via_daal_uses_facet_labels():
     # Factor 1 should be labeled "Anxiety"
     assert labels[0] == "Depression"
     assert labels[1] == "Anxiety"
+
+
+# ----- Phase 14 follow-up: factor-sign indeterminacy fix -----
+
+
+def test_align_factor_signs_flips_negative_dominant():
+    """Reproduces the production bug: oblimin returned all-negative loadings.
+    After alignment, the dominant loading must be positive."""
+    loadings = np.array([
+        [-0.80, 0.10],
+        [-0.70, 0.05],
+        [-0.65, 0.00],
+    ])
+    aligned, flipped = _align_factor_signs(loadings)
+    assert flipped == [True, False]
+    np.testing.assert_array_almost_equal(aligned[:, 0], [0.80, 0.70, 0.65])
+    np.testing.assert_array_almost_equal(aligned[:, 1], [0.10, 0.05, 0.00])
+
+
+def test_align_factor_signs_preserves_positive_dominant():
+    """Already-positive loadings must not be touched."""
+    loadings = np.array([[0.80, 0.10], [0.70, 0.05]])
+    aligned, flipped = _align_factor_signs(loadings)
+    assert flipped == [False, False]
+    np.testing.assert_array_equal(aligned, loadings)
+
+
+def test_align_factor_signs_uses_largest_absolute_magnitude():
+    """When small positive and large negative are mixed, the largest absolute
+    value drives the decision (Mulaik 2010 convention)."""
+    loadings = np.array([
+        [0.05, 0.0],
+        [-0.95, 0.0],
+        [0.10, 0.0],
+    ])
+    aligned, flipped = _align_factor_signs(loadings)
+    # The -0.95 dominates → flip
+    assert flipped[0] is True
+    np.testing.assert_array_almost_equal(aligned[:, 0], [-0.05, 0.95, -0.10])
+
+
+def test_align_factor_signs_handles_empty_factor():
+    """Edge case: zero-length column (shouldn't happen but be defensive)."""
+    loadings = np.zeros((3, 0))
+    aligned, flipped = _align_factor_signs(loadings)
+    assert aligned.shape == (3, 0)
+    assert flipped == []
+
+
+def test_align_factor_signs_handles_all_zero_column():
+    """A factor with all-zero loadings (degenerate) should not flip."""
+    loadings = np.array([[0.0, 0.5], [0.0, 0.6]])
+    aligned, flipped = _align_factor_signs(loadings)
+    assert flipped == [False, False]
+
+
+def test_decide_verdict_uses_mean_abs_congruence():
+    """Verdict 'good' requires congruence ≥ 0.95 (or 0 sentinel)."""
+    # Good rmsr + good recovery + excellent congruence → good
+    assert _decide_verdict(0.04, 0.85, 0.96) == "good"
+    # Good rmsr + good recovery + poor congruence → not good
+    assert _decide_verdict(0.04, 0.85, 0.40) == "poor"
+    # Acceptable recovery + fair congruence → acceptable
+    assert _decide_verdict(0.10, 0.65, 0.86) == "acceptable"
+    # Sentinel: congruence=0 (e.g., couldn't compute) doesn't penalize
+    assert _decide_verdict(0.04, 0.85, 0.0) == "good"
+
+
+def test_run_pfa_aligns_negative_factor_to_positive(monkeypatch):
+    """End-to-end: synthesize embeddings that produce a negative-orientation
+    factor; assert the post-alignment loadings are positive AND Tucker's
+    congruence is positive.
+
+    Reproduces the user's production case (Emotional Wellbeing items showing
+    -0.73 / -0.66 / -0.63 / -0.73 / -0.69) and asserts the fix flips them.
+    """
+    facet_names = ["Wellbeing"]
+    items = _make_items(
+        ["item one wb.", "item two wb.", "item three wb.", "item four wb.", "item five wb."],
+        facet_names * 5,
+    )
+
+    # Synthesize embeddings whose first principal component points in a
+    # NEGATIVE direction. Without sign-alignment, oblimin will return
+    # negative loadings; with the fix, they should come back positive.
+    rng = np.random.default_rng(7)
+    base = np.array([-1.0, 0.0, 0.0, 0.0])  # negative principal axis
+    text_to_emb = {
+        item.item_text: base + rng.normal(0, 0.05, 4) for item in items
+    }
+
+    def _embed_lookup(item_texts, model=None):
+        return np.array([text_to_emb[t] for t in item_texts])
+
+    import backend.agents.pfa_estimator as pfa_mod
+    monkeypatch.setattr(pfa_mod, "embed_items_sync", _embed_lookup)
+
+    result = run_pfa(
+        items,
+        facet_mapping=_make_facet_mapping(facet_names),
+        n_factors=1,
+    )
+
+    # All loadings on the single factor should be positive (post-alignment).
+    for fl in result.loadings:
+        assert fl.loadings[0] > 0, (
+            f"Expected positive loading after sign alignment; got {fl.loadings[0]} "
+            f"for item {fl.item_index}"
+        )
+
+    # Tucker's congruence should be positive (and high) after alignment.
+    assert result.tuckers_congruence, "Expected Tucker's congruence values"
+    for c in result.tuckers_congruence:
+        assert c > 0, f"Tucker's congruence should be positive after alignment; got {c}"
 
 
 def test_compute_identifiability_saturated_with_3_items_1_factor():

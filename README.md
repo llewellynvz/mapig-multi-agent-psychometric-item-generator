@@ -6,7 +6,7 @@ MAPIG is a research-grade web app that helps researchers, psychometricians, and 
 
 > **Important caveat**: MAPIG generates *candidate* items and *estimated* psychometric properties. It supports expert judgment but does **not** replace empirical piloting, factor analysis on respondent data, or formal validation studies. Use it as the first 80% of scale development, and your respondent data as the final 20%.
 
-![MAPIG architecture](./public/mapig_arc.png)
+![MAPIG system architecture — frontend, API, LangGraph orchestration with 17 agents, external services and data stores](./public/mapig_arc.png)
 
 ## Video tutorial
 
@@ -59,7 +59,7 @@ The output: candidate items + a structural report (factor recovery, reliability,
 
 ## Pipeline at a glance
 
-![MAPIG Process Flow](./public/processflow.png)
+![MAPIG pipeline flow — six phases from user input through evidence, mapping, drafting, validation, decide-and-revise, to pre-calibration analytics](./public/processflow.svg)
 
 ```
                     ┌─ Retrieval Agent (local sources)

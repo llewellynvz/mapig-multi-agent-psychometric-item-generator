@@ -247,6 +247,13 @@ def validate_items(
                 default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
             )
             model_name = "claude-opus-4-6"
+            # Surface Sonnet → Opus transition explicitly in logs so we can
+            # measure how often the smart_validation tier escalates.
+            logger.info(
+                "VALIDATOR_MODEL_ESCALATION attempt=%d from=claude-sonnet-4-5 "
+                "to=claude-opus-4-6 reason=retry_after_failure",
+                attempt,
+            )
         elif _use_smart_validation():
             # Smart validation: Sonnet for first attempt
             model = get_claude_chat_model(model="claude-sonnet-4-5")
@@ -257,8 +264,8 @@ def validate_items(
             model_name = "claude-opus-4-6"
 
         logger.info(
-            "VALIDATOR model_selected=%s attempt=%d smart_validation=%s",
-            model_name, attempt, _use_smart_validation(),
+            "VALIDATOR model_selected=%s attempt=%d smart_validation=%s items=%d",
+            model_name, attempt, _use_smart_validation(), len(items),
         )
 
         # Build messages — cache system prompt on retries (billing savings only).
@@ -391,6 +398,31 @@ def validate_items(
                 )
 
         accepted_count = sum(1 for v in result.validations if v.accept)
+
+        # Per-failed-item detail log — surfaces WHICH dimensions failed and by
+        # how much. Critical for diagnosing why validation retries fire.
+        for v in result.validations:
+            if not v.accept:
+                dim_scores = {ds.dimension: ds.score for ds in v.dimension_scores}
+                # Identify the dimension(s) most below the implicit "good" threshold
+                # of 7.0 — these are the items dragging the weighted score down.
+                low_dims = [
+                    f"{name}={score:.1f}"
+                    for name, score in dim_scores.items()
+                    if score < 7.0
+                ]
+                logger.info(
+                    "VALIDATOR_FAIL_DETAIL item_idx=%d attempt=%d weighted=%.2f "
+                    "correspondence=%.1f distinctiveness=%.1f clarity=%.1f specificity=%.1f "
+                    "low_dims=[%s]",
+                    v.item_index, attempt, v.weighted_score,
+                    dim_scores.get("correspondence", 0.0),
+                    dim_scores.get("distinctiveness", 0.0),
+                    dim_scores.get("clarity", 0.0),
+                    dim_scores.get("specificity", 0.0),
+                    ",".join(low_dims),
+                )
+
         logger.info(
             f"Validated {len(items)} items with {model_name} on attempt {attempt}. "
             f"Accepted: {accepted_count}/{len(items)}. "

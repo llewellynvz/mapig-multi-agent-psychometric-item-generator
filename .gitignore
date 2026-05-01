@@ -90,6 +90,7 @@ run_dev.sh
 
 # local dev / evaluation files
 EVAL_PROMPT.md
+IMPLEMENTATION_PLAN_*.md
 nul
 payload.json
 test_payload.json

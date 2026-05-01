@@ -102,3 +102,8 @@ network_psychometrics_skill.md
 comparison_report.md
 *.pdf
 *.ipynb
+/.planning
+
+# test code (local only, not published)
+/tests/
+/tests-e2e/

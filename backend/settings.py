@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     # Retrieval allowlist
     APPROVED_SOURCES_DIR: str = "data/approved_sources"
 
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    def cors_origins(self) -> list[str]:
+        """Return browser origins allowed to call the API cross-origin."""
+        raw = (self.CORS_ORIGINS or "").strip()
+        if not raw:
+            return []
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
     # Phase 9: Instrument comparison and plagiarism detection
     PUBLISHER_BLOCKLIST: str = "pearson.com,parinc.com,mhs.com,wpspublish.com,hogrefe.com,proedinc.com,mindgarden.com"
     PLAGIARISM_SIMILARITY_THRESHOLD: float = 0.75

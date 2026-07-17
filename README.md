@@ -226,6 +226,8 @@ EFA on the embedding-based correlation matrix using `factor-analyzer`:
 | **CAF** (Common-Part Accounted For) | Higher is better. > 0.70 = good. |
 | **Identifiability** | `over_identified` (typical) / `identified` / `saturated` (when n_items ≤ n_factors + 2; fit indices uninformative). |
 
+When the factor model cannot be fit (an embedding failure, or fewer than three items), these indices report **not estimable** rather than zeros, and the panel says so instead of showing a hollow "poor" verdict.
+
 **UI rendering: a CFA path diagram in the textbook style.** The PFA Panel shows your factor structure exactly the way you'd draw it on a whiteboard for a methods paper:
 
 - **`η`** (eta) ellipses for latent factors, labelled with the factor name + φ
@@ -248,6 +250,22 @@ The **factor sign indeterminacy** problem is handled automatically: after EFA co
 
 Sentence-transformer-based check against known item texts in `data/known_instrument_items/`. Items > 0.85 similar to a published item are flagged.
 
+### Statistical integrity: honest numbers or none
+
+Pre-calibration statistics are only worth reporting if you can trust exactly what they are, so MAPIG holds a strict line:
+
+- **Every number carries its method.** Inline badges mark whether a value came from semantic similarity, a pre-data estimate, an LLM judge, or a synthetic pilot. Pseudo-alpha (semantic) is never dressed up as respondent reliability, and the loading-based pseudo-omega is reported separately from the PFA solution.
+- **"Not estimable" beats a plausible fake.** When a statistic cannot be computed (too few items, a degenerate matrix, an embedding failure), MAPIG reports it as not estimable instead of substituting a default like 0.5. Failed validity scoring, undefined agreement statistics, and an unfittable factor model all say so plainly.
+- **A failed analytic degrades to an empty panel, never a wrong one.** If one lane cannot run, its panel shows an honest empty state and the rest of the run finishes. You never see a fabricated correlation because one embedding call timed out.
+- **No confidence intervals without a sample.** Interval estimates appear only where a real N exists (the synthetic pilot), never bolted onto a pre-data semantic estimate.
+
+### Hardening for shared use
+
+- **Optional API-key gate** on the generation endpoints, a no-op when unset, for cost-abuse protection.
+- **Concurrency cap** that returns `429` when every slot is busy, so a burst of runs cannot exhaust the serverless budget.
+- **A wall-clock ceiling on evidence retrieval**, so a slow academic search cannot starve item generation downstream.
+- **Honest cost accounting**: per-model token counts and USD costs land in the audit trail from a single static rate table.
+
 ---
 
 ## LLM allocation & cost
@@ -266,7 +284,7 @@ MAPIG is deliberately stingy with expensive models. Cheap models do the volume w
 | Meta Editor | Claude Sonnet 4.5 | Same | Surgical editing demands precision. |
 | Persona Validator | **GPT-5.4-mini** | Same | Multiple persona calls; cost-controlled. |
 | Expert Panel (× 3) | **GPT-5.4-mini** | Same | 3 + 3 = up to 6 calls; cost-controlled. |
-| Correlation Estimator | OpenAI embeddings (`text-embedding-3-small`) | Same | Embeddings, not chat. |
+| Correlation Estimator | OpenAI embeddings (`text-embedding-3-large`) | Same | Unified with PFA so adjacent statistics share one embedding space. |
 | PFA Estimator | OpenAI embeddings (`text-embedding-3-large`) | Same | Higher-quality embeddings for factor analysis. |
 | Instrument Searcher | Perplexity `sonar-pro` (academic mode) | Same | Built for citations. |
 | Validity Scorer | GPT-5.2 (high reasoning) | Same | Dual-direction LLM-as-judge benefits from strong reasoning. |

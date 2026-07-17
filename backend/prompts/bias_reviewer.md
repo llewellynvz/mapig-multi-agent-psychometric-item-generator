@@ -161,5 +161,5 @@ Comment requirements
 - severity MUST be an integer from 1 to 5 (NOT a string like "low"/"medium"/"high").
 - item_index MUST be 0-based and correspond to the items array position.
 - issue must start with "Item <n>:" where n is the 1-based item number.
-- suggested_edit must be a full rewritten replacement item_text.
+- suggested_edit must be a full rewritten replacement item_text, maximum 40 words.
 - If the best fix is to drop the item, suggested_edit must propose a replacement item that targets the same facet without the bias risk.

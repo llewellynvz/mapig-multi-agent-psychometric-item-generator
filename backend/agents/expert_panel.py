@@ -75,7 +75,7 @@ class _ExpertPanelOutput(BaseModel):
     expert_label: str = Field(..., min_length=2)
     item_scores: List[_ExpertItemScore]
     overall_verdict: str = Field(..., min_length=2)
-    overall_summary: str = Field(..., max_length=600)
+    overall_summary: str = Field(..., max_length=500)
 
 
 def _to_evaluation(out: _ExpertPanelOutput) -> ExpertEvaluation:
@@ -99,7 +99,7 @@ def _to_evaluation(out: _ExpertPanelOutput) -> ExpertEvaluation:
         item_scores=scores,
         item_comments=comments,
         overall_verdict=verdict,  # type: ignore[arg-type]
-        overall_summary=out.overall_summary or "",
+        overall_summary=(out.overall_summary or "")[:500],
     )
 
 

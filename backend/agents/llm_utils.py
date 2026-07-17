@@ -82,6 +82,19 @@ def _extract_token_usage(response_message, model_name: str = "") -> TokenUsage:
     return usage
 
 
+def truncate_review_comment_fields(data: dict) -> dict:
+    """pre_validate hook for reviewer responses: clamp per-comment field
+    lengths to the ReviewComment schema caps so an over-long LLM suggestion
+    degrades to truncation instead of a validation failure."""
+    for comment in data.get("comments", []) or []:
+        if isinstance(comment, dict):
+            if isinstance(comment.get("issue"), str):
+                comment["issue"] = comment["issue"][:210]
+            if isinstance(comment.get("suggested_edit"), str):
+                comment["suggested_edit"] = comment["suggested_edit"][:300]
+    return data
+
+
 def invoke_structured(
     schema: Type[SchemaT],
     messages: List[Message],

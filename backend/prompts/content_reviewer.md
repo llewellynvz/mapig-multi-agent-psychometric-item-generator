@@ -141,7 +141,7 @@ Rules
 - issue must start with "Item N:" where N = item_index + 1.
 - **CRITICAL: Be concise. Maximum 30 words per comment issue field.**
 - Always include c_mean and d_mean in the issue text.
-- suggested_edit must be a full replacement item_text when severity >= 2.
+- suggested_edit must be a full replacement item_text when severity >= 2, maximum 40 words.
 - If severity = 1, suggested_edit may repeat the original item_text unchanged.
 - If no issues for any items, return {"comments": []}.
 - Do not invent evidence citations. Do not add citations in this response.

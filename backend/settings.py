@@ -34,7 +34,6 @@ class Settings(BaseSettings):
     # Hybrid model strategy (cost optimization)
     # Some agents can use cheaper OpenAI models instead of Claude
     AGENT_MODEL_OVERRIDES_ENABLED: bool = True  # Enable per-agent model selection
-    OPENAI_CHEAP_MODEL: str = "gpt-5.4-mini"  # Latest mini model for peripheral agents (replaces gpt-4o-mini)
 
     # Smart validation (cost optimization)
     # Use Sonnet for first validation attempt, only Opus if items fail
@@ -74,12 +73,9 @@ class Settings(BaseSettings):
     EVIDENCE_MIN_CHUNKS: int = 20
     EVIDENCE_MAX_RETRIES: int = 3
 
-    # Orchestrator tuning
-    ITEM_COUNT: int = 10
-    # Max 2 iterations: fits within Vercel 300s budget. Stagnation detection
-    # typically triggers by iteration 2 anyway. Raise to 3 for local dev only.
+    # Orchestrator tuning. Stagnation detection typically triggers by
+    # iteration 2; 3 iterations fits the Vercel 300s budget.
     MAX_ITERATIONS: int = 3
-    CRITIC_MAX_SEVERITY_TO_ACCEPT: int = Field(default=2, ge=1, le=5)
 
     # Persistence (LangGraph checkpointer)
     CHECKPOINT_DB_PATH: str = ".checkpoints.sqlite"
@@ -105,7 +101,11 @@ class Settings(BaseSettings):
 
     # Phase 14: Pseudo-Factor Analysis (Varrasi et al., 2026)
     PFA_ENABLED: bool = True
-    PFA_EMBEDDING_MODEL: str = "text-embedding-3-large"  # Higher quality for PFA (correlation_estimator keeps 3-small)
+    # Single embedding model for ALL similarity surfaces (correlation panel,
+    # diversity check, convergent validity, PFA) so adjacent statistics are
+    # computed in the same embedding space.
+    EMBEDDING_MODEL: str = "text-embedding-3-large"
+    PFA_EMBEDDING_MODEL: str = "text-embedding-3-large"
     # Multiply requested item_count by this for initial pool. Lowered from 2.0 to 1.3
     # so validation+regen passes don't blow the 300s Vercel budget.
     PFA_OVERGENERATE_FACTOR: float = 1.3
@@ -158,7 +158,6 @@ class Settings(BaseSettings):
         'OPENAI_MODEL',
         'CHATGPT_CRITIC_MODEL',
         'OPENAI_BASE_URL',
-        'OPENAI_CHEAP_MODEL',
         'AZURE_OPENAI_ENDPOINT',
         'AZURE_OPENAI_API_KEY',
         'AZURE_OPENAI_DEPLOYMENT',

@@ -274,6 +274,7 @@ def decide(
     model_provider: str = "claude",
     use_chatgpt_critics: bool = False,
     iteration_history: Optional[List[IterationSnapshot]] = None,
+    cultural_group: Optional[str] = None,
 ) -> Tuple[Decision, str]:
     """
     LLM-based critic with adaptive thresholds and rule-based optimization.
@@ -378,6 +379,7 @@ def decide(
         "bias_blocker": thresholds['bias_blocker'],
         "content_blocker": thresholds['content_blocker'],
         "threshold_mode": thresholds['mode'],
+        "cultural_group": cultural_group,
         "linguistic_comments": [c.model_dump() for c in linguistic_comments],
         "bias_comments": [c.model_dump() for c in bias_comments],
         "content_comments": [c.model_dump() for c in content_comments],

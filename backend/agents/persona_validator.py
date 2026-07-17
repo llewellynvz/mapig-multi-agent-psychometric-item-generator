@@ -6,7 +6,7 @@ the same wording very differently — a different failure mode than bias or
 linguistic clarity reviews.
 
 Pipeline position: inside `validation_node`, parallel to LLM-as-judge validator.
-Lightweight — uses gpt-5.4-mini (settings.OPENAI_CHEAP_MODEL).
+Lightweight — uses gpt-5.4-mini via the per-agent model override.
 """
 
 from __future__ import annotations

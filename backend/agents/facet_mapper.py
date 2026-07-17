@@ -74,7 +74,7 @@ def map_facets(
         FacetMapperResponse,
         messages,
         agent_name="facet_mapper",
-        model_provider="claude",
+        model_provider=request.model_provider,
     )
 
     # Post-validation: ensure item counts sum to requested total

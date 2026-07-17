@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List, Tuple
 
-from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
+from backend.agents.llm_utils import invoke_structured_with_usage, truncate_review_comment_fields, TokenUsage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import AbbreviatedRequest, DraftItem, LinguisticReviewResponse, ReviewComment
 from backend.settings import settings
@@ -51,6 +51,7 @@ def review_linguistic(
         agent_name="linguistic_reviewer",
         model_provider=request.model_provider,
         use_chatgpt_critics=request.use_chatgpt_critics,
+        pre_validate=truncate_review_comment_fields,
     )
 
     # Safety: enforce comment type at runtime.

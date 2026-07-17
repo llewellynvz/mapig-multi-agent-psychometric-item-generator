@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, conint
+from pydantic import BaseModel, ConfigDict, Field, conint, field_validator
 
 
 class LogEvent(BaseModel):
@@ -205,6 +205,17 @@ class EvidenceChunk(BaseModel):
         description="Subcomponents or dimensions from theoretical framework (e.g., ['emotional', 'psychological', 'social'])"
     )
 
+    @field_validator("title", "snippet", "quote", mode="before")
+    @classmethod
+    def _sanitize_external_text(cls, v):
+        # Evidence text comes from external sources (web search, local files)
+        # and is interpolated into agent prompts — strip injection patterns
+        # at ingestion so every creation site is covered.
+        if isinstance(v, str):
+            from backend.agents.sanitizer import sanitize_string
+            return sanitize_string(v, "evidence_text")
+        return v
+
 
 class DraftItem(BaseModel):
     """A single candidate item."""
@@ -295,8 +306,8 @@ class ReviewComment(BaseModel):
     )
     suggested_edit: Optional[str] = Field(
         default=None,
-        max_length=175,  # ~25 words for concise suggestions
-        description="Proposed fix in plain text. Maximum 25 words. None for global/facet-level comments.",
+        max_length=300,  # room for a full replacement item (~40 words)
+        description="Proposed replacement text, max 40 words. None for global/facet-level comments.",
     )
 
 
@@ -386,7 +397,7 @@ class CorrelationCell(BaseModel):
 
     item_i_index: int = Field(..., ge=0, description="Index of first item (0-based)")
     item_j_index: int = Field(..., ge=0, description="Index of second item (0-based)")
-    correlation: float = Field(..., ge=-1.0, le=1.0, description="Estimated correlation coefficient")
+    correlation: float = Field(..., ge=-1.0, le=1.0, description="Embedding cosine similarity treated as a pseudo inter-item correlation (pre-data estimate)")
     ci_low: Optional[float] = Field(default=None, ge=-1.0, le=1.0, description="Lower bound of 95% confidence interval")
     ci_high: Optional[float] = Field(default=None, ge=-1.0, le=1.0, description="Upper bound of 95% confidence interval")
 
@@ -417,6 +428,7 @@ class CorrelationMatrix(BaseModel):
     guidance: Optional[str] = Field(default=None, description="Actionable guidance based on internal_consistency_flag")
     redundancy_flags: Optional[List[str]] = Field(default=None, description="Warnings for item pairs with cosine similarity > 0.75, suggesting redundancy")
     disclaimer: str = Field(default="Similarities computed via sentence-embedding cosine similarity, treated as pseudo-correlations (Hommel & Arslan, 2024). Pre-data estimates; not a substitute for empirical validation.", description="Standard disclaimer for embedding-based estimates")
+    embedding_model: Optional[str] = Field(default=None, description="Embedding model that produced the similarity matrix (auditability)")
 
 
 class ComparisonInstrument(BaseModel):
@@ -436,7 +448,20 @@ class ComparisonInstrument(BaseModel):
     psychometric_properties: Optional[str] = Field(default=None, description="Reported reliability/validity summary")
     similarity_rationale: Optional[str] = Field(default=None, description="Why this instrument is relevant for comparison")
     items: Optional[List[str]] = Field(default=None, description="Actual item texts from the published instrument (for embedding-based validity)")
-    validity_method: Optional[str] = Field(default=None, description="Method used for validity scoring: 'embedding' or 'llm-as-judge'")
+    validity_method: Optional[str] = Field(default=None, description="Method used for validity scoring: 'embedding', 'llm-as-judge', 'disabled', or 'failed'")
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _sanitize_fetched_items(cls, v):
+        # Published item texts are fetched from the web and later embedded in
+        # prompts — strip injection patterns at ingestion.
+        if isinstance(v, list):
+            from backend.agents.sanitizer import sanitize_string
+            return [
+                sanitize_string(item, "instrument_item") if isinstance(item, str) else item
+                for item in v
+            ]
+        return v
 
 
 class ConstructPairAnalysis(BaseModel):
@@ -795,7 +820,12 @@ class PFAResult(BaseModel):
     loadings: List[FactorLoading] = Field(..., description="Per-item loadings + retention check")
     tuckers_congruence: List[float] = Field(
         default_factory=list,
-        description="Per-factor Tucker's congruence vs expected pattern. >0.85 fair, >0.95 excellent.",
+        description=(
+            "Per-factor Tucker congruence computed against a one-hot target built from the LLM facet "
+            "assignments — measures how concentrated loadings are on the expected facet, not cross-solution "
+            "factor similarity. The 0.85/0.95 bands are applied heuristically (they were calibrated for "
+            "loading-vs-loading comparisons; Lorenzo-Seva & ten Berge, 2006)."
+        ),
     )
     factor_recovery_rate: float = Field(
         default=0.0,
@@ -805,7 +835,14 @@ class PFAResult(BaseModel):
     )
     rmsr: float = Field(default=0.0, description="Root Mean Square Residual (lower is better; <0.05 good)")
     caf: float = Field(default=0.0, description="Common Part Accounted For (higher is better; >0.7 good)")
-    eigenvalues: List[float] = Field(default_factory=list, description="Eigenvalues of the cosine-similarity matrix")
+    eigenvalues: List[float] = Field(
+        default_factory=list,
+        description=(
+            "Eigenvalues of the cosine-similarity matrix (original correlation-matrix eigenvalues on the "
+            "factor-analyzer path; signed eigendecomposition values on the PCA fallback — negatives signal "
+            "a non-positive-definite matrix)."
+        ),
+    )
     residual_correlation_matrix: List[List[float]] = Field(
         default_factory=list,
         description="Item × item residual correlation matrix (similarity − reproduced)",

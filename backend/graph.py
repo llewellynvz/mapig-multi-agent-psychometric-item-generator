@@ -6,7 +6,7 @@ import concurrent.futures
 import datetime as _dt
 import time as _time
 import uuid
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from typing_extensions import TypedDict
 
@@ -362,8 +362,8 @@ def retrieve_node(state: GraphState) -> GraphState:
 def _check_item_diversity(items: List[DraftItem]) -> None:
     """Log a warning if generated items are too semantically similar.
 
-    Uses OpenAI text-embedding-3-small (already available) to compute
-    pairwise cosine similarity.  Non-blocking — warning only.
+    Uses the shared settings.EMBEDDING_MODEL to compute pairwise cosine
+    similarity.  Non-blocking — warning only.
     """
     if len(items) < 3:
         return
@@ -375,7 +375,7 @@ def _check_item_diversity(items: List[DraftItem]) -> None:
             base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
         )
         texts = [it.item_text for it in items]
-        resp = client.embeddings.create(input=texts, model="text-embedding-3-small")
+        resp = client.embeddings.create(input=texts, model=settings.EMBEDDING_MODEL)
         vecs = np.array([d.embedding for d in resp.data])
         norms = np.linalg.norm(vecs, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1, norms)
@@ -812,6 +812,7 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "pfa_p
         model_provider=model_provider,
         use_chatgpt_critics=use_chatgpt_critics,
         iteration_history=state.get("iteration_history", []),
+        cultural_group=user_request.cultural_group if user_request else None,
     )
 
     rem_sec = _remaining_seconds(state)
@@ -829,9 +830,18 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "pfa_p
             goto="meta_editor_node",
         )
 
-    # accept / stop_max_iterations / needs_human → proceed to PFA pruning then expert panel
+    # accept / stop_max_iterations / needs_human → proceed to PFA pruning then
+    # expert panel. A durable human-in-the-loop interrupt needs persistent
+    # checkpointing (deferred), so needs_human is surfaced as an audit warning
+    # instead of being silently treated as accept.
+    update: Dict[str, Any] = {"stop_reason": reason}
+    if decision == "needs_human":
+        existing_warnings = list(state.get("audit_warnings", []))
+        existing_warnings.append(f"Critic flagged this item set for human review: {reason}")
+        update["audit_warnings"] = existing_warnings
+        logger.warning("CRITIC_NEEDS_HUMAN surfaced as audit warning: %s", reason)
     return Command(
-        update={"stop_reason": reason},
+        update=update,
         goto="pfa_pruning_node",
     )
 
@@ -1367,12 +1377,14 @@ async def correlation_node(state: GraphState) -> GraphState:
 
             # Build CorrelationMatrix — a failed calculation stays None so the
             # UI can say "not estimable" instead of showing a fabricated 0.000
+            from backend.agents.correlation_estimator import EMBEDDING_MODEL as _corr_embedding_model
             correlation_matrix = CorrelationMatrix(
                 cells=cells,
                 pseudo_alpha=pseudo_alpha,
                 mean_inter_item_correlation=alpha_result["mean_inter_item_correlation"],
                 internal_consistency_flag=internal_consistency_flag,
                 guidance=alpha_result.get("guidance"),
+                embedding_model=_corr_embedding_model,
             )
 
             # Update FinalOutput with correlation_matrix
@@ -1817,20 +1829,13 @@ def build_graph(checkpointer=None):
     builder.add_node("item_writer_node", item_writer_node)
     builder.add_node("validation_node", validation_node)
     builder.add_node("regenerate_items_node", regenerate_items_node)
-    # Keep individual reviewer nodes for backward compatibility if needed
-    builder.add_node("content_review_node", content_review_node)
-    builder.add_node("linguistic_review_node", linguistic_review_node)
-    builder.add_node("bias_review_node", bias_review_node)
-    # New parallel reviewers node
+    # Reviewers run in parallel inside reviewers_fanout_node; the analytics
+    # functions (correlation/comparison/cross-construct) are called directly
+    # by analytics_dispatch_node — neither group is registered as graph nodes.
     builder.add_node("reviewers_fanout_node", reviewers_fanout_node)
     builder.add_node("critic_node", critic_node)
     builder.add_node("meta_editor_node", meta_editor_node)
     builder.add_node("finalize_node", finalize_node)
-    # Phase 7: Analytics placeholder nodes
-    builder.add_node("correlation_node", correlation_node)
-    builder.add_node("comparison_node", comparison_node)
-    builder.add_node("cross_construct_node", cross_construct_node)
-    # Phase 10: Analytics dispatch node (parallel via asyncio.gather)
     builder.add_node("analytics_dispatch_node", analytics_dispatch_node)
 
     builder.add_node("facet_mapper_node", facet_mapper_node)

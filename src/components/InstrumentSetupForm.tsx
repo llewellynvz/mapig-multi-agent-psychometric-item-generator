@@ -397,6 +397,31 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-1">
+                  <Label htmlFor="include_qualitative" className="cursor-pointer">Qualitative questions</Label>
+                  <p className="text-xs text-muted-foreground mr-6">
+                    {form.watch("include_qualitative") ? (
+                      <>
+                        <span className="font-medium text-white">Included</span> — Also generates open-ended interview probes for construct pre-testing.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-white">Off</span> — Quantitative items only.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Switch
+                  id="include_qualitative"
+                  checked={form.watch("include_qualitative")}
+                  onCheckedChange={(checked) => form.setValue("include_qualitative", checked)}
+                  className="data-[state=checked]:bg-[#008da1] data-[state=unchecked]:bg-[#b1dd0c]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
                   <Label htmlFor="use_chatgpt_critics" className="cursor-pointer">Critic Model</Label>
                   <p className="text-xs text-muted-foreground mr-6">
                     {form.watch("use_chatgpt_critics") ? (

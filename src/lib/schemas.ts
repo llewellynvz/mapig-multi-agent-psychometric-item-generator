@@ -8,6 +8,7 @@ export const instrumentSetupSchema = z.object({
   use_chatgpt_critics: z.boolean().default(true),
   use_gpt52_analytics: z.boolean().default(false),
   is_unidimensional: z.boolean().default(true),
+  include_qualitative: z.boolean().default(false),
   construct_name: z
     .string()
     .min(2, "Construct name must be at least 2 characters"),
@@ -89,6 +90,7 @@ export const defaultInstrumentSetup: InstrumentSetupFormValues = {
   use_chatgpt_critics: true,
   use_gpt52_analytics: false,
   is_unidimensional: true,
+  include_qualitative: false,
   construct_name: "",
   construct_definition: "",
   target_population: "",

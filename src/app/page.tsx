@@ -11,6 +11,7 @@ import { GeneratedItemsTable } from "@/components/GeneratedItemsTable";
 import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
 import { PFAPanel } from "@/components/PFAPanel";
 import { SyntheticPilotPanel } from "@/components/SyntheticPilotPanel";
+import { QualitativeQuestionsPanel } from "@/components/QualitativeQuestionsPanel";
 import { ExpertPanelCard } from "@/components/ExpertPanelCard";
 import { PersonaValidationCard } from "@/components/PersonaValidationCard";
 import { InstrumentSetupForm } from "@/components/InstrumentSetupForm";
@@ -624,6 +625,11 @@ export default function HomePage() {
                       <p className="text-sm text-muted-foreground">No generated items yet.</p>
                     </CardContent>
                   </SurfaceCard>
+                )}
+
+                {/* Qualitative interview probes (opt-in) */}
+                {result && result.qualitative_questions && result.qualitative_questions.length > 0 && (
+                  <QualitativeQuestionsPanel questions={result.qualitative_questions} />
                 )}
 
                 {/* Correlation Analysis — directly under items */}

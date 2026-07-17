@@ -117,6 +117,12 @@ class UserRequest(BaseModel):
         description="User's intended construct structure. If true, items target a single construct and sub-constructs are flagged for separate runs."
     )
 
+    # Qualitative questions (Phase 18)
+    include_qualitative: bool = Field(
+        default=False,
+        description="Also generate open-ended cognitive-interview probe questions for construct pre-testing."
+    )
+
 
 class AbbreviatedRequest(BaseModel):
     """Minimal request for agents that don't need full context.

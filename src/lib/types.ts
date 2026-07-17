@@ -22,6 +22,7 @@ export interface UserRequest {
   use_chatgpt_critics?: boolean;
   use_gpt52_analytics?: boolean;
   is_unidimensional?: boolean;
+  include_qualitative?: boolean;
 }
 
 export interface DimensionScore {
@@ -230,6 +231,15 @@ export interface PersonaValidationResponse {
   summary: string;
 }
 
+// Phase 18: Qualitative questions (opt-in)
+
+export interface QualitativeQuestion {
+  question_text: string;
+  facet: string;
+  probe_type: "comprehension" | "elaboration" | "example" | "contrast" | "process";
+  rationale: string;
+}
+
 // Phase 17: Synthetic-respondent pilot (flag-gated)
 
 export interface SyntheticPilotResult {
@@ -276,6 +286,9 @@ export interface FinalOutput {
 
   // Phase 17: Synthetic-respondent pilot
   synthetic_pilot?: SyntheticPilotResult;
+
+  // Phase 18: Qualitative questions
+  qualitative_questions?: QualitativeQuestion[];
 }
 
 export interface HealthResponse {

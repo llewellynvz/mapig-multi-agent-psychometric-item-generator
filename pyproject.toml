@@ -21,6 +21,7 @@ dependencies = [
     "scipy>=1.11.0",
     "pandas>=2.1.0",
     "factor-analyzer>=0.5.1",
+    "networkx>=3.6,<3.7",
 ]
 
 [project.optional-dependencies]

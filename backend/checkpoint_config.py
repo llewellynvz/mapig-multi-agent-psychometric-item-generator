@@ -57,6 +57,11 @@ ALLOWED_CHECKPOINT_TYPES: list[tuple[str, str]] = [
     ("backend.schemas", "SyntheticPilotResult"),
     # Phase 18: Qualitative questions
     ("backend.schemas", "QualitativeQuestion"),
+    # Phase 19: EGA/UVA
+    ("backend.schemas", "EGANode"),
+    ("backend.schemas", "EGAEdge"),
+    ("backend.schemas", "RedundantPair"),
+    ("backend.schemas", "EGAResult"),
 ]
 
 

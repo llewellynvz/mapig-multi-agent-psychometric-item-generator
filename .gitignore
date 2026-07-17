@@ -114,3 +114,6 @@ comparison_report.md
 /tests-e2e/
 
 REVIEW.md
+
+# Local planning docs (never commit)
+docs/PRD.md

@@ -271,8 +271,8 @@ def get_chat_model_for_agent(
     - all other agents: claude-sonnet-4-5 (cost-effective for drafting/reviewing)
 
     Agent overrides (when AGENT_MODEL_OVERRIDES_ENABLED):
-    - bias_reviewer: gpt-4o-mini (20x cheaper than Sonnet, fairness detection OK)
-    - critic: gpt-4o-mini (20x cheaper, has rule fallback)
+    - see AGENT_MODEL_OVERRIDES at module top (bias_reviewer, critic, persona
+      validator, expert panel, synthetic respondent → gpt-5.4-mini)
 
     ChatGPT critics toggle (when use_chatgpt_critics=True):
     - All critic agents (validator, linguistic_reviewer, bias_reviewer, content_reviewer, critic)

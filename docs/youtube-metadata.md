@@ -59,7 +59,7 @@ TIMESTAMPS:
 ## Tags
 
 ```
-psychometrics, psychometric item generation, AI scale development, multi-agent AI, LangGraph, survey design, item writing, bias detection, convergent validity, discriminant validity, embedding correlations, cosine similarity, McDonald's omega, LLM-as-judge, Claude AI, GPT-4o, automated item generation, scale development, I/O psychology, research methods, test development, Pydantic, FastAPI, Next.js, Hommel Arslan 2024, sentence transformers, MAPIG
+psychometrics, psychometric item generation, AI scale development, multi-agent AI, LangGraph, survey design, item writing, bias detection, convergent validity, discriminant validity, embedding correlations, cosine similarity, pseudo-alpha, LLM-as-judge, Claude AI, GPT-4o, automated item generation, scale development, I/O psychology, research methods, test development, Pydantic, FastAPI, Next.js, Hommel Arslan 2024, sentence transformers, MAPIG
 ```
 
 ---

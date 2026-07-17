@@ -4,11 +4,12 @@ import asyncio
 import datetime as _dt
 import json
 import logging
+import secrets
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, StreamingResponse
 
@@ -21,14 +22,6 @@ from backend.schemas import FinalOutput, UserRequest
 from backend.settings import STANDARD_ITEM_CONSTRAINTS, settings
 from backend.evaluation.baseline_runner import run_baseline_comparison, BaselineComparison
 from backend.checkpoint_config import create_checkpointer
-
-# TODO: Token tracking implementation
-# Currently cost fields remain None until token usage tracking is added.
-# Options for implementation:
-# 1. LangSmith callbacks (tracks usage automatically)
-# 2. Custom callback handler on LLM instances
-# 3. Parse response metadata from invoke_structured returns
-# This task prepares schemas; actual tracking deferred to future optimization phase.
 
 RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
@@ -142,11 +135,36 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins(),
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Matches all Vercel preview and production URLs
-    allow_credentials=True,
+    # Only this project's Vercel preview deployments — production is same-origin.
+    allow_origin_regex=r"https://lmaig-langgraph(-[a-z0-9-]+)?\.vercel\.app",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Generation runs are expensive (many LLM calls); cap concurrent runs and
+# reject the overflow with 429 instead of letting them pile onto the budget.
+_GENERATION_SLOTS = asyncio.Semaphore(2)
+
+
+def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
+    """Optional shared-key gate for generation endpoints (cost-abuse
+    protection, not authentication). No-op when MAPIG_API_KEY is unset."""
+    expected = settings.MAPIG_API_KEY
+    # Compare bytes: compare_digest raises TypeError on non-ASCII str input,
+    # which would turn a hostile header into a 500 instead of a 401.
+    if expected and not secrets.compare_digest(
+        (x_api_key or "").encode("utf-8", "surrogateescape"), expected.encode("utf-8")
+    ):
+        raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key header")
+
+
+def _reject_if_at_capacity() -> None:
+    if _GENERATION_SLOTS.locked():
+        raise HTTPException(
+            status_code=429,
+            detail="Generation capacity reached (2 concurrent runs). Retry shortly.",
+        )
 
 
 @app.get("/", include_in_schema=False)
@@ -174,7 +192,7 @@ def run_status(thread_id: str):
     return state
 
 
-@app.post("/v1/generate-items", response_model=FinalOutput)
+@app.post("/v1/generate-items", response_model=FinalOutput, dependencies=[Depends(require_api_key)])
 async def generate_items(
     request: UserRequest,
     x_thread_id: Optional[str] = Header(default=None),
@@ -185,6 +203,7 @@ async def generate_items(
     """
     if not hasattr(app.state, "graph"):
         raise HTTPException(status_code=503, detail="Graph not initialized")
+    _reject_if_at_capacity()
 
     thread_id = x_thread_id or str(uuid.uuid4())
     run_id = str(uuid.uuid4())
@@ -216,7 +235,8 @@ async def generate_items(
     )
 
     try:
-        result_state = await app.state.graph.ainvoke(initial_state, config=config)
+        async with _GENERATION_SLOTS:
+            result_state = await app.state.graph.ainvoke(initial_state, config=config)
     except Exception as exc:
         _set_run_status(
             thread_id,
@@ -249,7 +269,7 @@ async def generate_items(
     return final_output
 
 
-@app.post("/v1/generate-items-stream")
+@app.post("/v1/generate-items-stream", dependencies=[Depends(require_api_key)])
 async def generate_items_stream(
     request: UserRequest,
     x_thread_id: Optional[str] = Header(default=None),
@@ -261,6 +281,7 @@ async def generate_items_stream(
     """
     if not hasattr(app.state, "graph"):
         raise HTTPException(status_code=503, detail="Graph not initialized")
+    _reject_if_at_capacity()
 
     # Validate API key for selected provider
     if request.model_provider == "claude":
@@ -310,7 +331,12 @@ async def generate_items_stream(
     )
 
     async def event_generator():
-        """Generate SSE events as the graph executes."""
+        """Generate SSE events as the graph executes.
+
+        The slot is acquired as the generator's first statement: if the client
+        aborts before streaming starts, an unstarted generator's body (and its
+        finally) never runs, so acquiring outside would leak the slot."""
+        await _GENERATION_SLOTS.acquire()
         try:
             # Send initial event
             yield f"data: {json.dumps({'type': 'start', 'run_id': run_id, 'thread_id': thread_id})}\n\n"
@@ -440,6 +466,8 @@ async def generate_items_stream(
                 error=error_msg,
             )
             yield f"data: {json.dumps({'type': 'error', 'message': error_msg, 'trace': error_trace})}\n\n"
+        finally:
+            _GENERATION_SLOTS.release()
 
     return StreamingResponse(
         event_generator(),

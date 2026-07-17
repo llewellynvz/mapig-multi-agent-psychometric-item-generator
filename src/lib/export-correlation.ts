@@ -86,34 +86,6 @@ export function exportCorrelationMatrixToCsv(
 }
 
 /**
- * Export confidence intervals as separate CSV file
- * @param matrix - CorrelationMatrix object with cells containing CI data
- * @param itemTexts - Array of item text strings for labels
- * @returns CSV string with UTF-8 BOM
- */
-export function exportConfidenceIntervalsToCsv(
-  matrix: CorrelationMatrix,
-  itemTexts: string[]
-): string {
-  // UTF-8 BOM for Excel compatibility
-  let csv = '\uFEFF';
-
-  // Header row
-  csv += 'Item_i,Item_j,Correlation,CI_Low,CI_High\r\n';
-
-  // One row per cell
-  for (const cell of matrix.cells) {
-    const itemI = `Item ${cell.item_i_index + 1}`;
-    const itemJ = `Item ${cell.item_j_index + 1}`;
-    const ciLow = cell.ci_low != null ? cell.ci_low.toFixed(3) : '';
-    const ciHigh = cell.ci_high != null ? cell.ci_high.toFixed(3) : '';
-    csv += `${itemI},${itemJ},${cell.correlation.toFixed(3)},${ciLow},${ciHigh}\r\n`;
-  }
-
-  return csv;
-}
-
-/**
  * Export full CorrelationMatrix as JSON with disclaimer
  * @param matrix - CorrelationMatrix object
  * @returns Pretty-printed JSON string

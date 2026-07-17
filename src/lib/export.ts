@@ -302,7 +302,7 @@ export function exportToMarkdown(fullOutput: FinalOutput): string {
     if (ec.irr_pairwise_spearman && Object.keys(ec.irr_pairwise_spearman).length > 0) {
       md += `**Pairwise Spearman ρ** (relative item ordering — robust to rubric differences):\n\n`;
       Object.entries(ec.irr_pairwise_spearman).forEach(([pair, rho]) => {
-        md += `- ${pair.replace('|', ' ↔ ')}: ρ = ${rho.toFixed(3)}\n`;
+        md += `- ${pair.replace('|', ' ↔ ')}: ρ = ${rho == null ? 'not estimable' : rho.toFixed(3)}\n`;
       });
       md += '\n';
     }
@@ -310,7 +310,7 @@ export function exportToMarkdown(fullOutput: FinalOutput): string {
     if (Object.keys(ec.irr_pairwise).length > 0) {
       md += `**[Legacy] Pairwise Cohen's κ on raw scores:**\n\n`;
       Object.entries(ec.irr_pairwise).forEach(([pair, kappa]) => {
-        md += `- ${pair.replace('|', ' ↔ ')}: κ = ${kappa.toFixed(3)}\n`;
+        md += `- ${pair.replace('|', ' ↔ ')}: κ = ${kappa == null ? 'not estimable' : kappa.toFixed(3)}\n`;
       });
       md += '\n';
     }

@@ -39,13 +39,8 @@ export function CorrelationTooltip({
         Item {cell.item_i_index + 1} × Item {cell.item_j_index + 1}
       </div>
       <div className="mb-2">
-        <span className="text-sm font-bold">r = {cell.correlation.toFixed(3)}</span>
+        <span className="text-sm font-bold">cos = {cell.correlation.toFixed(3)}</span>
       </div>
-      {cell.ci_low != null && cell.ci_high != null && (
-        <div className="mb-2 text-xs text-slate-300">
-          95% CI: [{cell.ci_low.toFixed(3)}, {cell.ci_high.toFixed(3)}]
-        </div>
-      )}
       <div className="border-t border-slate-700 pt-2 text-xs text-slate-400">
         <div className="mb-1">
           <span className="font-semibold">Item {cell.item_i_index + 1}:</span>{' '}

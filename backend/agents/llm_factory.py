@@ -163,7 +163,6 @@ def _get_azure_test_analytics_model() -> AzureChatOpenAI:
         "azure_ad_token_provider": azure_token_provider,
         "azure_ad_async_token_provider": azure_token_provider_async,
         "max_tokens": 25000,
-        "temperature": 0.2,
         "max_retries": 2,
         "timeout": 30,
     }

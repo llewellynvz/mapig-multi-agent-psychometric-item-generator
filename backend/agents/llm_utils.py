@@ -169,7 +169,12 @@ def invoke_structured_with_usage(
         llm = get_chat_model()
 
     # Determine model name for tracking
-    model_name = getattr(llm, "model_name", getattr(llm, "model", "unknown"))
+    model_name = (
+        getattr(llm, "model_name", None)
+        or getattr(llm, "model", None)
+        or getattr(llm, "deployment_name", None)
+        or "unknown"
+    )
 
     # Convert messages to LangChain format with optional cache_control
     # Only apply cache control for Claude models (Anthropic API)

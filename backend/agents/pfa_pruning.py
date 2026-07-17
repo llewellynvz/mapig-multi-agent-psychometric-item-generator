@@ -212,7 +212,7 @@ def prune_items(
     )
 
     logger.info(
-        "PFA pruning complete: kept=%d dropped=%d verdict=%s recovery=%.3f rmsr=%.3f",
+        "PFA pruning complete: kept=%d dropped=%d verdict=%s recovery=%s rmsr=%s",
         len(current), len(dropped_original_indices),
         final_result.fit_verdict, final_result.factor_recovery_rate, final_result.rmsr,
     )

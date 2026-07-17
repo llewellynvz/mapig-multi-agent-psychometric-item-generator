@@ -509,14 +509,20 @@ export default function HomePage() {
             </div>
 
             {/* Pseudo-Factor Analysis full-width row (centerpiece structural result) */}
-            {result && result.pfa_result && result.pfa_result.loadings.length > 0 && (
+            {result && result.pfa_result && result.pfa_result.loadings.length > 0 ? (
               <PFAPanel
                 pfa={result.pfa_result}
                 egaSemantic={result.ega_semantic}
                 egaSynthetic={result.ega_synthetic}
                 itemTexts={result.final_items.map(item => item.item_text)}
               />
-            )}
+            ) : result ? (
+              <EmptyPanel title="Pseudo-Factor Analysis" className="mt-4 border-lime-300/70">
+                {result.final_items.length >= 3
+                  ? "Factor analysis did not complete for this run."
+                  : "Requires 3+ items for factor analysis."}
+              </EmptyPanel>
+            ) : null}
 
             {/* Synthetic-respondent pilot full-width row (flag-gated, simulated data) */}
             {result && result.synthetic_pilot && (

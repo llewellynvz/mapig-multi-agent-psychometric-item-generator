@@ -238,9 +238,9 @@ export function exportToMarkdown(fullOutput: FinalOutput): string {
     md += `| Metric | Value |\n|---|---|\n`;
     md += `| Items | ${pfa.n_items} |\n`;
     md += `| Factors | ${pfa.n_factors} |\n`;
-    md += `| Factor recovery rate | ${(pfa.factor_recovery_rate * 100).toFixed(0)}% |\n`;
-    md += `| RMSR | ${pfa.rmsr.toFixed(4)} |\n`;
-    md += `| CAF | ${pfa.caf.toFixed(4)} |\n`;
+    md += `| Factor recovery rate | ${pfa.factor_recovery_rate != null ? `${(pfa.factor_recovery_rate * 100).toFixed(0)}%` : "not estimable"} |\n`;
+    md += `| RMSR | ${pfa.rmsr != null ? pfa.rmsr.toFixed(4) : "not estimable"} |\n`;
+    md += `| CAF | ${pfa.caf != null ? pfa.caf.toFixed(4) : "not estimable"} |\n`;
     if (pfa.tuckers_congruence.length > 0) {
       const meanCong = pfa.tuckers_congruence.reduce((a, b) => a + b, 0) / pfa.tuckers_congruence.length;
       md += `| Mean Tucker's congruence | ${meanCong.toFixed(3)} |\n`;

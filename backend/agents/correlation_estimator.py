@@ -23,6 +23,49 @@ logger = logging.getLogger("lmaig")
 EMBEDDING_MODEL = settings.EMBEDDING_MODEL
 
 
+# TEMPORARY — remove with the Azure evaluation switch
+def _azure_embedding_deployment() -> Optional[str]:
+    """Deployment serving embeddings under the Azure test switch, else None."""
+    if settings.AZURE_TEST_OVERRIDE and settings.AZURE_EMBEDDING_DEPLOYMENT:
+        return settings.AZURE_EMBEDDING_DEPLOYMENT
+    return None
+
+
+def active_embedding_model(requested: Optional[str] = None) -> str:
+    """Label for the model that embeddings actually come from.
+
+    The Azure switch serves a different deployment than the configured OpenAI
+    model, so statistics must report the space they were computed in rather
+    than the one that was asked for.
+    """
+    deployment = _azure_embedding_deployment()
+    if deployment:  # TEMPORARY — remove with the Azure evaluation switch
+        return f"azure/{deployment}"
+    return requested or EMBEDDING_MODEL
+
+
+def _embedding_target(model: Optional[str]) -> tuple:
+    """Return (client_kwargs, model_name, is_azure) for an embeddings call."""
+    deployment = _azure_embedding_deployment()
+    if deployment:  # TEMPORARY — remove with the Azure evaluation switch
+        return (
+            {
+                "azure_endpoint": settings.AZURE_OPENAI_ENDPOINT,
+                "api_version": settings.AZURE_OPENAI_API_VERSION,
+            },
+            deployment,
+            True,
+        )
+    return (
+        {
+            "api_key": settings.OPENAI_API_KEY,
+            "base_url": settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
+        },
+        model or EMBEDDING_MODEL,
+        False,
+    )
+
+
 async def embed_items(items: List[str], model: Optional[str] = None) -> np.ndarray:
     """Get embeddings for all items in a single API call.
 
@@ -30,19 +73,23 @@ async def embed_items(items: List[str], model: Optional[str] = None) -> np.ndarr
         items: List of item texts to embed
         model: OpenAI embedding model name; defaults to settings.EMBEDDING_MODEL.
     """
-    model = model or EMBEDDING_MODEL
+    kwargs, model_name, is_azure = _embedding_target(model)
     logger.info(
-        "EMBED_ITEMS calling OpenAI embeddings model=%s api_key_set=%s base_url=%s",
-        model,
-        bool(settings.OPENAI_API_KEY),
-        settings.OPENAI_BASE_URL or "default",
+        "EMBED_ITEMS calling embeddings model=%s provider=%s items=%d",
+        model_name, "azure" if is_azure else "openai", len(items),
     )
-    client = AsyncOpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
-    )
+    if is_azure:  # TEMPORARY — remove with the Azure evaluation switch
+        from openai import AsyncAzureOpenAI
+
+        from backend.agents.azure_auth import azure_token_provider_async
+
+        client = AsyncAzureOpenAI(
+            azure_ad_token_provider=azure_token_provider_async, **kwargs
+        )
+    else:
+        client = AsyncOpenAI(**kwargs)
     response = await client.embeddings.create(
-        model=model,
+        model=model_name,
         input=items,
     )
     # Sort by index to ensure order matches input
@@ -55,16 +102,20 @@ def embed_items_sync(items: List[str], model: Optional[str] = None) -> np.ndarra
 
     Used by PFA estimator when called from sync graph nodes.
     """
-    model = model or EMBEDDING_MODEL
+    kwargs, model_name, is_azure = _embedding_target(model)
     logger.info(
-        "EMBED_ITEMS_SYNC calling OpenAI embeddings model=%s items=%d",
-        model, len(items),
+        "EMBED_ITEMS_SYNC calling embeddings model=%s provider=%s items=%d",
+        model_name, "azure" if is_azure else "openai", len(items),
     )
-    client = OpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
-    )
-    response = client.embeddings.create(model=model, input=items)
+    if is_azure:  # TEMPORARY — remove with the Azure evaluation switch
+        from openai import AzureOpenAI
+
+        from backend.agents.azure_auth import azure_token_provider
+
+        client = AzureOpenAI(azure_ad_token_provider=azure_token_provider, **kwargs)
+    else:
+        client = OpenAI(**kwargs)
+    response = client.embeddings.create(model=model_name, input=items)
     sorted_data = sorted(response.data, key=lambda x: x.index)
     return np.array([e.embedding for e in sorted_data])
 
@@ -198,15 +249,8 @@ def compute_cross_scale_validity_sync(
         len(generated_items), len(published_items),
     )
 
-    client = OpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
-    )
-
     all_items = generated_items + published_items
-    resp = client.embeddings.create(model=EMBEDDING_MODEL, input=all_items)
-    sorted_data = sorted(resp.data, key=lambda x: x.index)
-    all_embeddings = np.array([e.embedding for e in sorted_data])
+    all_embeddings = embed_items_sync(all_items)
 
     gen_emb = all_embeddings[: len(generated_items)]
     pub_emb = all_embeddings[len(generated_items) :]

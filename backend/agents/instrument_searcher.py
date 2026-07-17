@@ -28,6 +28,26 @@ def _safe_int(val) -> Optional[int]:
         return None
 
 
+def _safe_str(val) -> Optional[str]:
+    """Flatten LLM output to prose.
+
+    These fields are described to the model as free text, but it frequently
+    answers with a nested object instead. Rejecting those costs the whole
+    search and silently falls back to hardcoded instruments.
+    """
+    if val is None:
+        return None
+    if isinstance(val, str):
+        return val or None
+    if isinstance(val, dict):
+        parts = [f"{k}: {_safe_str(v)}" for k, v in val.items() if v is not None]
+        return "; ".join(p for p in parts if p) or None
+    if isinstance(val, (list, tuple)):
+        parts = [_safe_str(v) for v in val]
+        return "; ".join(p for p in parts if p) or None
+    return str(val)
+
+
 def search_instruments(
     construct_name: str,
     construct_definition: str
@@ -170,13 +190,13 @@ def _search_perplexity_instrument(
 
         # Build ComparisonInstrument
         instrument = ComparisonInstrument(
-            name=parsed.get("name", "Unknown Instrument"),
-            measured_construct=parsed.get("construct", construct_name),
+            name=_safe_str(parsed.get("name")) or "Unknown Instrument",
+            measured_construct=_safe_str(parsed.get("construct")) or construct_name,
             source_citation=citation,
             publication_year=_safe_int(parsed.get("year")),
             sample_items_count=_safe_int(parsed.get("item_count")),
-            psychometric_properties=parsed.get("psychometric_properties"),
-            similarity_rationale=parsed.get("similarity_rationale")
+            psychometric_properties=_safe_str(parsed.get("psychometric_properties")),
+            similarity_rationale=_safe_str(parsed.get("similarity_rationale"))
         )
 
         log.info("PERPLEXITY_INSTRUMENT_SEARCH success type=%s instrument=%s", search_type, instrument.name)

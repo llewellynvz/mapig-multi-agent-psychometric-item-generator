@@ -192,12 +192,19 @@ def _synthesize_cultural_query(request: UserRequest) -> str:
     return "\n".join(parts)
 
 
+# Retrieval must leave the rest of the pipeline room inside the serverless
+# budget; supplementary retry/cultural calls are skipped once this is spent.
+_SURF_DEADLINE_S = 120.0
+
+
 def surf(request: UserRequest) -> RetrievalResponse:
     """Use Perplexity academic search to retrieve evidence chunks."""
     if not settings.PERPLEXITY_API_KEY:
         raise RuntimeError(
             "PERPLEXITY_API_KEY is not set but SEARCH_PROVIDER requires Perplexity."
         )
+
+    _surf_start = time.perf_counter()
 
     system_prompt = load_prompt("web_surfer.md")
 
@@ -235,7 +242,7 @@ def surf(request: UserRequest) -> RetrievalResponse:
     }
 
     _t0 = time.perf_counter()
-    with httpx.Client(timeout=30) as client:
+    with httpx.Client(timeout=75) as client:
         resp = client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
@@ -274,7 +281,11 @@ def surf(request: UserRequest) -> RetrievalResponse:
 
     # Retry loop: broaden search if below minimum evidence threshold
     retry_count = 0
-    while len(evidence) < settings.EVIDENCE_MIN_CHUNKS and retry_count < settings.EVIDENCE_MAX_RETRIES:
+    while (
+        len(evidence) < settings.EVIDENCE_MIN_CHUNKS
+        and retry_count < settings.EVIDENCE_MAX_RETRIES
+        and (time.perf_counter() - _surf_start) < _SURF_DEADLINE_S
+    ):
         retry_count += 1
         log.info("EVIDENCE_RETRY attempt=%d current=%d target=%d", retry_count, len(evidence), settings.EVIDENCE_MIN_CHUNKS)
 
@@ -314,7 +325,7 @@ def surf(request: UserRequest) -> RetrievalResponse:
 
         try:
             _t0_retry = time.perf_counter()
-            with httpx.Client(timeout=30) as client:
+            with httpx.Client(timeout=40) as client:
                 retry_resp = client.post(url, headers=headers, json=retry_payload)
                 retry_resp.raise_for_status()
                 retry_data = retry_resp.json()
@@ -361,8 +372,8 @@ def surf(request: UserRequest) -> RetrievalResponse:
 
     log.info("PERPLEXITY_SEARCH done evidence=%d", len(evidence))
 
-    # Cultural context search (if cultural_group is set)
-    if request.cultural_group:
+    # Cultural context search (if cultural_group is set and budget remains)
+    if request.cultural_group and (time.perf_counter() - _surf_start) < _SURF_DEADLINE_S:
         try:
             cultural_query = _synthesize_cultural_query(request)
             cultural_payload = {

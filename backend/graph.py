@@ -1291,7 +1291,7 @@ def finalize_node(state: GraphState) -> GraphState:
                     facet_mapping=state.get("facet_mapping"),
                 )
                 logger.info(
-                    "FINALIZE_PFA_FALLBACK ran inline PFA — verdict=%s recovery=%.3f",
+                    "FINALIZE_PFA_FALLBACK ran inline PFA — verdict=%s recovery=%s",
                     pfa_result_for_output.fit_verdict,
                     pfa_result_for_output.factor_recovery_rate,
                 )
@@ -1364,7 +1364,9 @@ async def correlation_node(state: GraphState) -> GraphState:
 
             # Build CorrelationMatrix — a failed calculation stays None so the
             # UI can say "not estimable" instead of showing a fabricated 0.000
-            from backend.agents.correlation_estimator import EMBEDDING_MODEL as _corr_embedding_model
+            from backend.agents.correlation_estimator import active_embedding_model as _active_embedding_model
+
+            _corr_embedding_model = _active_embedding_model()
             correlation_matrix = CorrelationMatrix(
                 cells=cells,
                 pseudo_alpha=pseudo_alpha,
@@ -1490,16 +1492,29 @@ def comparison_node(state: GraphState) -> GraphState:
             logger.info(f"Plagiarism check: {len(published_items)} known items for '{convergent_instrument.name}'")
 
             _t_plag = _time.time()
-            plagiarism_detector = get_plagiarism_detector()
-            plagiarism_flags = plagiarism_detector.detect_plagiarism(
-                item_texts,
-                published_items,
-                convergent_instrument.name
-            )
-            logger.info(
-                "COMPARISON_PLAGIARISM_CHECK elapsed=%.2fs known_items=%d flags=%d",
-                _time.time() - _t_plag, len(published_items), len(plagiarism_flags),
-            )
+            plagiarism_warning = None
+            try:
+                plagiarism_detector = get_plagiarism_detector()
+                plagiarism_flags = plagiarism_detector.detect_plagiarism(
+                    item_texts,
+                    published_items,
+                    convergent_instrument.name
+                )
+                logger.info(
+                    "COMPARISON_PLAGIARISM_CHECK elapsed=%.2fs known_items=%d flags=%d",
+                    _time.time() - _t_plag, len(published_items), len(plagiarism_flags),
+                )
+            except Exception as plag_error:
+                # An optional overlap check must never discard the instruments
+                # and validity scores already computed above.
+                plagiarism_flags = {}
+                # Member-visible: never interpolate the provider exception (it can
+                # carry a masked key fragment and internal URLs). Detail stays in logs.
+                plagiarism_warning = "Plagiarism check unavailable for this run."
+                logger.warning(
+                    "COMPARISON_PLAGIARISM_CHECK failed after %.2fs: %s",
+                    _time.time() - _t_plag, plag_error,
+                )
 
             # Add convergent ceiling warning to plagiarism flags
             if convergent_score is not None and convergent_score > 0.85:
@@ -1513,6 +1528,10 @@ def comparison_node(state: GraphState) -> GraphState:
             updated_final_output.comparison_instruments = [convergent_instrument, discriminant_instrument]
             updated_final_output.plagiarism_flags = plagiarism_flags if plagiarism_flags else None
             updated_final_output.convergent_validity_score = convergent_score
+            if plagiarism_warning:
+                updated_final_output.audit.warnings = (
+                    list(updated_final_output.audit.warnings or []) + [plagiarism_warning]
+                )
 
             logger.info(
                 f"Comparison analysis complete: {len(updated_final_output.comparison_instruments)} instruments, "
@@ -1680,7 +1699,7 @@ def _run_pfa_analytics_safe(state: GraphState) -> dict:
             items_dropped=state.get("pfa_dropped_indices", []),
         )
         logger.info(
-            "PFA_ANALYTICS done (parallel) verdict=%s recovery=%.3f rmsr=%.3f",
+            "PFA_ANALYTICS done (parallel) verdict=%s recovery=%s rmsr=%s",
             pfa_result.fit_verdict,
             pfa_result.factor_recovery_rate,
             pfa_result.rmsr,

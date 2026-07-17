@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     AZURE_CLIENT_CERT_PASSWORD: Optional[str] = None
     AZURE_FRONTIER_DEPLOYMENT: str = "gpt-5.1"
     AZURE_CHEAP_DEPLOYMENT: str = "gpt-5.4-mini"
+    AZURE_EMBEDDING_DEPLOYMENT: Optional[str] = None
 
     # Anthropic Claude (used for validation)
     CLAUDE_API_KEY: Optional[str] = Field(default=None)
@@ -189,6 +190,7 @@ class Settings(BaseSettings):
         'AZURE_CLIENT_CERT_PASSWORD',
         'AZURE_FRONTIER_DEPLOYMENT',
         'AZURE_CHEAP_DEPLOYMENT',
+        'AZURE_EMBEDDING_DEPLOYMENT',
         'CLAUDE_API_KEY',
         'MAPIG_API_KEY',
         'VALIDATOR_MODEL',

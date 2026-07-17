@@ -45,13 +45,13 @@ def compute_pfa_analytics(
             factor_labels=["Single Factor"],
             loadings=[],
             tuckers_congruence=[],
-            factor_recovery_rate=0.0,
-            rmsr=0.0,
-            caf=0.0,
+            factor_recovery_rate=None,
+            rmsr=None,
+            caf=None,
             eigenvalues=[],
             residual_correlation_matrix=[],
             items_dropped=items_dropped or [],
-            fit_verdict="poor",
+            fit_verdict="not_estimable",
         )
 
     return run_pfa(

@@ -158,13 +158,14 @@ export interface PFAResult {
   factor_labels: string[];
   loadings: FactorLoading[];
   tuckers_congruence: number[];
-  factor_recovery_rate: number;
-  rmsr: number;
-  caf: number;
+  /** null = not estimable (embedding or solver failure). */
+  factor_recovery_rate: number | null;
+  rmsr: number | null;
+  caf: number | null;
   eigenvalues: number[];
   residual_correlation_matrix: number[][];
   items_dropped: number[];
-  fit_verdict: "good" | "acceptable" | "poor";
+  fit_verdict: "good" | "acceptable" | "poor" | "not_estimable";
   model_identifiability?: "saturated" | "identified" | "over_identified";
   disclaimer: string;
   solver?: string;

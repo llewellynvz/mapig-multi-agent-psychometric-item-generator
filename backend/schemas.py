@@ -886,6 +886,24 @@ class PFAResult(BaseModel):
             "loadings — NOT respondent-based reliability. None = not estimable (e.g., Heywood case)."
         ),
     )
+    kmo_semantic: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "KMO formula applied to the semantic similarity matrix — a factorability heuristic, "
+            "not sampling adequacy (no respondent sample exists). None = not estimable (singular matrix)."
+        ),
+    )
+    n_factors_suggested_kaiser: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Number of eigenvalues > 1.0 (Kaiser rule) — a data-driven dimensionality signal to compare against the LLM facet count.",
+    )
+    n_factors_source: str = Field(
+        default="llm_facet_mapping",
+        description="Where n_factors came from. Currently always the LLM facet mapping; the Kaiser suggestion is reported alongside for comparison.",
+    )
 
 
 # --- Agent I/O wrappers (contracts) ---

@@ -561,7 +561,7 @@ def run_expert_panel(
         logger.warning("Krippendorff's α (per-item) failed: %s", e)
         irr_alpha = float("nan")
 
-    irr_pairwise = pairwise_kappa_matrix(matrix, role_labels)
+    irr_pairwise = pairwise_kappa_matrix(matrix, role_labels, categories=range(1, 6))
 
     # New: Spearman rank correlation per pair — robust to differing rubrics
     irr_pairwise_spearman = pairwise_spearman_matrix(matrix, role_labels)

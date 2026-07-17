@@ -14,7 +14,7 @@ No external dependencies beyond NumPy.
 from __future__ import annotations
 
 import logging
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 import numpy as np
 
@@ -125,7 +125,12 @@ def krippendorff_alpha(ratings: np.ndarray, level: str = "ordinal") -> float:
     return float(alpha)
 
 
-def cohens_kappa(a: np.ndarray, b: np.ndarray, weighted: bool = True) -> float:
+def cohens_kappa(
+    a: np.ndarray,
+    b: np.ndarray,
+    weighted: bool = True,
+    categories: Optional[Iterable[float]] = None,
+) -> float:
     """Compute (linear-weighted) Cohen's κ for two raters' ratings.
 
     Args:
@@ -133,6 +138,12 @@ def cohens_kappa(a: np.ndarray, b: np.ndarray, weighted: bool = True) -> float:
         b: 1D array of rater B's ratings (same length as a).
         weighted: If True, use linear weights for ordinal data. If False,
             use unweighted κ (treat ratings as nominal).
+        categories: The full ordinal scale (e.g., range(1, 6) for a 1-5
+            rubric). Weights are then based on category VALUES, so unused
+            scale points keep their true distance — raters using only {1, 3, 5}
+            are 2 scale points apart between 1 and 3, not adjacent. When None,
+            falls back to the observed unique values (legacy behavior, only
+            safe when every scale point appears).
 
     Returns:
         Cohen's κ in [-1, 1]. NaN if insufficient data.
@@ -149,8 +160,16 @@ def cohens_kappa(a: np.ndarray, b: np.ndarray, weighted: bool = True) -> float:
     if n == 0:
         return float("nan")
 
-    # Build joint set of categories
-    cats = np.unique(np.concatenate([a_v, b_v]))
+    if categories is not None:
+        cats = np.asarray(sorted(float(c) for c in categories), dtype=float)
+        observed = set(np.concatenate([a_v, b_v]).tolist())
+        if not observed.issubset(set(cats.tolist())):
+            raise ValueError(
+                f"Ratings contain values outside the declared categories: "
+                f"{sorted(observed - set(cats.tolist()))}"
+            )
+    else:
+        cats = np.unique(np.concatenate([a_v, b_v]))
     K = len(cats)
     if K <= 1:
         return float("nan")
@@ -167,9 +186,11 @@ def cohens_kappa(a: np.ndarray, b: np.ndarray, weighted: bool = True) -> float:
     expected = np.outer(row_marg, col_marg)
 
     if weighted and K > 1:
-        # Linear weights
-        idx = np.arange(K).astype(float)
-        w = 1.0 - np.abs(idx[:, None] - idx[None, :]) / (K - 1)
+        # Linear weights on category VALUES (standard weighted-kappa
+        # definition); equals index-based weights only for evenly spaced,
+        # fully observed scales.
+        span = float(cats[-1] - cats[0])
+        w = 1.0 - np.abs(cats[:, None] - cats[None, :]) / span
         po = float((w * obs).sum())
         pe = float((w * expected).sum())
     else:
@@ -177,36 +198,41 @@ def cohens_kappa(a: np.ndarray, b: np.ndarray, weighted: bool = True) -> float:
         pe = float(np.trace(expected))
 
     if pe == 1.0:
-        return 1.0 if po == 1.0 else float("nan")
+        # Chance agreement is total (e.g., both raters constant): κ = 0/0.
+        # Undefined — report NaN rather than claiming perfect or zero agreement.
+        return float("nan")
     return float((po - pe) / (1.0 - pe))
 
 
 def pairwise_kappa_matrix(
     ratings: np.ndarray,
     role_labels: Iterable[str],
-) -> dict[str, float]:
+    categories: Optional[Iterable[float]] = None,
+) -> dict[str, Optional[float]]:
     """Compute Cohen's κ for every pair of raters.
 
     Args:
         ratings: 2D array (n_raters, n_items) with NaN for missing ratings.
         role_labels: Per-rater role labels of length n_raters.
+        categories: Full ordinal scale passed through to cohens_kappa.
 
     Returns:
-        Dict mapping "role_a|role_b" -> κ.
+        Dict mapping "role_a|role_b" -> κ, or None when κ is not estimable
+        (e.g., zero variance) — never collapsed to 0.0.
     """
     arr = np.asarray(ratings, dtype=float)
     labels = list(role_labels)
-    out: dict[str, float] = {}
+    out: dict[str, Optional[float]] = {}
     n_raters = arr.shape[0]
     for i in range(n_raters):
         for j in range(i + 1, n_raters):
             try:
-                k = cohens_kappa(arr[i], arr[j], weighted=True)
+                k = cohens_kappa(arr[i], arr[j], weighted=True, categories=categories)
             except Exception as e:
                 logger.warning("κ computation failed for %s vs %s: %s", labels[i], labels[j], e)
                 k = float("nan")
             key = f"{labels[i]}|{labels[j]}"
-            out[key] = round(float(k), 3) if not np.isnan(k) else 0.0
+            out[key] = round(float(k), 3) if not np.isnan(k) else None
     return out
 
 
@@ -283,13 +309,14 @@ def _average_ranks(values: np.ndarray) -> np.ndarray:
 def pairwise_spearman_matrix(
     ratings: np.ndarray,
     role_labels: Iterable[str],
-) -> dict[str, float]:
+) -> dict[str, Optional[float]]:
     """Spearman ρ for every pair of raters. Same shape contract as
-    pairwise_kappa_matrix.
+    pairwise_kappa_matrix. Not-estimable pairs (zero variance, too few
+    ratings) are reported as None, never collapsed to 0.0.
     """
     arr = np.asarray(ratings, dtype=float)
     labels = list(role_labels)
-    out: dict[str, float] = {}
+    out: dict[str, Optional[float]] = {}
     n_raters = arr.shape[0]
     for i in range(n_raters):
         for j in range(i + 1, n_raters):
@@ -302,7 +329,7 @@ def pairwise_spearman_matrix(
                 )
                 rho = float("nan")
             key = f"{labels[i]}|{labels[j]}"
-            out[key] = round(float(rho), 3) if not np.isnan(rho) else 0.0
+            out[key] = round(float(rho), 3) if not np.isnan(rho) else None
     return out
 
 

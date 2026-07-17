@@ -722,16 +722,19 @@ class ExpertConsensus(BaseModel):
             "asks 'do they agree on the bottom-line outcome?'"
         ),
     )
-    irr_pairwise: Dict[str, float] = Field(
+    irr_pairwise: Dict[str, Optional[float]] = Field(
         default_factory=dict,
-        description="[Legacy] Map 'role_a|role_b' → Cohen's κ (ordinal weighted) for per-item scores",
+        description=(
+            "[Legacy] Map 'role_a|role_b' → Cohen's κ (linear-weighted on the fixed 1-5 scale) "
+            "for per-item scores. None = not estimable (e.g., zero variance)."
+        ),
     )
-    irr_pairwise_spearman: Dict[str, float] = Field(
+    irr_pairwise_spearman: Dict[str, Optional[float]] = Field(
         default_factory=dict,
         description=(
             "Pairwise Spearman rank correlation between experts on per-item scores. "
             "Measures whether experts agree on RELATIVE ITEM ORDERING — robust to "
-            "differing rubrics."
+            "differing rubrics. None = not estimable (zero variance or too few ratings)."
         ),
     )
     consensus_revisions: RevisionPlan = Field(

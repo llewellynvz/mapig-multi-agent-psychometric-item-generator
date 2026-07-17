@@ -648,6 +648,18 @@ class FinalOutput(BaseModel):
         description="Persona-based conceptual alignment check: respondent persona ratings and inter-persona divergence flags."
     )
 
+    # Phase 17: Synthetic-respondent pilot (flag-gated, opt-in)
+    synthetic_pilot: Optional["SyntheticPilotResult"] = Field(
+        default=None,
+        description="Classical statistics (Pearson + CIs, alpha, omega, parallel analysis, KMO, Bartlett) on an LLM-simulated respondent matrix. Synthetic data — item triage only."
+    )
+
+    # Phase 18: Qualitative questions (opt-in via UserRequest.include_qualitative)
+    qualitative_questions: List["QualitativeQuestion"] = Field(
+        default_factory=list,
+        description="Open-ended cognitive-interview probes for construct pre-testing, grounded in the facet mapping and evidence."
+    )
+
 
 # --- Phase 14-16 Schemas: PFA, Expert Panel, Persona Validation ---
 
@@ -689,6 +701,70 @@ class PersonaValidationResponse(BaseModel):
         description="Mean across-persona standard deviation of ratings (higher = more interpretive ambiguity)",
     )
     summary: str = Field(default="", description="One-line human-readable summary")
+
+
+class QualitativeQuestion(BaseModel):
+    """An open-ended cognitive-interview-style probe accompanying the item set."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question_text: str = Field(..., min_length=10, max_length=400, description="The question exactly as an interviewer would ask it")
+    facet: str = Field(..., min_length=1, max_length=120, description="Facet this question explores, or the construct name for global questions")
+    probe_type: Literal["comprehension", "elaboration", "example", "contrast", "process"] = Field(
+        ..., description="Cognitive-interview probe category"
+    )
+    rationale: str = Field(..., min_length=5, max_length=400, description="What the question surfaces and why it matters for this construct")
+
+
+SYNTHETIC_PILOT_DISCLAIMER = (
+    "Simulated LLM respondents — known compressed variance and WEIRD/model bias "
+    "per the silicon-sampling literature. Not evidence of human psychometric "
+    "properties; use for item triage only."
+)
+
+
+class SyntheticPilotResult(BaseModel):
+    """Classical statistics from a synthetic-respondent pilot.
+
+    A rating matrix is produced by LLM-simulated respondents with drawn trait
+    levels, then analyzed with standard formulas (Pearson + Fisher-z CIs,
+    Cronbach's alpha, omega from EFA loadings, Horn's parallel analysis, KMO,
+    Bartlett). The math is valid because a real N exists; the caveat is the
+    data source, which the required disclaimer states.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    n_respondents: int = Field(..., ge=1, description="Number of simulated respondents in the rating matrix")
+    n_items: int = Field(..., ge=1, description="Number of items rated")
+    model_name: str = Field(..., description="Model that produced the ratings, or 'mock'")
+    scale_points: int = Field(..., ge=2, description="Number of Likert scale points used")
+    cells: List[CorrelationCell] = Field(
+        default_factory=list,
+        description="Pearson inter-item correlations from the synthetic matrix, with Fisher-z 95% CIs",
+    )
+    cronbach_alpha: Optional[float] = Field(
+        default=None, le=1.0,
+        description="Cronbach's alpha on the synthetic matrix. None = not estimable; negative = degenerate.",
+    )
+    omega_total: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Omega-total from a minres EFA on the synthetic matrix. None = not estimable.",
+    )
+    parallel_analysis_n_factors: Optional[int] = Field(
+        default=None, ge=0,
+        description="Factors retained by Horn's parallel analysis (95th percentile). None = not estimable.",
+    )
+    observed_eigenvalues: List[float] = Field(default_factory=list, description="Eigenvalues of the synthetic correlation matrix, descending")
+    threshold_eigenvalues: List[float] = Field(default_factory=list, description="95th-percentile random-data eigenvalue thresholds from parallel analysis")
+    kmo: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Kaiser-Meyer-Olkin sampling adequacy. None = not estimable.")
+    bartlett_chi2: Optional[float] = Field(default=None, ge=0.0, description="Bartlett's sphericity chi-square. None = not estimable.")
+    bartlett_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Bartlett's sphericity p-value. None = not estimable.")
+    failed_respondents: int = Field(default=0, ge=0, description="Simulated respondents whose rating call failed and were excluded")
+    disclaimer: str = Field(
+        default=SYNTHETIC_PILOT_DISCLAIMER,
+        description="Required honesty statement rendered with every statistic from this panel",
+    )
 
 
 ExpertRole = Literal["psychometric", "domain", "localization", "custom"]

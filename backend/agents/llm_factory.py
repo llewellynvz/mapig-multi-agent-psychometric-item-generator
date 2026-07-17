@@ -19,6 +19,8 @@ AGENT_MODEL_OVERRIDES = {
     "expert_panel_psychometric": ("openai", "gpt-5.4-mini"),  # Cost-controlled face validity
     "expert_panel_domain": ("openai", "gpt-5.4-mini"),  # Cost-controlled construct fidelity
     "expert_panel_localization": ("openai", "gpt-5.4-mini"),  # Cost-controlled cultural fit
+    # Phase 17: Synthetic-respondent pilot
+    "synthetic_respondent": ("openai", "gpt-5.4-mini"),  # One cheap call per simulated respondent
 }
 
 

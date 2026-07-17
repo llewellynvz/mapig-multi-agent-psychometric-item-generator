@@ -145,6 +145,12 @@ class Settings(BaseSettings):
     EXPERT_PANEL_DEBATE_MIN_REMAINING: int = 15
     EXPERT_PANEL_PARTIAL_MIN_REMAINING: int = 8
 
+    # Phase 17: Synthetic-respondent pilot (opt-in; simulated data, item triage only)
+    SYNTHETIC_PILOT_ENABLED: bool = False
+    SYNTHETIC_N_RESPONDENTS: int = 50
+    # Skip the pilot when less than this many seconds remain in the Vercel budget.
+    SYNTHETIC_PILOT_MIN_REMAINING_SECS: int = 60
+
     # Phase 16: Persona Validator
     PERSONA_VALIDATOR_ENABLED: bool = True
     PERSONA_VALIDATOR_PERSONAS: int = 3  # Set 0 to disable

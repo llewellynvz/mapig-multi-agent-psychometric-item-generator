@@ -3,7 +3,7 @@
  * Supports CSV (square matrix + CI export) and JSON formats
  */
 
-import type { CorrelationMatrix } from './types';
+import type { CorrelationMatrix, SyntheticPilotResult } from './types';
 
 /**
  * Escape a field value for CSV according to RFC 4180
@@ -92,4 +92,49 @@ export function exportCorrelationMatrixToCsv(
  */
 export function exportCorrelationMatrixToJson(matrix: CorrelationMatrix): string {
   return JSON.stringify(matrix, null, 2);
+}
+
+/**
+ * Export the synthetic-respondent pilot as CSV. Every column carries the
+ * synthetic_ prefix so simulated statistics can never be mistaken for
+ * human data downstream.
+ */
+export function exportSyntheticPilotToCsv(
+  pilot: SyntheticPilotResult,
+  itemTexts: string[]
+): string {
+  const num = (value: number | null, digits = 4) =>
+    value != null ? value.toFixed(digits) : 'not estimable';
+
+  let csv = '﻿';
+  csv += `SYNTHETIC PILOT (SIMULATED LLM RESPONDENTS)\r\n`;
+  csv += `${escapeCsvField(pilot.disclaimer)}\r\n`;
+  csv += `synthetic_n_respondents,${pilot.n_respondents}\r\n`;
+  csv += `synthetic_n_items,${pilot.n_items}\r\n`;
+  csv += `synthetic_scale_points,${pilot.scale_points}\r\n`;
+  csv += `synthetic_model,${escapeCsvField(pilot.model_name)}\r\n`;
+  csv += `synthetic_failed_respondents,${pilot.failed_respondents}\r\n`;
+  csv += `synthetic_cronbach_alpha,${num(pilot.cronbach_alpha)}\r\n`;
+  csv += `synthetic_omega_total,${num(pilot.omega_total)}\r\n`;
+  csv += `synthetic_kmo,${num(pilot.kmo)}\r\n`;
+  csv += `synthetic_bartlett_chi2,${num(pilot.bartlett_chi2, 2)}\r\n`;
+  csv += `synthetic_bartlett_p,${pilot.bartlett_p != null ? pilot.bartlett_p.toExponential(3) : 'not estimable'}\r\n`;
+  csv += `synthetic_parallel_analysis_n_factors,${pilot.parallel_analysis_n_factors ?? 'not estimable'}\r\n`;
+  csv += `\r\n`;
+
+  csv += `synthetic_component,synthetic_observed_eigenvalue,synthetic_random_threshold\r\n`;
+  pilot.observed_eigenvalues.forEach((eig, i) => {
+    const threshold = pilot.threshold_eigenvalues[i];
+    csv += `${i + 1},${eig.toFixed(4)},${threshold != null ? threshold.toFixed(4) : ''}\r\n`;
+  });
+  csv += `\r\n`;
+
+  csv += `synthetic_item_i,synthetic_item_j,synthetic_pearson_r,synthetic_ci_low,synthetic_ci_high\r\n`;
+  for (const cell of pilot.cells) {
+    const labelI = escapeCsvField(truncateItemText(itemTexts[cell.item_i_index] ?? `Item ${cell.item_i_index + 1}`));
+    const labelJ = escapeCsvField(truncateItemText(itemTexts[cell.item_j_index] ?? `Item ${cell.item_j_index + 1}`));
+    csv += `${labelI},${labelJ},${cell.correlation.toFixed(4)},${cell.ci_low != null ? cell.ci_low.toFixed(4) : ''},${cell.ci_high != null ? cell.ci_high.toFixed(4) : ''}\r\n`;
+  }
+
+  return csv;
 }

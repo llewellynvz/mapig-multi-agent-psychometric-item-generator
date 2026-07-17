@@ -717,7 +717,12 @@ export default function HomePage() {
 
             {/* Pseudo-Factor Analysis full-width row (centerpiece structural result) */}
             {result && result.pfa_result && result.pfa_result.loadings.length > 0 && (
-              <PFAPanel pfa={result.pfa_result} />
+              <PFAPanel
+                pfa={result.pfa_result}
+                egaSemantic={result.ega_semantic}
+                egaSynthetic={result.ega_synthetic}
+                itemTexts={result.final_items.map(item => item.item_text)}
+              />
             )}
 
             {/* Synthetic-respondent pilot full-width row (flag-gated, simulated data) */}

@@ -7,10 +7,85 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { MethodBadge } from "./MethodBadge";
 import { MethodologyNote } from "./MethodologyNote";
-import type { PFAResult, FactorLoading } from "@/lib/types";
+import type { PFAResult, FactorLoading, EGAResult } from "@/lib/types";
 
 export interface PFAPanelProps {
   pfa: PFAResult;
+  egaSemantic?: EGAResult;
+  egaSynthetic?: EGAResult;
+  itemTexts?: string[];
+}
+
+const COMMUNITY_COLORS = [
+  "#a7d12b",
+  "#4db8c9",
+  "#e0a83c",
+  "#c96fb0",
+  "#8a91f0",
+  "#6fc98f",
+];
+
+function EGANetworkView({ ega, itemTexts }: { ega: EGAResult; itemTexts?: string[] }) {
+  return (
+    <div className="rounded-lg border border-border/40 bg-slate-900/30 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-semibold text-slate-50">
+          {ega.method === "semantic_threshold" ? "Semantic network" : "Synthetic-pilot network"}
+        </span>
+        <MethodBadge
+          variant={ega.method === "semantic_threshold" ? "semantic" : "synthetic"}
+          className="px-1.5 text-[8px]"
+        />
+        <span className="text-[10px] text-muted-foreground/70">
+          {ega.n_dimensions} communit{ega.n_dimensions === 1 ? "y" : "ies"}
+        </span>
+      </div>
+      <svg viewBox="0 0 100 100" className="w-full max-w-[280px] mx-auto" role="img" aria-label="Item network diagram">
+        {ega.edges.map((edge, i) => {
+          const a = ega.nodes.find((n) => n.item_index === edge.source);
+          const b = ega.nodes.find((n) => n.item_index === edge.target);
+          if (!a || !b) return null;
+          return (
+            <line
+              key={i}
+              x1={a.x * 88 + 6}
+              y1={a.y * 88 + 6}
+              x2={b.x * 88 + 6}
+              y2={b.y * 88 + 6}
+              stroke="#64748b"
+              strokeWidth={Math.max(0.3, Math.min(1.5, Math.abs(edge.weight) * 2))}
+              opacity={0.5}
+            />
+          );
+        })}
+        {ega.nodes.map((node) => (
+          <g key={node.item_index}>
+            <circle
+              cx={node.x * 88 + 6}
+              cy={node.y * 88 + 6}
+              r={3.2}
+              fill={COMMUNITY_COLORS[node.community % COMMUNITY_COLORS.length]}
+            >
+              <title>
+                {itemTexts?.[node.item_index] ?? `Item ${node.item_index + 1}`}
+              </title>
+            </circle>
+            <text
+              x={node.x * 88 + 6}
+              y={node.y * 88 + 6.9}
+              textAnchor="middle"
+              fontSize="2.6"
+              fill="#0f172a"
+              fontWeight="bold"
+            >
+              {node.item_index + 1}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <p className="text-[10px] text-muted-foreground/60 mt-2">{ega.disclaimer}</p>
+    </div>
+  );
 }
 
 function verdictBadge(v: string): { color: string; icon: React.ReactNode; label: string } {
@@ -457,7 +532,7 @@ function MeasurementEquations({ pfa }: { pfa: PFAResult }) {
   );
 }
 
-export function PFAPanel({ pfa }: PFAPanelProps) {
+export function PFAPanel({ pfa, egaSemantic, egaSynthetic, itemTexts }: PFAPanelProps) {
   const verdict = verdictBadge(pfa.fit_verdict);
   const meanCongruence =
     pfa.tuckers_congruence.length > 0
@@ -598,7 +673,41 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
           {pfa.kmo_semantic != null && (
             <>{" · "}Semantic KMO = {pfa.kmo_semantic.toFixed(2)} (factorability heuristic)</>
           )}
+          {egaSemantic && (
+            <>{" · "}Semantic EGA communities = {egaSemantic.n_dimensions}</>
+          )}
+          {egaSynthetic && (
+            <>{" · "}Synthetic-pilot EGA dimensions = {egaSynthetic.n_dimensions}</>
+          )}
         </div>
+
+        {/* EGA network views + UVA redundancy (Phase 19) */}
+        {(egaSemantic || egaSynthetic) && (
+          <div className="mb-5">
+            <h4 className="text-sm font-semibold text-slate-50 mb-2">
+              Exploratory Graph Analysis
+            </h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {egaSemantic && <EGANetworkView ega={egaSemantic} itemTexts={itemTexts} />}
+              {egaSynthetic && <EGANetworkView ega={egaSynthetic} itemTexts={itemTexts} />}
+            </div>
+            {egaSemantic && egaSemantic.redundant_pairs.length > 0 && (
+              <div className="mt-3">
+                <span className="text-xs font-semibold text-slate-50">
+                  Redundant item pairs (UVA, wTO ≥ 0.25):
+                </span>
+                <ul className="mt-1 space-y-0.5">
+                  {egaSemantic.redundant_pairs.slice(0, 8).map((pair, i) => (
+                    <li key={i} className="text-[11px] text-amber-300/90">
+                      Item {pair.item_i_index + 1} × Item {pair.item_j_index + 1}{" "}
+                      (wTO = {pair.wto.toFixed(2)}) — consider keeping only one.
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Factor labels + congruence */}
         {pfa.factor_labels.length > 0 && (

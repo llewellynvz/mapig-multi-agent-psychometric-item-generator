@@ -18,6 +18,8 @@ import logging
 import time as _time
 from typing import List, Optional, Tuple
 
+import numpy as np
+
 from backend.agents.pfa_estimator import run_pfa
 from backend.schemas import DraftItem, FacetMapperResponse, PFAResult
 from backend.settings import settings
@@ -31,6 +33,37 @@ def _facet_counts(items: List[DraftItem]) -> dict[str, int]:
         key = it.facet_name or ""
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def _uva_redundancy_scores(items: List[DraftItem]) -> dict[int, float]:
+    """Per-item max weighted topological overlap (UVA) on the semantic network,
+    computed once on the original pool. Used as a drop-priority tie-breaker:
+    among near-equally weak items, the more redundant one drops first.
+    Returns an empty dict when embeddings are unavailable (e.g. mock mode)."""
+    try:
+        from backend.agents.correlation_estimator import (
+            compute_cosine_similarity_matrix,
+            embed_items_sync,
+        )
+        from backend.analytics.ega import (
+            SEMANTIC_EDGE_THRESHOLD,
+            weighted_topological_overlap,
+        )
+
+        embeddings = embed_items_sync(
+            [it.item_text for it in items], model=settings.PFA_EMBEDDING_MODEL
+        )
+        polarity = np.array(
+            [1.0 if (it.polarity or "+") == "+" else -1.0 for it in items]
+        ).reshape(-1, 1)
+        sim = compute_cosine_similarity_matrix(embeddings * polarity)
+        adjacency = np.where(sim >= SEMANTIC_EDGE_THRESHOLD, sim, 0.0)
+        np.fill_diagonal(adjacency, 0.0)
+        wto = weighted_topological_overlap(adjacency)
+        return {i: float(wto[i].max()) for i in range(len(items))}
+    except Exception as e:
+        logger.info("UVA tie-breaker unavailable (%s); pruning on loadings only", e)
+        return {}
 
 
 def prune_items(
@@ -82,6 +115,7 @@ def prune_items(
     current = list(items)
     original_index_of: List[int] = list(range(len(items)))
     dropped_original_indices: List[int] = []
+    redundancy_of: dict[int, float] = _uva_redundancy_scores(items)
 
     last_result: Optional[PFAResult] = None
 
@@ -124,8 +158,14 @@ def prune_items(
                 iteration,
             )
 
-        # Sort weakest first
-        candidates.sort(key=lambda fl: fl.primary_loading)
+        # Bucketed weakest-first (loadings rounded to 0.01); within a bucket
+        # the more UVA-redundant item drops first.
+        candidates.sort(
+            key=lambda fl: (
+                round(fl.primary_loading, 2),
+                -redundancy_of.get(original_index_of[fl.item_index], 0.0),
+            )
+        )
 
         # Facet-preservation: only enforce for multi-dimensional constructs.
         # Unidimensional constructs have a single facet, so the rule reduces

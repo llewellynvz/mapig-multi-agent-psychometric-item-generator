@@ -1746,6 +1746,43 @@ def _run_synthetic_pilot_safe(state: GraphState) -> dict:
         return {}
 
 
+def _run_ega_semantic_safe(state: GraphState) -> dict:
+    """Semantic-threshold EGA network on the final items' embeddings.
+
+    Returns {'ega_semantic': EGAResult} or empty dict on failure/too few
+    items. Heuristic signal — labeled as such in the schema disclaimer."""
+    final_output = state.get("final_output")
+    if not final_output or len(final_output.final_items) < 4:
+        return {}
+    try:
+        import numpy as np
+
+        from backend.agents.correlation_estimator import (
+            compute_cosine_similarity_matrix,
+            embed_items_sync,
+        )
+        from backend.analytics.ega import build_ega_result, build_semantic_network
+
+        items = final_output.final_items
+        embeddings = embed_items_sync(
+            [it.item_text for it in items], model=settings.EMBEDDING_MODEL
+        )
+        polarity = np.array(
+            [1.0 if (it.polarity or "+") == "+" else -1.0 for it in items]
+        ).reshape(-1, 1)
+        sim = compute_cosine_similarity_matrix(embeddings * polarity)
+        network = build_semantic_network(sim)
+        result = build_ega_result(network, "semantic_threshold")
+        logger.info(
+            "EGA_SEMANTIC done n_dimensions=%d redundant_pairs=%d",
+            result.n_dimensions, len(result.redundant_pairs),
+        )
+        return {"ega_semantic": result}
+    except Exception as e:
+        logger.error(f"Semantic EGA failed: {e}", exc_info=True)
+        return {}
+
+
 def _run_qualitative_safe(state: GraphState) -> dict:
     """Synchronous qualitative-question generation for asyncio.to_thread.
 
@@ -1809,17 +1846,19 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             asyncio.to_thread(_run_pfa_analytics_safe, state),
             asyncio.to_thread(_run_synthetic_pilot_safe, state),
             asyncio.to_thread(_run_qualitative_safe, state),
+            asyncio.to_thread(_run_ega_semantic_safe, state),
             return_exceptions=True,
         )
 
-        correlation_result, comparison_result, pfa_result_dict, synthetic_result, qualitative_result = results
+        correlation_result, comparison_result, pfa_result_dict, synthetic_result, qualitative_result, ega_result = results
         logger.info(
-            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s synthetic=%s qualitative=%s",
+            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s synthetic=%s qualitative=%s ega=%s",
             "ok" if isinstance(correlation_result, dict) else type(correlation_result).__name__,
             "ok" if isinstance(comparison_result, dict) else type(comparison_result).__name__,
             "ok" if isinstance(pfa_result_dict, dict) and pfa_result_dict.get("pfa_result") else "missing",
             "ok" if isinstance(synthetic_result, dict) and synthetic_result.get("synthetic_pilot") else "off",
             "ok" if isinstance(qualitative_result, dict) and qualitative_result.get("qualitative_questions") else "off",
+            "ok" if isinstance(ega_result, dict) and ega_result.get("ega_semantic") else "off",
         )
 
         if isinstance(correlation_result, dict) and "final_output" in correlation_result:
@@ -1870,6 +1909,34 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
         if isinstance(qualitative_result, dict) and qualitative_result.get("qualitative_warnings"):
             existing_warnings = list(updated.audit.warnings or [])
             updated.audit.warnings = existing_warnings + qualitative_result["qualitative_warnings"]
+
+        if isinstance(ega_result, dict) and ega_result.get("ega_semantic"):
+            updated.ega_semantic = ega_result["ega_semantic"]
+        elif isinstance(ega_result, Exception):
+            logger.error(f"Semantic EGA raised: {ega_result}")
+
+        # Statistical EGA runs on the synthetic pilot's Pearson matrix — only
+        # meaningful where a real N exists, so it waits for the pilot result.
+        if updated.synthetic_pilot and updated.synthetic_pilot.cells:
+            try:
+                import numpy as np
+
+                from backend.analytics.ega import build_ebic_glasso_network, build_ega_result
+
+                pilot = updated.synthetic_pilot
+                pearson = np.eye(pilot.n_items)
+                for cell in pilot.cells:
+                    pearson[cell.item_i_index, cell.item_j_index] = cell.correlation
+                    pearson[cell.item_j_index, cell.item_i_index] = cell.correlation
+                network = build_ebic_glasso_network(pearson, pilot.n_respondents)
+                if network is not None:
+                    updated.ega_synthetic = build_ega_result(network, "ebic_glasso_synthetic")
+                    logger.info(
+                        "EGA_SYNTHETIC done n_dimensions=%d",
+                        updated.ega_synthetic.n_dimensions,
+                    )
+            except Exception as e:
+                logger.error(f"Synthetic EGA failed: {e}", exc_info=True)
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
         # Time-budget check: cross-construct requires 2 GPT-5.2 calls (~30-60s).

@@ -231,6 +231,37 @@ export interface PersonaValidationResponse {
   summary: string;
 }
 
+// Phase 19: EGA/UVA dimensionality signals
+
+export interface EGANode {
+  item_index: number;
+  x: number;
+  y: number;
+  community: number;
+}
+
+export interface EGAEdge {
+  source: number;
+  target: number;
+  weight: number;
+}
+
+export interface RedundantPair {
+  item_i_index: number;
+  item_j_index: number;
+  wto: number;
+}
+
+export interface EGAResult {
+  method: "semantic_threshold" | "ebic_glasso_synthetic";
+  n_dimensions: number;
+  communities: number[][];
+  redundant_pairs: RedundantPair[];
+  nodes: EGANode[];
+  edges: EGAEdge[];
+  disclaimer: string;
+}
+
 // Phase 18: Qualitative questions (opt-in)
 
 export interface QualitativeQuestion {
@@ -289,6 +320,10 @@ export interface FinalOutput {
 
   // Phase 18: Qualitative questions
   qualitative_questions?: QualitativeQuestion[];
+
+  // Phase 19: EGA/UVA dimensionality signals
+  ega_semantic?: EGAResult;
+  ega_synthetic?: EGAResult;
 }
 
 export interface HealthResponse {

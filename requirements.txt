@@ -13,4 +13,5 @@ numpy>=1.26.0
 scipy>=1.11.0
 pandas>=2.1.0
 factor-analyzer>=0.5.1
+networkx>=3.6,<3.7
 # Optional (local Azure testing only): azure-identity>=1.19

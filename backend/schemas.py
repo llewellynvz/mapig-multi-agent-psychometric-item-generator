@@ -666,6 +666,16 @@ class FinalOutput(BaseModel):
         description="Open-ended cognitive-interview probes for construct pre-testing, grounded in the facet mapping and evidence."
     )
 
+    # Phase 19: EGA/UVA dimensionality signals
+    ega_semantic: Optional["EGAResult"] = Field(
+        default=None,
+        description="Semantic-threshold network EGA on the embedding cosine matrix — heuristic dimensionality signal."
+    )
+    ega_synthetic: Optional["EGAResult"] = Field(
+        default=None,
+        description="EBIC-glasso EGA on the synthetic pilot's Pearson matrix — only present when the synthetic pilot ran."
+    )
+
 
 # --- Phase 14-16 Schemas: PFA, Expert Panel, Persona Validation ---
 
@@ -707,6 +717,56 @@ class PersonaValidationResponse(BaseModel):
         description="Mean across-persona standard deviation of ratings (higher = more interpretive ambiguity)",
     )
     summary: str = Field(default="", description="One-line human-readable summary")
+
+
+class EGANode(BaseModel):
+    """One item in the EGA network with a deterministic layout position."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_index: int = Field(..., ge=0)
+    x: float = Field(..., ge=0.0, le=1.0, description="Spring-layout x in the unit square (seeded, deterministic)")
+    y: float = Field(..., ge=0.0, le=1.0, description="Spring-layout y in the unit square (seeded, deterministic)")
+    community: int = Field(..., ge=0, description="Louvain community index")
+
+
+class EGAEdge(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: int = Field(..., ge=0)
+    target: int = Field(..., ge=0)
+    weight: float = Field(..., description="Edge weight: cosine similarity (semantic path) or absolute partial correlation (synthetic path)")
+
+
+class RedundantPair(BaseModel):
+    """UVA redundancy flag: two items with high weighted topological overlap."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_i_index: int = Field(..., ge=0)
+    item_j_index: int = Field(..., ge=0)
+    wto: float = Field(..., ge=0.0, description="Weighted topological overlap; pairs at or above 0.25 are flagged")
+
+
+class EGAResult(BaseModel):
+    """Exploratory Graph Analysis dimensionality signal.
+
+    method='semantic_threshold' is a SEMANTIC heuristic on the embedding
+    cosine network (no sample size, no likelihood claims).
+    method='ebic_glasso_synthetic' is the Golino & Epskamp EGA procedure on
+    the synthetic pilot's Pearson matrix, where a real N exists — synthetic
+    data, item triage only.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["semantic_threshold", "ebic_glasso_synthetic"]
+    n_dimensions: int = Field(..., ge=0, description="Number of Louvain communities detected (seeded, deterministic)")
+    communities: List[List[int]] = Field(default_factory=list, description="Item indices grouped by community")
+    redundant_pairs: List[RedundantPair] = Field(default_factory=list, description="UVA-flagged redundant item pairs, strongest first")
+    nodes: List[EGANode] = Field(default_factory=list)
+    edges: List[EGAEdge] = Field(default_factory=list)
+    disclaimer: str = Field(..., description="Method-honest framing rendered with the network")
 
 
 class QualitativeQuestion(BaseModel):

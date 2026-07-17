@@ -161,6 +161,7 @@ export interface PFAResult {
   fit_verdict: "good" | "acceptable" | "poor";
   model_identifiability?: "saturated" | "identified" | "over_identified";
   disclaimer: string;
+  solver?: string;
 }
 
 export interface ExpertEvaluation {

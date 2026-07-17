@@ -98,7 +98,10 @@ export interface CorrelationCell {
 
 export interface CorrelationMatrix {
   cells: CorrelationCell[];
-  mcdonalds_omega: number;
+  /** Standardized alpha on the semantic-similarity matrix ("pseudo-alpha",
+   *  pre-data estimate). NOT McDonald's omega, NOT respondent reliability.
+   *  null = not estimable; negative = degenerate item set. */
+  pseudo_alpha: number | null;
   mean_inter_item_correlation: number;
   internal_consistency_flag: string;
   redundancy_flags?: string[];
@@ -162,6 +165,9 @@ export interface PFAResult {
   model_identifiability?: "saturated" | "identified" | "over_identified";
   disclaimer: string;
   solver?: string;
+  /** Omega-total from the PFA loading solution (Φ-aware). Pre-data semantic
+   *  estimate, not respondent reliability. null = not estimable. */
+  pseudo_omega?: number | null;
 }
 
 export interface ExpertEvaluation {

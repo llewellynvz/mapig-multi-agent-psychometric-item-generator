@@ -1350,35 +1350,29 @@ async def correlation_node(state: GraphState) -> GraphState:
 
             # Import correlation modules
             from backend.agents.correlation_estimator import estimate_pairwise_correlations
-            from backend.analytics.omega_calculator import calculate_omega
+            from backend.analytics.omega_calculator import calculate_pseudo_alpha
             from backend.schemas import CorrelationMatrix
 
             # Estimate pairwise correlations using embedding cosine similarity
             cells = await estimate_pairwise_correlations(item_texts, construct_name)
 
             if not cells:
-                logger.warning("Correlation estimation returned no cells, skipping omega calculation")
+                logger.warning("Correlation estimation returned no cells, skipping pseudo-alpha calculation")
                 return {}
 
-            # Calculate McDonald's omega and internal consistency metrics
-            omega_result = calculate_omega(cells, num_items=len(item_texts))
+            # Pseudo-alpha (standardized alpha on the semantic matrix)
+            alpha_result = calculate_pseudo_alpha(cells, num_items=len(item_texts))
+            pseudo_alpha = alpha_result["pseudo_alpha"]
+            internal_consistency_flag = alpha_result["internal_consistency_flag"]
 
-            # Handle calculation failure
-            if omega_result["omega_total"] is None:
-                logger.warning("Omega calculation failed (non-positive-definite matrix), setting omega=0.0")
-                omega_total = 0.0
-                internal_consistency_flag = "calculation_failed"
-            else:
-                omega_total = omega_result["omega_total"]
-                internal_consistency_flag = omega_result["internal_consistency_flag"]
-
-            # Build CorrelationMatrix
+            # Build CorrelationMatrix — a failed calculation stays None so the
+            # UI can say "not estimable" instead of showing a fabricated 0.000
             correlation_matrix = CorrelationMatrix(
                 cells=cells,
-                mcdonalds_omega=omega_total,
-                mean_inter_item_correlation=omega_result["mean_inter_item_correlation"],
+                pseudo_alpha=pseudo_alpha,
+                mean_inter_item_correlation=alpha_result["mean_inter_item_correlation"],
                 internal_consistency_flag=internal_consistency_flag,
-                guidance=omega_result.get("guidance"),
+                guidance=alpha_result.get("guidance"),
             )
 
             # Update FinalOutput with correlation_matrix
@@ -1386,9 +1380,10 @@ async def correlation_node(state: GraphState) -> GraphState:
             updated_final_output.correlation_matrix = correlation_matrix
 
             logger.info(
-                f"Correlation analysis complete: omega={omega_total:.3f}, "
-                f"mean_r={omega_result['mean_inter_item_correlation']:.3f}, "
-                f"flag={internal_consistency_flag}"
+                "Correlation analysis complete: pseudo_alpha=%s, mean_r=%.3f, flag=%s",
+                f"{pseudo_alpha:.3f}" if pseudo_alpha is not None else "not_estimable",
+                alpha_result["mean_inter_item_correlation"],
+                internal_consistency_flag,
             )
 
             # TODO: Track GPT-5.2 token usage from correlation estimation

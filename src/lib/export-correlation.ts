@@ -60,9 +60,9 @@ export function exportCorrelationMatrixToCsv(
   let csv = '\uFEFF';
 
   // Metadata header rows
-  csv += `CORRELATION MATRIX (LLM-ESTIMATED)\r\n`;
-  csv += `McDonald's Omega,${matrix.mcdonalds_omega.toFixed(3)}\r\n`;
-  csv += `Mean Inter-Item Correlation,${matrix.mean_inter_item_correlation.toFixed(3)}\r\n`;
+  csv += `SEMANTIC SIMILARITY MATRIX (EMBEDDING-BASED PRE-DATA ESTIMATE)\r\n`;
+  csv += `Pseudo-alpha (semantic),${matrix.pseudo_alpha != null ? matrix.pseudo_alpha.toFixed(3) : 'not estimable'}\r\n`;
+  csv += `Mean Semantic Similarity,${matrix.mean_inter_item_correlation.toFixed(3)}\r\n`;
   csv += `Internal Consistency,${matrix.internal_consistency_flag}\r\n`;
   csv += `\r\n`; // Empty line separator
 

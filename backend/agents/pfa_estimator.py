@@ -286,6 +286,36 @@ def ensure_sklearn_compat() -> None:
         pass
 
 
+def compute_pseudo_omega(loadings: np.ndarray, phi: Optional[np.ndarray] = None) -> Optional[float]:
+    """Omega-total from a factor solution: (Λ′1)′Φ(Λ′1) / [(Λ′1)′Φ(Λ′1) + Σ(1−diag(ΛΦΛ′))].
+
+    General Φ-aware form — reduces to (Σλ)²/((Σλ)²+Σ(1−λ²)) for a single
+    factor (Φ=1). Computed on PFA loadings, so it is a pre-data semantic
+    estimate ("pseudo-omega"), not respondent-based reliability.
+
+    Returns None when not estimable: empty loadings, a Heywood case
+    (communality > 1 → negative uniqueness), or a degenerate denominator.
+    """
+    if loadings.size == 0:
+        return None
+    if phi is None:
+        phi = np.eye(loadings.shape[1])
+    col_sums = loadings.sum(axis=0)
+    num = float(col_sums @ phi @ col_sums)
+    communalities = np.diag(loadings @ phi @ loadings.T)
+    uniquenesses = 1.0 - communalities
+    if np.any(uniquenesses < 0):
+        logger.warning(
+            "PSEUDO_OMEGA not estimable: Heywood case (min uniqueness %.4f)",
+            float(uniquenesses.min()),
+        )
+        return None
+    denom = num + float(uniquenesses.sum())
+    if denom <= 0:
+        return None
+    return num / denom
+
+
 def _pca_eigh_loadings(sim: np.ndarray, n_factors: int) -> Tuple[np.ndarray, List[float]]:
     """Unrotated PCA loadings via eigendecomposition, with SIGNED eigenvalues.
 
@@ -647,6 +677,7 @@ def run_pfa(
 
     # 9. Fit indices (ΛΦΛ' — Φ from the oblique solution, sign-conjugated)
     rmsr, caf, residual = compute_model_fit(sim, loadings, phi=phi)
+    pseudo_omega = compute_pseudo_omega(loadings, phi=phi)
 
     # Build per-item FactorLoading entries
     abs_loadings = np.abs(loadings)
@@ -726,4 +757,5 @@ def run_pfa(
         model_identifiability=identifiability,  # type: ignore[arg-type]
         disclaimer=disclaimer,
         solver=solver_used,
+        pseudo_omega=pseudo_omega,
     )

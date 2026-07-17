@@ -906,6 +906,52 @@ def meta_editor_node(state: GraphState) -> GraphState:
         }
 
 
+def _fallback_trim_to_target(
+    items: list,
+    target: int,
+    validation_results: list,
+) -> tuple[list, list[int]]:
+    """Trim items to target count by validator weighted_score when PFA cannot.
+
+    Drops the lowest-scoring items first while never removing the last item of
+    a facet (facet coverage mirrors prune_items). Returns (kept, dropped_indices).
+    """
+    scores: dict[int, float] = {}
+    for v in validation_results:
+        idx = getattr(v, "item_index", None)
+        if idx is not None:
+            scores[idx] = getattr(v, "weighted_score", 0.0) or 0.0
+
+    current = list(items)
+    original_index_of = list(range(len(items)))
+    dropped: list[int] = []
+
+    while len(current) > target:
+        facet_counts: dict[str, int] = {}
+        for it in current:
+            key = it.facet_name or ""
+            facet_counts[key] = facet_counts.get(key, 0) + 1
+
+        candidates = sorted(
+            range(len(current)),
+            key=lambda i: scores.get(original_index_of[i], 0.0),
+        )
+        drop_pos = None
+        for pos in candidates:
+            facet_key = current[pos].facet_name or ""
+            if facet_counts.get(facet_key, 0) > 1 or len(facet_counts) <= 1:
+                drop_pos = pos
+                break
+        if drop_pos is None:
+            drop_pos = candidates[0]
+
+        dropped.append(original_index_of[drop_pos])
+        del current[drop_pos]
+        del original_index_of[drop_pos]
+
+    return current, dropped
+
+
 def pfa_pruning_node(state: GraphState) -> GraphState:
     """Phase 14: Prune over-generated items via PFA, always emit a structural report.
 
@@ -964,6 +1010,15 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
                 target_count=target,
                 deadline=deadline,
             )
+            if len(kept) > target:
+                kept, extra_dropped = _fallback_trim_to_target(
+                    kept, target, state.get("validation_results") or []
+                )
+                dropped = dropped + extra_dropped
+                logger.warning(
+                    "PFA_PRUNING_FALLBACK trimmed %d items by validation score (PFA loadings unavailable or budget hit)",
+                    len(extra_dropped),
+                )
             return {
                 "draft_items": kept,
                 "pfa_pruning_result": pfa_result,
@@ -971,6 +1026,15 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
             }
         except Exception as e:
             logger.error("PFA pruning failed: %s", e, exc_info=True)
+            if len(items) > target:
+                kept, dropped = _fallback_trim_to_target(
+                    items, target, state.get("validation_results") or []
+                )
+                logger.warning(
+                    "PFA_PRUNING_FALLBACK after exception: trimmed %d items by validation score",
+                    len(dropped),
+                )
+                return {"draft_items": kept, "pfa_dropped_indices": dropped}
             return {}
 
 

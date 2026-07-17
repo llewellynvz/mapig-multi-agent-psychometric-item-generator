@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { TopBar } from "@/components/TopBar";
-import { DebugLogger } from "@/components/DebugLogger";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -29,7 +28,6 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`min-h-screen ${manrope.variable} ${spaceGrotesk.variable}`}>
         <Providers>
-          <DebugLogger />
           <TopBar />
           {children}
         </Providers>

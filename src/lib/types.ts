@@ -116,6 +116,8 @@ export interface ComparisonInstrument {
   sample_items_count?: number;
   psychometric_properties?: string;
   similarity_rationale?: string;
+  validity_method?: string;
+  items?: string[];
 }
 
 export interface ConstructPairAnalysis {

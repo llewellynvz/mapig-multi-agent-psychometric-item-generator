@@ -4,11 +4,13 @@ Based on Hommel & Arslan (2024) methodology: sentence transformer embeddings
 with cosine similarity provide validated accuracy (r=.71 items, r=.89 scales,
 r=.86 reliability) for estimating inter-item correlations.
 
-Uses OpenAI text-embedding-3-small via the existing OPENAI_API_KEY.
+Uses the OpenAI embedding model configured by settings.EMBEDDING_MODEL via
+the existing OPENAI_API_KEY. All similarity surfaces share this model so
+adjacent statistics come from the same embedding space.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from openai import AsyncOpenAI, OpenAI
@@ -18,16 +20,17 @@ from backend.settings import settings
 
 logger = logging.getLogger("lmaig")
 
+EMBEDDING_MODEL = settings.EMBEDDING_MODEL
 
-async def embed_items(items: List[str], model: str = "text-embedding-3-small") -> np.ndarray:
+
+async def embed_items(items: List[str], model: Optional[str] = None) -> np.ndarray:
     """Get embeddings for all items in a single API call.
 
     Args:
         items: List of item texts to embed
-        model: OpenAI embedding model name. Defaults to "text-embedding-3-small"
-            for backward compatibility. PFA uses "text-embedding-3-large" via
-            settings.PFA_EMBEDDING_MODEL for higher congruence.
+        model: OpenAI embedding model name; defaults to settings.EMBEDDING_MODEL.
     """
+    model = model or EMBEDDING_MODEL
     logger.info(
         "EMBED_ITEMS calling OpenAI embeddings model=%s api_key_set=%s base_url=%s",
         model,
@@ -47,11 +50,12 @@ async def embed_items(items: List[str], model: str = "text-embedding-3-small") -
     return np.array([e.embedding for e in sorted_data])
 
 
-def embed_items_sync(items: List[str], model: str = "text-embedding-3-small") -> np.ndarray:
+def embed_items_sync(items: List[str], model: Optional[str] = None) -> np.ndarray:
     """Synchronous version of embed_items for use in non-async paths.
 
     Used by PFA estimator when called from sync graph nodes.
     """
+    model = model or EMBEDDING_MODEL
     logger.info(
         "EMBED_ITEMS_SYNC calling OpenAI embeddings model=%s items=%d",
         model, len(items),
@@ -200,7 +204,7 @@ def compute_cross_scale_validity_sync(
     )
 
     all_items = generated_items + published_items
-    resp = client.embeddings.create(model="text-embedding-3-small", input=all_items)
+    resp = client.embeddings.create(model=EMBEDDING_MODEL, input=all_items)
     sorted_data = sorted(resp.data, key=lambda x: x.index)
     all_embeddings = np.array([e.embedding for e in sorted_data])
 

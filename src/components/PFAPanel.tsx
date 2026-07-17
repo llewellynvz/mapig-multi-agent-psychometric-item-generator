@@ -5,6 +5,8 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { MethodBadge } from "./MethodBadge";
+import { MethodologyNote } from "./MethodologyNote";
 import type { PFAResult, FactorLoading } from "@/lib/types";
 
 export interface PFAPanelProps {
@@ -115,7 +117,7 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
         width="100%"
         style={{ minWidth: 720, maxWidth: layout.totalW, height: "auto" }}
         role="img"
-        aria-label="CFA-style measurement model with latent factor, item indicators, and residual variances"
+        aria-label="Pseudo-EFA loading diagram with latent factor, item indicators, and residual variances"
       >
         <defs>
           <marker
@@ -314,7 +316,7 @@ function PathDiagram({ pfa }: { pfa: PFAResult }) {
                   fill="#94a3b8"
                   fontSize="10"
                 >
-                  φ = {Math.abs(cong).toFixed(2)}
+                  c = {Math.abs(cong).toFixed(2)}
                 </text>
               )}
             </g>
@@ -466,8 +468,9 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
     <SurfaceCard className="mt-4 border-lime-300/70">
       <CardHeader className="border-b border-border/60">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base md:text-lg">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             Pseudo-Factor Analysis (Pre-Calibration)
+            <MethodBadge variant="predata" />
           </CardTitle>
           <Badge className={`gap-1.5 ${verdict.color}`}>
             {verdict.icon}
@@ -499,7 +502,7 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
           <div className="mb-6 rounded-lg border border-border/40 bg-slate-950/60 p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-slate-50">
-                CFA Measurement Model
+                Pseudo-EFA loading diagram (semantic)
               </h4>
               <span className="text-[10px] uppercase text-muted-foreground/70 tracking-wide">
                 pre-calibration estimate
@@ -508,7 +511,7 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
             <p className="text-[11px] text-muted-foreground/80 mb-3 leading-relaxed">
               Latent factor (<em>η</em>) → item indicators (<em>x<sub>i</sub></em>)
               ← residuals (<em>ε<sub>i</sub></em>). Standardized loadings (λ)
-              shown on each path. Tucker&apos;s congruence (φ) inside each ellipse.
+              shown on each path. Tucker&apos;s congruence (c) inside each ellipse.
             </p>
             <PathDiagram pfa={pfa} />
             <MeasurementEquations pfa={pfa} />
@@ -516,10 +519,10 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
         )}
 
         {/* Summary statistics */}
-        <div className="grid gap-3 sm:grid-cols-4 mb-5">
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5 mb-5">
           <div className="rounded-lg border border-border/40 bg-slate-900/30 p-3 text-center">
             <span className="text-[10px] uppercase font-medium text-muted-foreground/70 block">
-              Mean Tucker&apos;s congruence
+              Mean facet-target congruence
             </span>
             <span className={`mt-1 block text-xl font-bold tabular-nums ${congruenceColor(meanCongruence)}`}>
               {meanCongruence.toFixed(3)}
@@ -549,7 +552,34 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
               {pfa.caf.toFixed(3)}
             </span>
           </div>
+          <div className="rounded-lg border border-border/40 bg-slate-900/30 p-3 text-center">
+            <span className="text-[10px] uppercase font-medium text-muted-foreground/70 block">
+              Pseudo-omega (loadings)
+            </span>
+            {pfa.pseudo_omega != null ? (
+              <span className="mt-1 block text-xl font-bold tabular-nums text-[#a7d12b]">
+                {pfa.pseudo_omega.toFixed(3)}
+              </span>
+            ) : (
+              <span className="mt-1 block text-sm font-medium text-muted-foreground">
+                — not estimable
+              </span>
+            )}
+            <span className="mt-0.5 block text-[9px] text-muted-foreground/60">
+              from PFA solution — pre-data
+            </span>
+          </div>
         </div>
+
+        {pfa.solver && pfa.solver !== "factor_analyzer:oblimin" && (
+          <p className="-mt-3 mb-5 text-[10px] italic text-muted-foreground/70">
+            {pfa.solver === "pca_eigh_fallback"
+              ? "Unrotated PCA fallback (factor analysis failed)"
+              : pfa.solver === "oblimin_phi_missing"
+                ? "Factor correlations unavailable — fit computed with Φ=I"
+                : pfa.solver}
+          </p>
+        )}
 
         {/* Factor labels + congruence */}
         {pfa.factor_labels.length > 0 && (
@@ -662,12 +692,9 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
           </div>
         )}
 
-        {/* Disclaimer */}
-        <div className="mt-4 pt-4 border-t border-border/30">
-          <p className="text-[11px] italic text-muted-foreground/70">
-            {pfa.disclaimer}
-          </p>
-        </div>
+        <MethodologyNote embeddingModel={pfa.embedding_model}>
+          {pfa.disclaimer}
+        </MethodologyNote>
       </CardContent>
     </SurfaceCard>
   );

@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { AlertTriangle, ExternalLink } from "lucide-react";
+import { MethodBadge } from "./MethodBadge";
 import type { ComparisonInstrument } from "@/lib/types";
 
 export interface InstrumentCardProps {
   instrument: ComparisonInstrument;
   label: string;
-  score?: number;
+  score?: number | null;
   scoreLabel?: string;
   showWarning?: boolean;
   warningText?: string;
@@ -75,8 +76,19 @@ export function InstrumentCard({
   warningText
 }: InstrumentCardProps) {
   const authorYear = parseAuthorYear(instrument.source_citation);
-  const hasScore = score !== undefined;
+  const hasScore = score != null;
   const paperUrl = extractPaperUrl(instrument.source_citation);
+  const method = instrument.validity_method;
+  const scoreNotEstimable = !hasScore && (method === "failed" || method === "disabled");
+  const scoreCaption = hasScore
+    ? method === "embedding"
+      ? `cos = ${score.toFixed(2)}`
+      : method === "llm-as-judge"
+        ? `LLM est. ${score.toFixed(2)}`
+        : `est. ${score.toFixed(2)}`
+    : null;
+  const methodBadgeVariant =
+    method === "embedding" ? "semantic" : method === "llm-as-judge" ? "llm" : null;
 
   return (
     <div
@@ -126,17 +138,25 @@ export function InstrumentCard({
 
         {/* Right: Square score badge */}
         {hasScore && (
-          <div className="flex shrink-0 flex-col items-center justify-center rounded-xl border border-border/40 bg-slate-900/30 w-24 h-24">
-            <span className={`text-2xl font-bold tabular-nums leading-none ${getScoreColor(score)}`}>
-              {score.toFixed(2)}
-            </span>
-            <span className="mt-1 text-[9px] font-medium text-muted-foreground">
-              r = {score.toFixed(2)}
-            </span>
-            <span className={`mt-0.5 text-[9px] font-medium uppercase tracking-wider ${getScoreColor(score)}`}>
-              {getScoreLabel(score)}
-            </span>
+          <div className="flex shrink-0 flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-border/40 bg-slate-900/30 w-24 h-24">
+              <span className={`text-2xl font-bold tabular-nums leading-none ${getScoreColor(score)}`}>
+                {score.toFixed(2)}
+              </span>
+              <span className="mt-1 text-[9px] font-medium text-muted-foreground">
+                {scoreCaption}
+              </span>
+              <span className={`mt-0.5 text-[9px] font-medium uppercase tracking-wider ${getScoreColor(score)}`}>
+                {getScoreLabel(score)}
+              </span>
+            </div>
+            {methodBadgeVariant && <MethodBadge variant={methodBadgeVariant} />}
           </div>
+        )}
+        {scoreNotEstimable && (
+          <span className="shrink-0 self-center text-xs italic text-muted-foreground">
+            Score not estimable
+          </span>
         )}
       </div>
 

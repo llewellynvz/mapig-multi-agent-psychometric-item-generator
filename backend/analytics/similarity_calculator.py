@@ -89,7 +89,7 @@ class PlagiarismDetector:
         for i in range(len(generated_items)):
             max_sim = float(similarities[i].max())
             if max_sim >= self.threshold:
-                warning = f"Potential similarity to {instrument_name} item (r = {max_sim:.2f})"
+                warning = f"Potential similarity to {instrument_name} item (cosine similarity = {max_sim:.2f})"
                 flagged[i] = warning
                 log.info("PLAGIARISM_DETECTOR flagged item_index=%d similarity=%.3f", i, max_sim)
 

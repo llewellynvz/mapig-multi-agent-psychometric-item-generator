@@ -120,7 +120,12 @@ export function ProgressIndicator({
   }, [completedNodes.length, progress.currentNode]);
 
   return (
-    <SurfaceCard className="border-sky-300/70 overflow-hidden">
+    <SurfaceCard
+      className="border-sky-300/70 overflow-hidden"
+      role="status"
+      aria-live="polite"
+      aria-label="Generation progress"
+    >
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
         <div className="flex items-center gap-3">

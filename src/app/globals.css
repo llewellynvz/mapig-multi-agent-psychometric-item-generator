@@ -109,6 +109,15 @@
 }
 
 @layer utilities {
+  .bg-app-gradient {
+    background-image: linear-gradient(
+      to bottom,
+      var(--app-gradient-from, #0B2A34),
+      var(--app-gradient-via, #0F3743),
+      var(--app-gradient-to, #1A4A53)
+    );
+  }
+
   .animate-fade-up {
     animation: fade-up 0.45s ease-out both;
   }

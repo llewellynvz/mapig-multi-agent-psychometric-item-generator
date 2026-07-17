@@ -11,7 +11,7 @@ import type { ComparisonInstrument, CrossConstructComparison } from "@/lib/types
 export interface ComparisonPanelProps {
   convergentInstrument: ComparisonInstrument;
   discriminantInstrument: ComparisonInstrument;
-  convergentScore: number;
+  convergentScore: number | null;
   crossConstruct?: CrossConstructComparison;
   defaultExpanded?: boolean;
 }

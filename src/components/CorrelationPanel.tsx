@@ -12,7 +12,6 @@ import { CorrelationTooltip } from "./CorrelationTooltip";
 import type { CorrelationMatrix, CorrelationCell } from "@/lib/types";
 import {
   exportCorrelationMatrixToCsv,
-  exportConfidenceIntervalsToCsv,
   exportCorrelationMatrixToJson
 } from "@/lib/export-correlation";
 import { sanitizeFilename } from "@/lib/utils";
@@ -49,13 +48,13 @@ export function CorrelationPanel({
   // Find cell by indices
   const findCell = (i: number, j: number): CorrelationCell | null => {
     if (i === j) {
-      // Diagonal: perfect correlation
+      // Diagonal: self-similarity is 1 by definition
       return {
         item_i_index: i,
         item_j_index: j,
         correlation: 1.0,
-        ci_low: 1.0,
-        ci_high: 1.0
+        ci_low: null,
+        ci_high: null
       };
     }
 
@@ -106,16 +105,6 @@ export function CorrelationPanel({
     link.download = `${sanitizeFilename(constructName)}_correlation_matrix.csv`;
     link.click();
     URL.revokeObjectURL(url);
-
-    // Also export CI file
-    const ciCsv = exportConfidenceIntervalsToCsv(matrix, itemTexts);
-    const ciBlob = new Blob([ciCsv], { type: 'text/csv;charset=utf-8;' });
-    const ciUrl = URL.createObjectURL(ciBlob);
-    const ciLink = document.createElement('a');
-    ciLink.href = ciUrl;
-    ciLink.download = `${sanitizeFilename(constructName)}_confidence_intervals.csv`;
-    ciLink.click();
-    URL.revokeObjectURL(ciUrl);
   };
 
   const handleExportJson = () => {
@@ -211,13 +200,8 @@ export function CorrelationPanel({
 
                 <div className="mb-3">
                   <div className="text-lg font-bold">
-                    r = {selectedCell.correlation.toFixed(3)}
+                    cos = {selectedCell.correlation.toFixed(3)}
                   </div>
-                  {selectedCell.ci_low != null && selectedCell.ci_high != null && (
-                    <div className="text-sm text-slate-300">
-                      95% CI: [{selectedCell.ci_low.toFixed(3)}, {selectedCell.ci_high.toFixed(3)}]
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-2 border-t border-slate-700 pt-3">

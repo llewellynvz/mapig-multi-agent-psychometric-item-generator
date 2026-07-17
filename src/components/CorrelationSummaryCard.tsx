@@ -9,12 +9,15 @@ export interface CorrelationSummaryCardProps {
   matrix: CorrelationMatrix;
 }
 
-function getOmegaColor(omega: number): string {
-  return omega >= 0.70 ? "text-[#a7d12b]" : "text-[#a7d12b]/70";
+function getAlphaColor(alpha: number | null | undefined): string {
+  if (alpha == null) return "text-muted-foreground";
+  return alpha >= 0.70 ? "text-[#a7d12b]" : "text-[#a7d12b]/70";
 }
 
-function getOmegaLabel(omega: number): string {
-  return omega >= 0.70 ? "Reliable" : "Below threshold";
+function getAlphaLabel(alpha: number | null | undefined): string {
+  if (alpha == null) return "Not estimable";
+  if (alpha < 0) return "Degenerate (negative)";
+  return alpha >= 0.70 ? "≥ .70 heuristic band (pre-data)" : "Below .70 heuristic band (pre-data)";
 }
 
 function getMeanRColor(meanR: number): string {
@@ -55,20 +58,20 @@ export function CorrelationSummaryCard({ matrix }: CorrelationSummaryCardProps) 
       </CardHeader>
       <CardContent className="pt-5">
         <div className="grid gap-4 sm:grid-cols-3">
-          {/* McDonald's Omega */}
+          {/* Pseudo-alpha (semantic) */}
           <div className="flex flex-col items-center text-center rounded-lg border border-border/40 bg-slate-900/30 p-4">
-            <h4 className="text-sm font-semibold text-slate-50">McDonald&apos;s Omega</h4>
-            <span className={`mt-2 text-2xl font-bold tabular-nums ${getOmegaColor(matrix.mcdonalds_omega)}`}>
-              {matrix.mcdonalds_omega.toFixed(3)}
+            <h4 className="text-sm font-semibold text-slate-50">Pseudo-alpha (semantic)</h4>
+            <span className={`mt-2 text-2xl font-bold tabular-nums ${getAlphaColor(matrix.pseudo_alpha)}`}>
+              {matrix.pseudo_alpha != null ? matrix.pseudo_alpha.toFixed(3) : "—"}
             </span>
-            <span className={`mt-1 text-[10px] font-medium uppercase ${getOmegaColor(matrix.mcdonalds_omega)}`}>
-              {getOmegaLabel(matrix.mcdonalds_omega)}
+            <span className={`mt-1 text-[10px] font-medium uppercase ${getAlphaColor(matrix.pseudo_alpha)}`}>
+              {getAlphaLabel(matrix.pseudo_alpha)}
             </span>
           </div>
 
-          {/* Mean Inter-Item Correlation */}
+          {/* Mean semantic similarity */}
           <div className="flex flex-col items-center text-center rounded-lg border border-border/40 bg-slate-900/30 p-4">
-            <h4 className="text-sm font-semibold text-slate-50">Mean Inter-Item r</h4>
+            <h4 className="text-sm font-semibold text-slate-50">Mean semantic similarity</h4>
             <span className={`mt-2 text-2xl font-bold tabular-nums ${getMeanRColor(matrix.mean_inter_item_correlation)}`}>
               {matrix.mean_inter_item_correlation.toFixed(3)}
             </span>

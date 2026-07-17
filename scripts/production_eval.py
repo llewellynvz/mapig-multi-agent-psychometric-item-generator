@@ -143,7 +143,7 @@ class RunResult:
     bias_comments: int = 0
     has_correlation_matrix: bool = False
     has_comparison_instruments: bool = False
-    mcdonalds_omega: float | None = None
+    pseudo_alpha: float | None = None
     convergent_validity: float | None = None
     plagiarism_flags: int = 0
 
@@ -326,7 +326,7 @@ def _analyze_output(result: RunResult) -> None:
     cm = fo.get("correlation_matrix")
     if cm and isinstance(cm, dict):
         result.has_correlation_matrix = True
-        result.mcdonalds_omega = cm.get("mcdonalds_omega")
+        result.pseudo_alpha = cm.get("pseudo_alpha")
     result.has_comparison_instruments = len(fo.get("comparison_instruments", [])) > 0
     result.convergent_validity = fo.get("convergent_validity_score")
     result.plagiarism_flags = len(fo.get("plagiarism_flags") or {})
@@ -441,9 +441,11 @@ def _check_warnings(result: RunResult, fo: dict) -> None:
     # W12: Correlation matrix issues
     cm = fo.get("correlation_matrix")
     if cm and isinstance(cm, dict):
-        omega = cm.get("mcdonalds_omega", 0)
-        if omega < 0.5:
-            result.warnings.append(f"Low McDonald's omega: {omega:.3f} (< 0.50)")
+        alpha = cm.get("pseudo_alpha")
+        if alpha is not None and alpha < 0.5:
+            result.warnings.append(f"Low pseudo-alpha (semantic): {alpha:.3f} (< 0.50)")
+        elif alpha is None:
+            result.warnings.append("Pseudo-alpha not estimable")
         flag = cm.get("internal_consistency_flag", "")
         if flag == "too_high":
             result.warnings.append("Internal consistency TOO HIGH — possible item redundancy")
@@ -547,7 +549,7 @@ def generate_report(report: EvalReport) -> str:
     for r in report.runs:
         if not r.success:
             continue
-        omega = f"{r.mcdonalds_omega:.3f}" if r.mcdonalds_omega is not None else "N/A"
+        omega = f"{r.pseudo_alpha:.3f}" if r.pseudo_alpha is not None else "N/A"
         cv = f"{r.convergent_validity:.3f}" if r.convergent_validity is not None else "N/A"
         corr = "Yes" if r.has_correlation_matrix else "No"
         instr = "Yes" if r.has_comparison_instruments else "No"
@@ -734,7 +736,7 @@ def main() -> int:
                     "bias_comments": r.bias_comments,
                     "has_correlation_matrix": r.has_correlation_matrix,
                     "has_comparison_instruments": r.has_comparison_instruments,
-                    "mcdonalds_omega": r.mcdonalds_omega,
+                    "pseudo_alpha": r.pseudo_alpha,
                     "convergent_validity": r.convergent_validity,
                     "plagiarism_flags": r.plagiarism_flags,
                     "warnings": r.warnings,

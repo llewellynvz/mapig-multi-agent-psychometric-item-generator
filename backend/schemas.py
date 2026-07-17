@@ -392,21 +392,31 @@ class CorrelationCell(BaseModel):
 
 
 class CorrelationMatrix(BaseModel):
-    """Synthetic inter-item correlation matrix with aggregates.
+    """Semantic similarity matrix with pre-data aggregates.
 
-    Contains pairwise correlations (upper-triangular only) plus scale-level statistics
-    like McDonald's omega and mean inter-item correlation.
+    Contains pairwise embedding cosine similarities (upper-triangular only,
+    treated as pseudo inter-item correlations) plus scale-level pre-data
+    estimates such as pseudo-alpha and mean semantic similarity.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     cells: List[CorrelationCell] = Field(..., min_length=1, description="Flat list of N*(N-1)/2 cells (upper-triangular)")
-    mcdonalds_omega: float = Field(..., ge=0.0, le=1.0, description="McDonald's omega total for internal consistency reliability")
-    mean_inter_item_correlation: float = Field(..., description="Mean of all pairwise correlations")
-    internal_consistency_flag: str = Field(..., description="optimal_range/too_low/too_high based on mean inter-item correlation")
+    pseudo_alpha: Optional[float] = Field(
+        default=None,
+        le=1.0,
+        description=(
+            "Standardized Cronbach's alpha formula applied to the semantic-similarity matrix "
+            "('pseudo-alpha', a pre-data estimate; Hommel & Arslan 2024 framing). NOT McDonald's "
+            "omega and NOT respondent-based reliability. None = not estimable; negative values are "
+            "reported as-is (degenerate item set)."
+        ),
+    )
+    mean_inter_item_correlation: float = Field(..., description="Mean pairwise embedding cosine similarity (pseudo inter-item r)")
+    internal_consistency_flag: str = Field(..., description="optimal_range/too_low/too_high/calculation_failed based on mean semantic similarity")
     guidance: Optional[str] = Field(default=None, description="Actionable guidance based on internal_consistency_flag")
-    redundancy_flags: Optional[List[str]] = Field(default=None, description="Warnings for item pairs with r > 0.75, suggesting redundancy")
-    disclaimer: str = Field(default="Correlations estimated via sentence-embedding cosine similarity (Hommel & Arslan, 2024). Not a substitute for empirical validation.", description="Standard disclaimer for embedding-based estimates")
+    redundancy_flags: Optional[List[str]] = Field(default=None, description="Warnings for item pairs with cosine similarity > 0.75, suggesting redundancy")
+    disclaimer: str = Field(default="Similarities computed via sentence-embedding cosine similarity, treated as pseudo-correlations (Hommel & Arslan, 2024). Pre-data estimates; not a substitute for empirical validation.", description="Standard disclaimer for embedding-based estimates")
 
 
 class ComparisonInstrument(BaseModel):
@@ -828,6 +838,15 @@ class PFAResult(BaseModel):
             "Extraction path used. 'factor_analyzer:oblimin' = oblique EFA with factor correlations; "
             "'oblimin_phi_missing' = oblique solution but Φ unavailable (fit indices computed with Φ=I); "
             "'pca_eigh_fallback' = unrotated PCA fallback, eigenvalues reported signed."
+        ),
+    )
+    pseudo_omega: Optional[float] = Field(
+        default=None,
+        le=1.0,
+        description=(
+            "Omega-total computed from the PFA loading solution: (Λ′1)′Φ(Λ′1) / "
+            "[(Λ′1)′Φ(Λ′1) + Σ(1−diag(ΛΦΛ′))]. Pre-data semantic estimate on embedding-derived "
+            "loadings — NOT respondent-based reliability. None = not estimable (e.g., Heywood case)."
         ),
     )
 

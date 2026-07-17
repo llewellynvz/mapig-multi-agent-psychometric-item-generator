@@ -469,6 +469,16 @@ class ComparisonInstrument(BaseModel):
             ]
         return v
 
+    @field_validator("name", "measured_construct", mode="before")
+    @classmethod
+    def _sanitize_instrument_text(cls, v):
+        # Web-sourced and later interpolated into the validity-judge prompt —
+        # strip injection patterns at ingestion, same as fetched items.
+        if isinstance(v, str):
+            from backend.agents.sanitizer import sanitize_string
+            return sanitize_string(v, "instrument_text")
+        return v
+
 
 class ConstructPairAnalysis(BaseModel):
     """Discriminant validity analysis for a pair of constructs.
@@ -969,14 +979,20 @@ class PFAResult(BaseModel):
             "loading-vs-loading comparisons; Lorenzo-Seva & ten Berge, 2006)."
         ),
     )
-    factor_recovery_rate: float = Field(
-        default=0.0,
+    factor_recovery_rate: Optional[float] = Field(
+        default=None,
         ge=0.0,
         le=1.0,
-        description="Fraction of expected factors recovered (loading > 0.4 majority)",
+        description="Fraction of expected factors recovered (loading > 0.4 majority). None = not estimable.",
     )
-    rmsr: float = Field(default=0.0, description="Root Mean Square Residual (lower is better; <0.05 good)")
-    caf: float = Field(default=0.0, description="Common Part Accounted For (higher is better; >0.7 good)")
+    rmsr: Optional[float] = Field(
+        default=None,
+        description="Root Mean Square Residual (lower is better; <0.05 good). None = not estimable.",
+    )
+    caf: Optional[float] = Field(
+        default=None,
+        description="Common Part Accounted For (higher is better; >0.7 good). None = not estimable.",
+    )
     eigenvalues: List[float] = Field(
         default_factory=list,
         description=(
@@ -993,8 +1009,9 @@ class PFAResult(BaseModel):
         default_factory=list,
         description="Original item indices dropped during pruning (empty for analytics-only PFA)",
     )
-    fit_verdict: Literal["good", "acceptable", "poor"] = Field(
-        default="acceptable", description="Overall fit verdict"
+    fit_verdict: Literal["good", "acceptable", "poor", "not_estimable"] = Field(
+        default="acceptable",
+        description="Overall fit verdict; 'not_estimable' when the solution could not be computed",
     )
     model_identifiability: Literal["saturated", "identified", "over_identified"] = Field(
         default="over_identified",

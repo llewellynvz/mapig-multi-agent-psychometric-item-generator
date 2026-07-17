@@ -89,6 +89,13 @@ function EGANetworkView({ ega, itemTexts }: { ega: EGAResult; itemTexts?: string
 }
 
 function verdictBadge(v: string): { color: string; icon: React.ReactNode; label: string } {
+  if (v === "not_estimable") {
+    return {
+      color: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+      icon: <AlertTriangle className="h-3.5 w-3.5" />,
+      label: "Not estimable",
+    };
+  }
   if (v === "good") {
     return {
       color: "bg-[#a7d12b]/15 text-[#a7d12b] border-[#a7d12b]/30",
@@ -608,7 +615,9 @@ export function PFAPanel({ pfa, egaSemantic, egaSynthetic, itemTexts }: PFAPanel
               Factor recovery
             </span>
             <span className="mt-1 block text-xl font-bold tabular-nums text-[#a7d12b]">
-              {(pfa.factor_recovery_rate * 100).toFixed(0)}%
+              {pfa.factor_recovery_rate != null
+                ? `${(pfa.factor_recovery_rate * 100).toFixed(0)}%`
+                : <span className="text-sm font-medium text-muted-foreground">Not estimable</span>}
             </span>
           </div>
           <div className="rounded-lg border border-border/40 bg-slate-900/30 p-3 text-center">
@@ -616,7 +625,9 @@ export function PFAPanel({ pfa, egaSemantic, egaSynthetic, itemTexts }: PFAPanel
               RMSR
             </span>
             <span className="mt-1 block text-xl font-bold tabular-nums text-[#a7d12b]">
-              {pfa.rmsr.toFixed(3)}
+              {pfa.rmsr != null
+                ? pfa.rmsr.toFixed(3)
+                : <span className="text-sm font-medium text-muted-foreground">Not estimable</span>}
             </span>
           </div>
           <div className="rounded-lg border border-border/40 bg-slate-900/30 p-3 text-center">
@@ -624,7 +635,9 @@ export function PFAPanel({ pfa, egaSemantic, egaSynthetic, itemTexts }: PFAPanel
               CAF
             </span>
             <span className="mt-1 block text-xl font-bold tabular-nums text-[#a7d12b]">
-              {pfa.caf.toFixed(3)}
+              {pfa.caf != null
+                ? pfa.caf.toFixed(3)
+                : <span className="text-sm font-medium text-muted-foreground">Not estimable</span>}
             </span>
           </div>
           <div className="rounded-lg border border-border/40 bg-slate-900/30 p-3 text-center">

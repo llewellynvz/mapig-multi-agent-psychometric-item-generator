@@ -28,6 +28,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from backend.agents.correlation_estimator import (
+    active_embedding_model,
     compute_cosine_similarity_matrix,
     embed_items_sync,
 )
@@ -504,23 +505,26 @@ def run_pfa(
         # PFA needs at least 3 items. Return a minimal PFAResult signalling unfit.
         logger.warning("PFA skipped: only %d items (minimum 3)", len(items))
         return PFAResult(
-            embedding_model=embedding_model or settings.PFA_EMBEDDING_MODEL,
+            embedding_model=active_embedding_model(embedding_model or settings.PFA_EMBEDDING_MODEL),
             n_items=len(items),
             n_factors=1,
             factor_labels=["Single Factor"],
             loadings=[],
             tuckers_congruence=[],
-            factor_recovery_rate=0.0,
-            rmsr=0.0,
-            caf=0.0,
+            factor_recovery_rate=None,
+            rmsr=None,
+            caf=None,
             eigenvalues=[],
             residual_correlation_matrix=[],
             items_dropped=items_dropped or [],
-            fit_verdict="poor",
+            fit_verdict="not_estimable",
             model_identifiability="saturated",
         )
 
-    embedding_model = embedding_model or settings.PFA_EMBEDDING_MODEL
+    requested_embedding_model = embedding_model or settings.PFA_EMBEDDING_MODEL
+    # Report the space the loadings were actually computed in, which the Azure
+    # switch can change out from under the configured model.
+    embedding_model = active_embedding_model(requested_embedding_model)
     expected_assignments, facet_labels = _facet_assignments_from_mapping(items, facet_mapping)
     if n_factors is None:
         n_factors = max(1, len(facet_labels))
@@ -538,7 +542,7 @@ def run_pfa(
 
     # 1-2. Embed and apply polarity sign-flip
     try:
-        embeddings = embed_items_sync(item_texts, model=embedding_model)
+        embeddings = embed_items_sync(item_texts, model=requested_embedding_model)
     except Exception as e:
         logger.error("PFA embedding failed: %s", e, exc_info=True)
         return PFAResult(
@@ -548,13 +552,13 @@ def run_pfa(
             factor_labels=facet_labels[:n_factors],
             loadings=[],
             tuckers_congruence=[],
-            factor_recovery_rate=0.0,
-            rmsr=0.0,
-            caf=0.0,
+            factor_recovery_rate=None,
+            rmsr=None,
+            caf=None,
             eigenvalues=[],
             residual_correlation_matrix=[],
             items_dropped=items_dropped or [],
-            fit_verdict="poor",
+            fit_verdict="not_estimable",
             model_identifiability=_compute_identifiability(len(items), n_factors),
         )
 
@@ -635,13 +639,13 @@ def run_pfa(
                 factor_labels=facet_labels[:n_factors],
                 loadings=[],
                 tuckers_congruence=[],
-                factor_recovery_rate=0.0,
-                rmsr=0.0,
-                caf=0.0,
+                factor_recovery_rate=None,
+                rmsr=None,
+                caf=None,
                 eigenvalues=[],
                 residual_correlation_matrix=[],
                 items_dropped=items_dropped or [],
-                fit_verdict="poor",
+                fit_verdict="not_estimable",
                 model_identifiability=_compute_identifiability(len(items), n_factors),
             )
 

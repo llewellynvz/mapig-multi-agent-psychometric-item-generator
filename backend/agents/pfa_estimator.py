@@ -246,7 +246,6 @@ def compute_model_fit(
     iu = np.triu_indices(n, k=1)
     res_off = residual[iu]
     sim_off = sim_matrix[iu].copy()
-    np.fill_diagonal(sim_matrix, 1.0)  # restore diagonal; sim_off uses off-diagonal anyway
 
     rmsr = float(np.sqrt(np.mean(res_off ** 2)))
 

@@ -59,17 +59,9 @@ export function useRunRecovery({
             iteration: status.iteration ?? 0,
             status: "running",
           });
-          setActiveRun((prev) =>
-            prev
-              ? {
-                ...prev,
-                threadId: status.thread_id,
-                runId: status.run_id,
-                status: "running",
-                updatedAt: status.updated_at ?? new Date().toISOString(),
-              }
-              : prev
-          );
+          // No setActiveRun here: a new object each poll would re-trigger this
+          // effect (activeRun is a dep) and collapse the 2.5s interval into a
+          // tight polling loop. Transitions below still update it.
           return;
         }
 

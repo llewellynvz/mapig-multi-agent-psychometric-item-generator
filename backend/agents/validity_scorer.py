@@ -41,12 +41,14 @@ def score_convergent_validity(
     instrument_construct: str,
     target_construct: str,
     published_items: Optional[List[str]] = None,
-) -> tuple[float, str]:
+    gpt52_enabled: bool = True,
+) -> tuple[Optional[float], str]:
     """Score convergent validity using embeddings (preferred) or LLM-as-judge fallback.
 
     When published_items are provided, computes embedding-based cross-scale
     cosine similarity (centroid_r). Otherwise falls back to dual-direction
-    LLM-as-judge averaging.
+    LLM-as-judge averaging — unless gpt52_enabled is False, in which case no
+    LLM is called and the score is reported as not estimable.
 
     Args:
         generated_items: List of generated item texts
@@ -54,9 +56,12 @@ def score_convergent_validity(
         instrument_construct: Construct measured by comparison instrument
         target_construct: Construct measured by generated items
         published_items: Optional actual item texts from the published instrument
+        gpt52_enabled: Whether the user opted into GPT-5.2 analytics calls
 
     Returns:
-        Tuple of (score 0.0-1.0, method 'embedding' or 'llm-as-judge')
+        Tuple of (score 0.0-1.0 or None, method 'embedding' | 'llm-as-judge'
+        | 'disabled' | 'failed'). None means not estimable — a fabricated
+        neutral value is never substituted.
     """
     # Prefer embedding-based scoring when published items are available
     if published_items and len(published_items) >= 3:
@@ -75,7 +80,14 @@ def score_convergent_validity(
                 instrument_name, e,
             )
 
-    # Fallback: LLM-as-judge
+    # Fallback: LLM-as-judge (only when the user opted into GPT-5.2 analytics)
+    if not gpt52_enabled:
+        logger.info(
+            "CONVERGENT_VALIDITY method=disabled instrument=%s — GPT-5.2 analytics off and no usable published items",
+            instrument_name,
+        )
+        return None, "disabled"
+
     try:
         forward = _score_single_direction_convergent(
             generated_items, instrument_name, instrument_construct, target_construct, "forward"
@@ -95,10 +107,10 @@ def score_convergent_validity(
 
     except Exception as e:
         logger.warning(
-            "CONVERGENT_VALIDITY error scoring instrument=%s: %s - returning neutral default",
+            "CONVERGENT_VALIDITY error scoring instrument=%s: %s - score not estimable",
             instrument_name, str(e)
         )
-        return 0.5, "llm-as-judge"
+        return None, "failed"
 
 
 def score_discriminant_validity(
@@ -107,6 +119,7 @@ def score_discriminant_validity(
     instrument_construct: str,
     target_construct: str,
     published_items: Optional[List[str]] = None,
+    gpt52_enabled: bool = True,
 ) -> tuple[ConstructPairAnalysis, str]:
     """Score discriminant validity using embeddings (preferred) or LLM fallback.
 
@@ -150,7 +163,20 @@ def score_discriminant_validity(
                 target_construct, instrument_construct, e,
             )
 
-    # Fallback: LLM-as-judge
+    # Fallback: LLM-as-judge (only when the user opted into GPT-5.2 analytics)
+    if not gpt52_enabled:
+        logger.info(
+            "DISCRIMINANT_VALIDITY method=disabled constructs=%s vs %s — GPT-5.2 analytics off and no usable published items",
+            target_construct, instrument_construct,
+        )
+        return ConstructPairAnalysis(
+            construct_a=target_construct,
+            construct_b=instrument_construct,
+            estimated_correlation=None,
+            discriminant_validity_flag="not_estimable",
+            reasoning="LLM validity scoring disabled (GPT-5.2 analytics off) and no published items available for embedding-based scoring.",
+        ), "disabled"
+
     try:
         forward = _score_single_direction_discriminant(
             target_construct, instrument_construct, "forward"
@@ -181,16 +207,16 @@ def score_discriminant_validity(
 
     except Exception as e:
         logger.warning(
-            "DISCRIMINANT_VALIDITY error scoring constructs=%s vs %s: %s - returning defaults",
+            "DISCRIMINANT_VALIDITY error scoring constructs=%s vs %s: %s - not estimable",
             target_construct, instrument_construct, str(e)
         )
         return ConstructPairAnalysis(
             construct_a=target_construct,
             construct_b=instrument_construct,
-            estimated_correlation=0.3,
-            discriminant_validity_flag="adequate",
-            reasoning="Scoring unavailable due to LLM error"
-        ), "llm-as-judge"
+            estimated_correlation=None,
+            discriminant_validity_flag="not_estimable",
+            reasoning=f"Scoring failed: {str(e)[:200]}",
+        ), "failed"
 
 
 def _score_single_direction_convergent(

@@ -441,7 +441,7 @@ class ConstructPairAnalysis(BaseModel):
     construct_a: str = Field(..., description="First construct in the pair")
     construct_b: str = Field(..., description="Second construct in the pair")
     estimated_correlation: Optional[float] = Field(default=None, ge=-1.0, le=1.0, description="Expected correlation between constructs")
-    discriminant_validity_flag: Optional[str] = Field(default=None, description="adequate/concern/poor based on estimated correlation")
+    discriminant_validity_flag: Optional[str] = Field(default=None, description="adequate/concern/poor based on estimated correlation; 'not_estimable' when scoring failed or was disabled (no fabricated value is ever substituted)")
     reasoning: Optional[str] = Field(default=None, max_length=500, description="Chain-of-thought explanation for the discriminant validity assessment")
 
 

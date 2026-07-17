@@ -819,6 +819,14 @@ class PFAResult(BaseModel):
         ),
         description="Standard disclaimer for embedding-based factor analysis",
     )
+    solver: str = Field(
+        default="factor_analyzer:oblimin",
+        description=(
+            "Extraction path used. 'factor_analyzer:oblimin' = oblique EFA with factor correlations; "
+            "'oblimin_phi_missing' = oblique solution but Φ unavailable (fit indices computed with Φ=I); "
+            "'pca_eigh_fallback' = unrotated PCA fallback, eigenvalues reported signed."
+        ),
+    )
 
 
 # --- Agent I/O wrappers (contracts) ---

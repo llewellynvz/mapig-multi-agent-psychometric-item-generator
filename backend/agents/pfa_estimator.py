@@ -219,15 +219,22 @@ def label_factors_via_daal(
 def compute_model_fit(
     sim_matrix: np.ndarray,
     loadings: np.ndarray,
+    phi: Optional[np.ndarray] = None,
 ) -> Tuple[float, float, np.ndarray]:
     """Compute RMSR and CAF model-free fit indices.
 
-    RMSR (Root Mean Square Residual): RMS of (sim - loadings @ loadings.T) off-diagonal.
+    The model-implied matrix is ΛΦΛ' — for oblique rotations (oblimin) Φ is
+    the factor correlation matrix; omitting it (Φ=I) is only correct for
+    orthogonal or single-factor solutions.
+
+    RMSR (Root Mean Square Residual): RMS of (sim - ΛΦΛ') off-diagonal.
     CAF (Common part Accounted For): 1 - sum(residual_off_diag^2) / sum(sim_off_diag^2).
 
     Returns (rmsr, caf, residual_matrix).
     """
-    reproduced = loadings @ loadings.T
+    if phi is None:
+        phi = np.eye(loadings.shape[1])
+    reproduced = loadings @ phi @ loadings.T
     residual = sim_matrix - reproduced
     np.fill_diagonal(residual, 0.0)
 
@@ -253,7 +260,50 @@ def compute_model_fit(
 # ----- Main estimator -----
 
 
-def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool]]:
+def ensure_sklearn_compat() -> None:
+    """Shim for factor-analyzer ↔ scikit-learn 1.8+: `force_all_finite` was
+    renamed to `ensure_all_finite`; translate the kwarg in check_array."""
+    try:
+        import sklearn.utils.validation as _sk_validation
+        if getattr(_sk_validation, "_pfa_check_array_patched", False):
+            return
+        _orig_check_array = _sk_validation.check_array
+
+        def _patched_check_array(*args, **kwargs):
+            if "force_all_finite" in kwargs and "ensure_all_finite" not in kwargs:
+                kwargs["ensure_all_finite"] = kwargs.pop("force_all_finite")
+            return _orig_check_array(*args, **kwargs)
+
+        _sk_validation.check_array = _patched_check_array
+        _sk_validation._pfa_check_array_patched = True
+        try:
+            import factor_analyzer.factor_analyzer as _fa_mod
+            if hasattr(_fa_mod, "check_array"):
+                _fa_mod.check_array = _patched_check_array
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _pca_eigh_loadings(sim: np.ndarray, n_factors: int) -> Tuple[np.ndarray, List[float]]:
+    """Unrotated PCA loadings via eigendecomposition, with SIGNED eigenvalues.
+
+    Negative eigenvalues (a non-positive-definite similarity matrix) are
+    clipped to zero for the loading scale but reported signed so degeneracy
+    stays visible instead of being masked by abs().
+
+    Returns (loadings, all_eigenvalues_descending).
+    """
+    eigvals, eigvecs = np.linalg.eigh(sim)
+    order = np.argsort(eigvals)[::-1]
+    eigvals = eigvals[order]
+    eigvecs = eigvecs[:, order]
+    loadings = eigvecs[:, :n_factors] * np.sqrt(np.clip(eigvals[:n_factors], 0.0, None))
+    return loadings, [float(v) for v in eigvals]
+
+
+def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool], np.ndarray]:
     """Reflect each factor column so its dominant loading is positive.
 
     Factor analysis has sign indeterminacy: F and -F are equivalent solutions
@@ -272,24 +322,32 @@ def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool]]:
     +0.998.
 
     Returns:
-        (aligned_loadings, was_flipped_per_factor)
+        (aligned_loadings, was_flipped_per_factor, sign_vector)
+
+    The sign vector s (+1/-1 per factor) must conjugate any factor correlation
+    matrix from the same solution: Φ_aligned = diag(s) Φ diag(s), otherwise
+    ΛΦΛ' changes under reflection and fit indices are corrupted.
     """
     aligned = loadings.copy()
     n_factors = aligned.shape[1]
     flipped: List[bool] = []
+    signs: List[float] = []
     for j in range(n_factors):
         col = aligned[:, j]
         if col.size == 0:
             flipped.append(False)
+            signs.append(1.0)
             continue
         dominant_idx = int(np.argmax(np.abs(col)))
         dominant_value = float(col[dominant_idx])
         if dominant_value < 0:
             aligned[:, j] = -col
             flipped.append(True)
+            signs.append(-1.0)
         else:
             flipped.append(False)
-    return aligned, flipped
+            signs.append(1.0)
+    return aligned, flipped, np.array(signs)
 
 
 def _decide_verdict(
@@ -464,31 +522,7 @@ def run_pfa(
         )
 
     # 4. EFA via factor-analyzer
-    # Workaround for factor-analyzer ↔ scikit-learn 1.8+ incompatibility:
-    # FactorAnalyzer calls sklearn.utils.validation.check_array with the
-    # deprecated `force_all_finite` kwarg, which was renamed to
-    # `ensure_all_finite`. We shim check_array to translate the kwarg.
-    try:
-        import sklearn.utils.validation as _sk_validation
-        if not getattr(_sk_validation, "_pfa_check_array_patched", False):
-            _orig_check_array = _sk_validation.check_array
-
-            def _patched_check_array(*args, **kwargs):
-                if "force_all_finite" in kwargs and "ensure_all_finite" not in kwargs:
-                    kwargs["ensure_all_finite"] = kwargs.pop("force_all_finite")
-                return _orig_check_array(*args, **kwargs)
-
-            _sk_validation.check_array = _patched_check_array
-            _sk_validation._pfa_check_array_patched = True
-            # Also patch other modules that may have imported it directly
-            try:
-                import factor_analyzer.factor_analyzer as _fa_mod
-                if hasattr(_fa_mod, "check_array"):
-                    _fa_mod.check_array = _patched_check_array
-            except Exception:
-                pass
-    except Exception:
-        pass
+    ensure_sklearn_compat()
 
     solver_used = "factor_analyzer:oblimin"
     try:
@@ -499,6 +533,20 @@ def run_pfa(
         fa = FactorAnalyzer(n_factors=n_factors, rotation="oblimin", is_corr_matrix=True)
         fa.fit(sim)
         loadings = np.asarray(fa.loadings_)
+        raw_phi = getattr(fa, "phi_", None)
+        if raw_phi is not None:
+            phi = np.asarray(raw_phi, dtype=float)
+        elif n_factors == 1:
+            phi = np.eye(1)
+        else:
+            # Oblique multi-factor solution without a factor correlation matrix:
+            # fit indices would silently revert to the orthogonal ΛΛ' model.
+            phi = np.eye(n_factors)
+            solver_used = "oblimin_phi_missing"
+            logger.warning(
+                "PFA fa.phi_ missing for oblimin n_factors=%d — fit indices use Φ=I",
+                n_factors,
+            )
         eigenvalues, _ = fa.get_eigenvalues()
         eigenvalues = np.asarray(eigenvalues, dtype=float).tolist()
         logger.info(
@@ -507,16 +555,16 @@ def run_pfa(
         )
     except Exception as e:
         logger.error("PFA FactorAnalyzer fit failed: %s", e, exc_info=True)
-        solver_used = "svd_fallback"
-        # Fall back to PCA via SVD
+        solver_used = "pca_eigh_fallback"
+        # Fall back to unrotated PCA via eigendecomposition. Signed eigenvalues
+        # are reported so a non-positive-definite similarity matrix is visible
+        # rather than masked by abs().
         try:
-            U, S, Vt = np.linalg.svd(sim)
-            # Take top n_factors components scaled by sqrt(eigenvalue) → loadings
-            loadings = U[:, :n_factors] * np.sqrt(np.abs(S[:n_factors]))
-            eigenvalues = S.tolist()
+            loadings, eigenvalues = _pca_eigh_loadings(sim, n_factors)
+            phi = np.eye(n_factors)
             logger.warning(
-                "PFA_EFA_SOLVER chosen=svd_fallback reason=%s",
-                type(e).__name__,
+                "PFA_EFA_SOLVER chosen=pca_eigh_fallback reason=%s min_eigenvalue=%.4f",
+                type(e).__name__, float(min(eigenvalues)),
             )
         except Exception as e2:
             logger.error("PFA SVD fallback failed: %s", e2)
@@ -554,7 +602,8 @@ def run_pfa(
     # solution where loadings on a factor are all-negative — equivalent up to
     # reflection but visually wrong (Mulaik 2010 ch. 7; Lorenzo-Seva &
     # ten Berge 2006). Convention: dominant loading must be positive.
-    loadings, sign_flips = _align_factor_signs(loadings)
+    loadings, sign_flips, sign_vector = _align_factor_signs(loadings)
+    phi = np.diag(sign_vector) @ phi @ np.diag(sign_vector)
     for j, was_flipped in enumerate(sign_flips):
         col_aligned = loadings[:, j]
         dom_idx = int(np.argmax(np.abs(col_aligned))) if col_aligned.size else -1
@@ -596,8 +645,8 @@ def run_pfa(
     # 8. DAAL labels
     daal_labels = label_factors_via_daal(loadings, expected_assignments, facet_labels)
 
-    # 9. Fit indices
-    rmsr, caf, residual = compute_model_fit(sim, loadings)
+    # 9. Fit indices (ΛΦΛ' — Φ from the oblique solution, sign-conjugated)
+    rmsr, caf, residual = compute_model_fit(sim, loadings, phi=phi)
 
     # Build per-item FactorLoading entries
     abs_loadings = np.abs(loadings)
@@ -676,4 +725,5 @@ def run_pfa(
         fit_verdict=verdict,  # type: ignore[arg-type]
         model_identifiability=identifiability,  # type: ignore[arg-type]
         disclaimer=disclaimer,
+        solver=solver_used,
     )

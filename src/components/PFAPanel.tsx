@@ -581,6 +581,25 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
           </p>
         )}
 
+        {/* Dimensionality signals: LLM facet count vs data-driven Kaiser rule */}
+        <div className="mb-5 rounded-lg border border-border/40 bg-slate-900/30 px-3 py-2 text-[11px] text-muted-foreground">
+          <span className="font-semibold text-slate-50">Dimensionality signals: </span>
+          Facet mapping k = {pfa.n_factors}
+          {pfa.n_factors_suggested_kaiser != null && (
+            <>
+              {" · "}Eigenvalue rule (λ &gt; 1) suggests {pfa.n_factors_suggested_kaiser}
+              {pfa.n_factors_suggested_kaiser !== pfa.n_factors && (
+                <span className="text-amber-300/90">
+                  {" "}— signals disagree; inspect the loading pattern before trusting either.
+                </span>
+              )}
+            </>
+          )}
+          {pfa.kmo_semantic != null && (
+            <>{" · "}Semantic KMO = {pfa.kmo_semantic.toFixed(2)} (factorability heuristic)</>
+          )}
+        </div>
+
         {/* Factor labels + congruence */}
         {pfa.factor_labels.length > 0 && (
           <div className="mb-5">
@@ -670,7 +689,7 @@ export function PFAPanel({ pfa }: PFAPanelProps) {
         {/* Eigenvalues / scree (textual) */}
         {pfa.eigenvalues.length > 0 && (
           <div className="mb-4">
-            <h4 className="text-sm font-semibold text-slate-50 mb-2">Eigenvalues (top {pfa.eigenvalues.length})</h4>
+            <h4 className="text-sm font-semibold text-slate-50 mb-2">Eigenvalues (all {pfa.eigenvalues.length})</h4>
             <div className="flex flex-wrap gap-1.5">
               {pfa.eigenvalues.map((e, idx) => (
                 <Badge

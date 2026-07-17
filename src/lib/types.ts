@@ -170,6 +170,11 @@ export interface PFAResult {
   /** Omega-total from the PFA loading solution (Φ-aware). Pre-data semantic
    *  estimate, not respondent reliability. null = not estimable. */
   pseudo_omega?: number | null;
+  /** KMO formula on the semantic matrix — factorability heuristic. */
+  kmo_semantic?: number | null;
+  /** Eigenvalue > 1 count (Kaiser rule) — data-driven dimensionality signal. */
+  n_factors_suggested_kaiser?: number | null;
+  n_factors_source?: string;
 }
 
 export interface ExpertEvaluation {

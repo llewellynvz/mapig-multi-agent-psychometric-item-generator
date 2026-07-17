@@ -286,6 +286,37 @@ def ensure_sklearn_compat() -> None:
         pass
 
 
+def compute_semantic_kmo(sim: np.ndarray) -> Optional[float]:
+    """Kaiser-Meyer-Olkin sampling-adequacy formula applied to the semantic
+    similarity matrix: KMO = Σr² / (Σr² + Σp²) over off-diagonal cells, with
+    partial correlations from the inverted matrix's anti-image.
+
+    A heuristic analog — there is no respondent sample here, so this measures
+    whether the similarity structure is factorable, not sampling adequacy.
+    Bartlett's sphericity test is deliberately omitted: it requires a sample
+    size N, which does not exist pre-data. Returns None when the matrix is
+    singular or degenerate.
+    """
+    try:
+        inv = np.linalg.inv(sim)
+    except np.linalg.LinAlgError:
+        return None
+    if not np.isfinite(inv).all():
+        return None
+    d = np.sqrt(np.abs(np.diag(inv)))
+    if np.any(d == 0):
+        return None
+    partial = -inv / np.outer(d, d)
+    np.fill_diagonal(partial, 0.0)
+    off = sim.copy()
+    np.fill_diagonal(off, 0.0)
+    r2 = float((off ** 2).sum())
+    p2 = float((partial ** 2).sum())
+    if r2 + p2 == 0:
+        return None
+    return r2 / (r2 + p2)
+
+
 def compute_pseudo_omega(loadings: np.ndarray, phi: Optional[np.ndarray] = None) -> Optional[float]:
     """Omega-total from a factor solution: (Λ′1)′Φ(Λ′1) / [(Λ′1)′Φ(Λ′1) + Σ(1−diag(ΛΦΛ′))].
 
@@ -678,6 +709,10 @@ def run_pfa(
     # 9. Fit indices (ΛΦΛ' — Φ from the oblique solution, sign-conjugated)
     rmsr, caf, residual = compute_model_fit(sim, loadings, phi=phi)
     pseudo_omega = compute_pseudo_omega(loadings, phi=phi)
+    kmo_semantic = compute_semantic_kmo(sim)
+    n_factors_suggested_kaiser = (
+        int(sum(1 for e in eigenvalues if e > 1.0)) if eigenvalues else None
+    )
 
     # Build per-item FactorLoading entries
     abs_loadings = np.abs(loadings)
@@ -747,7 +782,7 @@ def run_pfa(
         factor_recovery_rate=float(recovery),
         rmsr=float(rmsr),
         caf=float(caf),
-        eigenvalues=[float(e) for e in eigenvalues[:n_factors]] if eigenvalues else [],
+        eigenvalues=[float(e) for e in eigenvalues] if eigenvalues else [],
         residual_correlation_matrix=[
             [round(float(residual[i, j]), 4) for j in range(residual.shape[1])]
             for i in range(residual.shape[0])
@@ -758,4 +793,7 @@ def run_pfa(
         disclaimer=disclaimer,
         solver=solver_used,
         pseudo_omega=pseudo_omega,
+        kmo_semantic=kmo_semantic,
+        n_factors_suggested_kaiser=n_factors_suggested_kaiser,
+        n_factors_source="llm_facet_mapping",
     )

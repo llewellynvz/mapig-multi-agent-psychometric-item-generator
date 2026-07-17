@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     # Retrieval allowlist
     APPROVED_SOURCES_DIR: str = "data/approved_sources"
 
+    # Optional shared key for generation endpoints. Cost-abuse protection,
+    # not authentication: when unset (default) every request is accepted.
+    MAPIG_API_KEY: Optional[str] = None
+
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     def cors_origins(self) -> list[str]:
@@ -186,6 +190,7 @@ class Settings(BaseSettings):
         'AZURE_FRONTIER_DEPLOYMENT',
         'AZURE_CHEAP_DEPLOYMENT',
         'CLAUDE_API_KEY',
+        'MAPIG_API_KEY',
         'VALIDATOR_MODEL',
         'SEARCH_PROVIDER',
         'PERPLEXITY_API_KEY',

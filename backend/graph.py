@@ -1181,32 +1181,22 @@ def finalize_node(state: GraphState) -> GraphState:
                 }
             )
 
-        # Calculate API costs (pricing as of 2025)
+        from backend.pricing import blended_cost, cache_savings as _cache_savings
+
         opus_tokens = state.get("opus_tokens_used", 0)
         sonnet_tokens = state.get("sonnet_tokens_used", 0)
         openai_tokens = state.get("openai_tokens_used", 0)
         chatgpt_tokens = state.get("chatgpt_tokens_used", 0)
 
-        # Claude pricing (per 1M tokens):
-        # - Opus: $15 input + $75 output → blended ~$45
-        # - Sonnet: $3 input + $15 output → blended ~$9
-        # OpenAI pricing (per 1M tokens):
-        # - GPT-4o: $2.50 input + $10 output → blended ~$6.25 (used for ChatGPT critics toggle)
-        # - GPT-4o-mini: $0.15 input + $0.60 output → blended ~$0.375 (20x cheaper than Sonnet!)
-        # Note: Assuming ~1:1 input/output ratio for blended rate
+        opus_cost = blended_cost(opus_tokens, "claude_opus")
+        sonnet_cost = blended_cost(sonnet_tokens, "claude_sonnet")
+        chatgpt_cost = blended_cost(chatgpt_tokens, "gpt_4o")
+        openai_cost = blended_cost(openai_tokens, "gpt_4o_mini")
 
-        opus_cost = (opus_tokens / 1_000_000) * 45.0  # Blended rate for Opus
-        sonnet_cost = (sonnet_tokens / 1_000_000) * 9.0  # Blended rate for Sonnet
-        # GPT-4o pricing (used when ChatGPT critics toggle is enabled)
-        chatgpt_cost = (chatgpt_tokens / 1_000_000) * 6.25  # Blended rate for GPT-4o
-        # GPT-4o-mini pricing (used for agent overrides like bias_reviewer, critic)
-        openai_cost = (openai_tokens / 1_000_000) * 0.375  # Blended rate for GPT-4o-mini
-
-        # Phase 10: GPT-5.2 cost calculation (reasoning tokens billed at $14/1M output rate)
         gpt52_reasoning = state.get("gpt52_reasoning_tokens", 0)
         gpt52_output = state.get("gpt52_output_tokens", 0)
-        gpt52_reasoning_cost = (gpt52_reasoning / 1_000_000) * 14.0
-        gpt52_output_cost = (gpt52_output / 1_000_000) * 14.0
+        gpt52_reasoning_cost = blended_cost(gpt52_reasoning, "gpt_52")
+        gpt52_output_cost = blended_cost(gpt52_output, "gpt_52")
 
         # Check budget cap
         total_gpt52_cost = gpt52_reasoning_cost + gpt52_output_cost
@@ -1214,12 +1204,9 @@ def finalize_node(state: GraphState) -> GraphState:
 
         total_cost = opus_cost + sonnet_cost + chatgpt_cost + openai_cost + gpt52_reasoning_cost + gpt52_output_cost
 
-        # Prompt caching savings estimate
         cache_read = state.get("cache_read_tokens", 0)
         cache_creation = state.get("cache_creation_tokens", 0)
-        # Cached tokens are charged at 10% of input rate (90% discount).
-        # Use Sonnet input rate ($3/M) as conservative estimate for blended savings.
-        cache_savings = (cache_read / 1_000_000) * 3.0 * 0.9 if cache_read > 0 else 0.0
+        cache_savings = _cache_savings(cache_read)
         if cache_read > 0 or cache_creation > 0:
             logger.info(
                 "CACHE_METRICS cache_read_tokens=%d cache_creation_tokens=%d estimated_savings=$%.4f",

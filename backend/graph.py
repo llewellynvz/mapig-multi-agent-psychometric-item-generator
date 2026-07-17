@@ -1460,31 +1460,32 @@ def comparison_node(state: GraphState) -> GraphState:
 
             # Score convergent validity (embedding-based when items available, LLM fallback)
             _t_validity = _time.time()
+            gpt52_enabled = bool(getattr(user_request, "use_gpt52_analytics", False))
             convergent_score, convergent_method = score_convergent_validity(
                 item_texts,
                 convergent_instrument.name,
                 convergent_instrument.measured_construct,
                 construct_name,
                 published_items=convergent_instrument.items,
+                gpt52_enabled=gpt52_enabled,
             )
             logger.info(
-                "COMPARISON_CONVERGENT_VALIDITY elapsed=%.2fs method=%s score=%.3f",
-                _time.time() - _t_validity, convergent_method, convergent_score,
+                "COMPARISON_CONVERGENT_VALIDITY elapsed=%.2fs method=%s score=%s",
+                _time.time() - _t_validity, convergent_method,
+                f"{convergent_score:.3f}" if convergent_score is not None else "not_estimable",
             )
             convergent_instrument = convergent_instrument.model_copy(
                 update={"validity_method": convergent_method}
             )
 
-            logger.info(f"Convergent validity score: {convergent_score:.2f} (method={convergent_method})")
-
             # 1B: Convergent validity ceiling warning
-            if convergent_score > 0.85:
+            if convergent_score is not None and convergent_score > 0.85:
                 ceiling_warning = (
                     f"Convergent validity of {convergent_score:.2f} with {convergent_instrument.name} "
                     f"suggests items may be derivative (expected: 0.60-0.80)"
                 )
                 logger.warning(f"CONVERGENT_CEILING_WARNING {ceiling_warning}")
-                # Will be added to plagiarism_flags below with index -1
+                # Will be added to plagiarism_flags below with key -1
 
             # Run plagiarism detection against known instrument items
             from data.known_instrument_items import lookup_instrument_items
@@ -1507,7 +1508,7 @@ def comparison_node(state: GraphState) -> GraphState:
             )
 
             # Add convergent ceiling warning to plagiarism flags
-            if convergent_score > 0.85:
+            if convergent_score is not None and convergent_score > 0.85:
                 plagiarism_flags[-1] = (
                     f"Convergent validity of {convergent_score:.2f} with {convergent_instrument.name} "
                     f"suggests items may be derivative (expected: 0.60-0.80)"
@@ -1607,17 +1608,25 @@ def cross_construct_node(state: GraphState) -> GraphState:
                 disc_construct,
                 construct_name,
                 published_items=discriminant_instrument.items,
+                gpt52_enabled=bool(getattr(user_request, "use_gpt52_analytics", False)),
             )
 
+            corr = discriminant_pair.estimated_correlation
+            flag = discriminant_pair.discriminant_validity_flag
             logger.info(
-                f"Discriminant validity: correlation={discriminant_pair.estimated_correlation:.2f}, "
-                f"flag={discriminant_pair.discriminant_validity_flag} (method={disc_method})"
+                "Discriminant validity: correlation=%s, flag=%s (method=%s)",
+                f"{corr:.2f}" if corr is not None else "not_estimable",
+                flag, disc_method,
             )
 
             # Build analysis summary
-            flag = discriminant_pair.discriminant_validity_flag
-            corr = discriminant_pair.estimated_correlation
-            if flag == "concern":
+            if corr is None:
+                summary = (
+                    f"Discriminant validity between '{construct_name}' and "
+                    f"'{discriminant_instrument.measured_construct}' could not be estimated "
+                    f"({'scoring disabled' if disc_method == 'disabled' else 'scoring failed'})."
+                )
+            elif flag == "concern":
                 summary = (
                     f"High overlap detected between '{construct_name}' and '{discriminant_instrument.measured_construct}' "
                     f"(estimated r = {corr:.2f}). Consider refining item wording to improve discriminant validity."
@@ -1629,11 +1638,12 @@ def cross_construct_node(state: GraphState) -> GraphState:
                 )
 
             # Build CrossConstructComparison
-            disc_disclaimer = (
-                "Embedding-based cosine similarity (Hommel & Arslan, 2024)"
-                if disc_method == "embedding"
-                else "LLM-estimated (no published items available), not empirically validated"
-            )
+            if disc_method == "embedding":
+                disc_disclaimer = "Embedding-based cosine similarity (Hommel & Arslan, 2024)"
+            elif corr is None:
+                disc_disclaimer = "Not estimable — no fabricated value substituted"
+            else:
+                disc_disclaimer = "LLM-estimated (no published items available), not empirically validated"
             cross_construct_analysis = CrossConstructComparison(
                 target_construct=construct_name,
                 comparison_constructs=[discriminant_instrument.measured_construct],

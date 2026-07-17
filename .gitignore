@@ -46,7 +46,11 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# certificates and key material (never commit)
+certs/
 *.pem
+*.pfx
 
 # vercel
 .vercel

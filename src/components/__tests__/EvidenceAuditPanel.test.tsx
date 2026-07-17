@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { EvidenceAuditPanel } from '../EvidenceAuditPanel';
 import type { AuditMetadata } from '@/lib/types';
+
+function renderExpanded(audit: AuditMetadata) {
+  const view = render(<EvidenceAuditPanel audit={audit} />);
+  fireEvent.click(screen.getByRole('button', { name: /show details/i }));
+  return view;
+}
 
 // Mock toast
 vi.mock('@/components/ui/use-toast', () => ({
@@ -32,7 +38,7 @@ describe('EvidenceAuditPanel - Cost Tracking Display (API-07)', () => {
       total_cost: 1.70,
     };
 
-    render(<EvidenceAuditPanel audit={auditWithCosts} />);
+    renderExpanded(auditWithCosts);
 
     // Find cost section heading
     const costHeading = screen.getByText(/API Cost Breakdown/i);
@@ -60,7 +66,7 @@ describe('EvidenceAuditPanel - Cost Tracking Display (API-07)', () => {
       // No cost fields
     };
 
-    render(<EvidenceAuditPanel audit={auditWithoutCosts} />);
+    renderExpanded(auditWithoutCosts);
 
     // Cost section should not be present
     const costHeading = screen.queryByText(/API Cost Breakdown/i);
@@ -76,7 +82,7 @@ describe('EvidenceAuditPanel - Cost Tracking Display (API-07)', () => {
       total_cost: 2.50,
     };
 
-    render(<EvidenceAuditPanel audit={auditWithPartialCosts} />);
+    renderExpanded(auditWithPartialCosts);
 
     // Opus should be displayed (non-zero)
     expect(screen.getByText(/Claude Opus.*Validation/i)).toBeDefined();
@@ -101,7 +107,7 @@ describe('EvidenceAuditPanel - Cost Tracking Display (API-07)', () => {
       total_cost: 3.579, // Should round to $3.58
     };
 
-    render(<EvidenceAuditPanel audit={auditWithCosts} />);
+    renderExpanded(auditWithCosts);
 
     // Check formatting (toFixed(2) should be applied)
     // The component uses .toFixed(2) so we should see exactly 2 decimal places
@@ -123,7 +129,7 @@ describe('EvidenceAuditPanel - Cost Tracking Display (API-07)', () => {
       total_cost: 2.25,
     };
 
-    render(<EvidenceAuditPanel audit={auditWithAllCosts} />);
+    renderExpanded(auditWithAllCosts);
 
     // All three provider lines should be present
     expect(screen.getByText(/Claude Opus.*Validation/i)).toBeDefined();
@@ -137,33 +143,22 @@ describe('EvidenceAuditPanel - Cost Tracking Display (API-07)', () => {
     expect(screen.getByText('$2.25')).toBeDefined();
   });
 
-  it('renders cost section only when both opus_cost and total_cost are defined', () => {
-    // Test case: Only total_cost defined (should NOT show)
-    const auditOnlyTotal: AuditMetadata = {
-      ...baseAudit,
-      total_cost: 1.00,
-    };
-
-    const { rerender } = render(<EvidenceAuditPanel audit={auditOnlyTotal} />);
-    expect(screen.queryByText(/API Cost Breakdown/i)).toBeNull();
-
-    // Test case: Only opus_cost defined (should NOT show)
+  it('renders cost section only when total_cost is a positive number', () => {
+    // Only opus_cost defined, no total_cost — should NOT show
     const auditOnlyOpus: AuditMetadata = {
       ...baseAudit,
       opus_cost: 1.00,
     };
 
-    rerender(<EvidenceAuditPanel audit={auditOnlyOpus} />);
+    const { rerender } = renderExpanded(auditOnlyOpus);
     expect(screen.queryByText(/API Cost Breakdown/i)).toBeNull();
 
-    // Test case: Both defined (should show)
-    const auditBothDefined: AuditMetadata = {
-      ...baseAudit,
-      opus_cost: 1.00,
-      total_cost: 1.00,
-    };
+    // Zero total_cost — should NOT show
+    rerender(<EvidenceAuditPanel audit={{ ...baseAudit, total_cost: 0 }} />);
+    expect(screen.queryByText(/API Cost Breakdown/i)).toBeNull();
 
-    rerender(<EvidenceAuditPanel audit={auditBothDefined} />);
+    // Positive total_cost — should show
+    rerender(<EvidenceAuditPanel audit={{ ...baseAudit, opus_cost: 1.00, total_cost: 1.00 }} />);
     expect(screen.getByText(/API Cost Breakdown/i)).toBeDefined();
   });
 });

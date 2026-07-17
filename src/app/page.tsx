@@ -716,7 +716,9 @@ export default function HomePage() {
           </section>
         )}
 
-        <DeveloperDrawer requestJson={lastRequestJson} responseJson={lastResponseJson} />
+        {process.env.NODE_ENV === "development" && (
+          <DeveloperDrawer requestJson={lastRequestJson} responseJson={lastResponseJson} />
+        )}
       </div>
     </main>
   );

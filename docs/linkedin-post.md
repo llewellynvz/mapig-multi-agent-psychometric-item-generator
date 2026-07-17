@@ -21,7 +21,7 @@ It's called MAPIG (Multi-Agent Psychometric Item Generator), and here's what hap
 
 5. A critic agent decides whether to accept or revise — using adaptive thresholds that progressively relax over iterations so the system converges instead of looping forever.
 
-6. After finalization, the system estimates your inter-item correlation matrix using embedding cosine similarity — validated by Hommel & Arslan (2024) at r = .89 for scale-level predictions. McDonald's omega calculated automatically.
+6. After finalization, the system estimates your inter-item correlation matrix using embedding cosine similarity — validated by Hommel & Arslan (2024) at r = .89 for scale-level predictions. A pseudo-alpha consistency estimate is calculated automatically and labeled as a pre-data signal.
 
 7. It then searches academic databases for published convergent and discriminant instruments, scores validity using a dual-direction LLM-as-judge pattern, and runs plagiarism detection to ensure originality.
 

@@ -173,10 +173,13 @@ The final report card. All four run simultaneously to estimate the scale's quali
 
 | Agent | What it does |
 |---|---|
-| 📊 **Correlation Estimator** | Estimates inter-item correlations + McDonald's ω from item embeddings — the same statistics you'd compute from real survey data. |
+| 📊 **Correlation Estimator** | Estimates inter-item relationships from embedding cosine similarity, with a pseudo-alpha (semantic) consistency estimate — a pre-data signal, honestly labeled, not respondent statistics. |
 | 📐 **PFA Analytics** | Reports the final factor structure as a CFA path diagram (η, λ, ε, φ) with full measurement equations. |
 | 🔍 **Instrument Searcher** | Finds published scales for benchmarking — one that measures the same construct (convergent), one that measures a related-but-distinct one (discriminant). |
 | 🧪 **Validity Scorer** | Estimates convergent and discriminant validity against those benchmarks + checks every item for plagiarism against known instruments. |
+| 🧬 **Synthetic Pilot** (opt-in) | Simulated respondents with drawn trait levels rate every item, then real classical statistics run on the matrix: Pearson correlations with confidence intervals, Cronbach's alpha, omega, parallel analysis, KMO, Bartlett. Every number is labeled synthetic — item triage only. |
+| 🕸️ **EGA/UVA** | Network-based dimensionality signal (community detection on the item network) plus redundancy detection: item pairs that overlap too much get flagged and prioritized for pruning. |
+| 💬 **Qualitative Questions** (opt-in) | Open-ended, cognitive-interview-style probe questions for pre-testing the construct with real people, grounded in the same facet mapping and evidence. |
 
 ---
 
@@ -191,7 +194,7 @@ These aren't "agents" in the LLM sense, but they're what makes the rest work cle
 | `llm_utils` | Wraps every LLM call with structured-output parsing, token tracking, prompt caching, and one structured `LLM_CALL` log line per call. |
 | `prompt_loader` | Loads each agent's `.md` system prompt with a shared prefix. |
 | `krippendorff` | Pure-NumPy Krippendorff's α + Cohen's κ + Spearman ρ — used by the Expert Panel for inter-rater reliability. |
-| `omega_calculator` | McDonald's ω from a synthetic correlation matrix. |
+| `omega_calculator` | Pseudo-alpha (standardized alpha formula on the semantic similarity matrix). |
 | `similarity_calculator` | Sentence-transformer plagiarism detection. |
 | `checkpoint_config` | LangGraph in-memory checkpointer with all custom types pre-registered. |
 
@@ -205,9 +208,9 @@ Beyond the per-agent descriptions above, here's how the analytics tell the full 
 
 Real scale validation needs respondent data. But before piloting, MAPIG estimates the inter-item correlation matrix from item embeddings alone:
 
-- All items go through `text-embedding-3-small`
-- Pairwise cosine similarity → correlation matrix
-- McDonald's ω total + mean inter-item correlation calculated
+- All items go through `text-embedding-3-large`
+- Pairwise cosine similarity matrix (labeled as semantic similarity, not correlation)
+- Pseudo-alpha (semantic) + mean inter-item similarity calculated
 - Flags: `optimal_range` (0.15–0.50), `too_low` (items don't cohere), `too_high` (redundant)
 - Pairs with r > 0.75 are flagged as redundant for review
 
@@ -435,7 +438,7 @@ lmaig-langgraph/
 │   │   └── prompt_loader.py
 │   ├── analytics/
 │   │   ├── pfa_analytics.py         # Post-final PFA report wrapper
-│   │   ├── omega_calculator.py      # McDonald's ω
+│   │   ├── omega_calculator.py      # Pseudo-alpha (semantic)
 │   │   ├── krippendorff.py          # IRR (α + κ) in pure NumPy
 │   │   └── similarity_calculator.py # Plagiarism (sentence-transformers)
 │   └── prompts/                     # Agent system prompts (.md)
@@ -536,7 +539,7 @@ MAPIG ships as a **single Vercel project** — Next.js at the repo root, FastAPI
 |---|---|
 | `final_items[]` | Generated items with text, rationale, evidence citations, validation scores. |
 | `audit` | Thread/run IDs, iteration count, stop reason, cost breakdown, model info, warnings. |
-| `correlation_matrix` | Pairwise correlations + McDonald's ω + redundancy flags. |
+| `correlation_matrix` | Pairwise semantic similarities + pseudo-alpha + redundancy flags. |
 | `pfa_result` | Factor structure: loadings, congruence, recovery, fit verdict. |
 | `expert_consensus` | Per-expert verdicts, IRR (Krippendorff's α + Cohen's κ), dissent flags, consensus revisions. |
 | `persona_validation` | Persona descriptors, ratings, cognitive-interview interpretations, ambiguity flags. |

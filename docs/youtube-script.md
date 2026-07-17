@@ -77,7 +77,7 @@ Once items are finalized, MAPIG estimates your inter-item correlation matrix —
 
 How? Using the validated methodology from Hommel and Arslan, published in 2024 in the European Journal of Psychological Assessment. They demonstrated that sentence transformer embeddings with cosine similarity accurately predict real inter-item correlations — with validities of point-seven-one at the item level and point-eight-nine at the scale level.
 
-Here's how it works: all your items get embedded into 1536-dimensional vectors using OpenAI's text-embedding-3-small model. Those vectors get normalized, and then we compute a full cosine similarity matrix — pure linear algebra, no LLM hallucination risk. From that matrix, MAPIG calculates McDonald's omega for internal consistency and the mean inter-item correlation, flagging whether your scale falls in the optimal range or whether items are too similar or too dissimilar.
+Here's how it works: all your items get embedded using OpenAI's text-embedding-3-large model. Those vectors get normalized, and then we compute a full cosine similarity matrix — pure linear algebra, no LLM hallucination risk. From that matrix, MAPIG calculates a pseudo-alpha consistency estimate, clearly labeled as a pre-data signal, and the mean inter-item similarity, flagging whether your scale falls in the optimal range or whether items are too similar or too dissimilar.
 
 ---
 

@@ -73,6 +73,15 @@ def calculate_pseudo_alpha(cells: List, num_items: int) -> Dict[str, Optional[fl
         k = num_items
         r_bar = mean_r
 
+        if k < 2:
+            logger.warning("Pseudo-alpha undefined for a single item.")
+            return {
+                "pseudo_alpha": None,
+                "mean_inter_item_correlation": mean_r,
+                "internal_consistency_flag": "calculation_failed",
+                "guidance": "Pseudo-alpha not estimable: fewer than 2 items.",
+            }
+
         if r_bar <= -1.0 / (k - 1):
             # The equicorrelation matrix is not positive semi-definite here;
             # standardized alpha is undefined.

@@ -1827,15 +1827,31 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
         # Phase 1: correlation + comparison + PFA in parallel.
         # PFA runs in this batch because it's fast (~1-2s) and would otherwise
         # be time-starved by the slower comparison_node (30-40s).
-        results = await asyncio.gather(
-            correlation_node(state),
-            asyncio.to_thread(comparison_node, state),
-            asyncio.to_thread(_run_pfa_analytics_safe, state),
-            asyncio.to_thread(_run_synthetic_pilot_safe, state),
-            asyncio.to_thread(_run_qualitative_safe, state),
-            asyncio.to_thread(_run_ega_semantic_safe, state),
-            return_exceptions=True,
-        )
+        # Hard wall-clock ceiling: a stalled lane must never push the run past
+        # the Vercel 300s kill (which would discard the whole response).
+        # Cancellation stops the wait, not the to_thread workers — acceptable,
+        # the function returns and the instance freezes/recycles.
+        gather_timeout = max(5.0, _remaining_seconds(state) - 30.0)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(
+                    correlation_node(state),
+                    asyncio.to_thread(comparison_node, state),
+                    asyncio.to_thread(_run_pfa_analytics_safe, state),
+                    asyncio.to_thread(_run_synthetic_pilot_safe, state),
+                    asyncio.to_thread(_run_qualitative_safe, state),
+                    asyncio.to_thread(_run_ega_semantic_safe, state),
+                    return_exceptions=True,
+                ),
+                timeout=gather_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "ANALYTICS_TIMEOUT gather exceeded %.0fs budget — returning without analytics "
+                "(items and audit from finalize are preserved)",
+                gather_timeout,
+            )
+            return {}
 
         correlation_result, comparison_result, pfa_result_dict, synthetic_result, qualitative_result, ega_result = results
         logger.info(
@@ -1904,13 +1920,25 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
 
         # Statistical EGA runs on the synthetic pilot's Pearson matrix — only
         # meaningful where a real N exists, so it waits for the pilot result.
-        if updated.synthetic_pilot and updated.synthetic_pilot.cells:
+        # A degenerate (zero-variance) item leaves gaps in the cell list; a
+        # gap imputed as 0.0 would present a missing-data artifact as a real
+        # dimension, so an incomplete cell set skips the network entirely.
+        pilot = updated.synthetic_pilot
+        expected_cells = pilot.n_items * (pilot.n_items - 1) // 2 if pilot else 0
+        if pilot and pilot.cells and len(pilot.cells) != expected_cells:
+            logger.warning(
+                "EGA_SYNTHETIC skipped: incomplete correlation cells (%d/%d — degenerate item)",
+                len(pilot.cells), expected_cells,
+            )
+        elif (
+            pilot and pilot.cells
+            and _remaining_seconds(state) > 15
+        ):
             try:
                 import numpy as np
 
                 from backend.analytics.ega import build_ebic_glasso_network, build_ega_result
 
-                pilot = updated.synthetic_pilot
                 pearson = np.eye(pilot.n_items)
                 for cell in pilot.cells:
                     pearson[cell.item_i_index, cell.item_j_index] = cell.correlation

@@ -424,27 +424,13 @@ async def generate_items_stream(
                 )
                 yield f"data: {payload}\n\n"
             else:
-                # Fallback: if stream ended without final_output, invoke synchronously
-                result_state = await asyncio.to_thread(app.state.graph.invoke, initial_state, config)
-                if "final_output" in result_state:
-                    _set_run_status(
-                        thread_id,
-                        run_id,
-                        status="complete",
-                        current_node="complete",
-                        display_name="Complete",
-                        final_output=result_state["final_output"].model_dump(),
-                        error=None,
-                    )
-                    yield f"data: {json.dumps({'type': 'complete', 'data': result_state['final_output'].model_dump()})}\n\n"
-                else:
-                    _set_run_status(
-                        thread_id,
-                        run_id,
-                        status="error",
-                        error="Graph completed without final_output",
-                    )
-                    yield f"data: {json.dumps({'type': 'error', 'message': 'Graph completed without final_output'})}\n\n"
+                _set_run_status(
+                    thread_id,
+                    run_id,
+                    status="error",
+                    error="Graph completed without final_output",
+                )
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Graph completed without final_output'})}\n\n"
 
         except asyncio.CancelledError:
             _set_run_status(
@@ -455,9 +441,7 @@ async def generate_items_stream(
             )
             raise
         except Exception as e:
-            import traceback
             error_msg = str(e)
-            error_trace = traceback.format_exc()
             logger.exception("SSE event_generator failed")
             _set_run_status(
                 thread_id,
@@ -465,7 +449,7 @@ async def generate_items_stream(
                 status="error",
                 error=error_msg,
             )
-            yield f"data: {json.dumps({'type': 'error', 'message': error_msg, 'trace': error_trace})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
         finally:
             _GENERATION_SLOTS.release()
 
@@ -480,7 +464,7 @@ async def generate_items_stream(
     )
 
 
-@app.post("/v1/run-evaluation", tags=["evaluation"])
+@app.post("/v1/run-evaluation", tags=["evaluation"], dependencies=[Depends(require_api_key)])
 async def run_evaluation(model_provider: str = "claude") -> dict:
     """Run evaluation suite and return baseline comparison results.
 
@@ -513,8 +497,10 @@ async def run_evaluation(model_provider: str = "claude") -> dict:
           }
         }
     """
+    _reject_if_at_capacity()
     try:
-        comparison = await run_baseline_comparison(model_provider)
+        async with _GENERATION_SLOTS:
+            comparison = await run_baseline_comparison(model_provider)
 
         return {
             "current": {

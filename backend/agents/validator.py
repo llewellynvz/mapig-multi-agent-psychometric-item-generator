@@ -233,7 +233,13 @@ def validate_items(
         # Smart validation: Sonnet for attempt 1 (~80% cheaper), Opus for retries.
         from backend.agents.llm_factory import get_claude_chat_model
 
-        if attempt >= 2:
+        if settings.AZURE_TEST_OVERRIDE and settings.AZURE_TEST_SCOPE == "all_agents":
+            # TEMPORARY — remove after Azure evaluation
+            from backend.agents.llm_factory import get_azure_test_chat_model
+
+            model = get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+            model_name = settings.AZURE_FRONTIER_DEPLOYMENT
+        elif attempt >= 2:
             # Retry: Opus with higher temperature to force score differentiation.
             # Prompt caching enabled for system prompt (billing optimization only —
             # human message differs per attempt, ensuring fresh evaluation).

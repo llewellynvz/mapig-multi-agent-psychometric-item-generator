@@ -182,11 +182,13 @@ export interface ExpertConsensus {
   /** Krippendorff's α (nominal) on bucketed verdicts — measures whether
    *  experts agree on the bottom-line accept/revise/reject decision. */
   irr_verdict_alpha?: number | null;
-  /** [Legacy] Pairwise Cohen's κ on per-item scores. */
-  irr_pairwise: Record<string, number>;
+  /** [Legacy] Pairwise Cohen's κ (linear-weighted, fixed 1-5 scale) on
+   *  per-item scores. null = not estimable (zero variance). */
+  irr_pairwise: Record<string, number | null>;
   /** Pairwise Spearman rank correlation — robust to differing rubrics;
-   *  measures whether experts agree on relative item ordering. */
-  irr_pairwise_spearman?: Record<string, number>;
+   *  measures whether experts agree on relative item ordering.
+   *  null = not estimable. */
+  irr_pairwise_spearman?: Record<string, number | null>;
   consensus_revisions: {
     summary: string;
     edits: Array<{

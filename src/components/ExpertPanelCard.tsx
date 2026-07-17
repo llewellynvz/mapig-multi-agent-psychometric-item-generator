@@ -244,9 +244,9 @@ export function ExpertPanelCard({ consensus }: ExpertPanelCardProps) {
                 <Badge
                   key={pair}
                   variant="outline"
-                  className={`text-[11px] ${irrColor(rho)}`}
+                  className={`text-[11px] ${rho == null ? "text-muted-foreground" : irrColor(rho)}`}
                 >
-                  {pair.replace("|", " ↔ ")}: ρ = {rho.toFixed(2)}
+                  {pair.replace("|", " ↔ ")}: ρ = {rho == null ? "— (not estimable)" : rho.toFixed(2)}
                 </Badge>
               ))}
             </div>
@@ -257,7 +257,7 @@ export function ExpertPanelCard({ consensus }: ExpertPanelCardProps) {
         {Object.keys(consensus.irr_pairwise).length > 0 && (
           <details className="mb-4 rounded border border-border/30 bg-slate-900/30 px-3 py-2">
             <summary className="cursor-pointer text-xs text-muted-foreground/80">
-              Legacy: pairwise Cohen&apos;s κ on raw scores (low values are expected with differing rubrics)
+              Legacy: pairwise weighted Cohen&apos;s κ (fixed 1–5 scale) on raw scores (low values are expected with differing rubrics)
             </summary>
             <div className="flex flex-wrap gap-2 mt-2">
               {Object.entries(consensus.irr_pairwise).map(([pair, kappa]) => (
@@ -266,7 +266,7 @@ export function ExpertPanelCard({ consensus }: ExpertPanelCardProps) {
                   variant="outline"
                   className="text-[11px] text-muted-foreground"
                 >
-                  {pair.replace("|", " ↔ ")}: κ = {kappa.toFixed(2)}
+                  {pair.replace("|", " ↔ ")}: κ = {kappa == null ? "— (not estimable)" : kappa.toFixed(2)}
                 </Badge>
               ))}
             </div>

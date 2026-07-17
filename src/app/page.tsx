@@ -5,8 +5,9 @@ import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, ArrowLeft, Rocket } from "lucide-react";
 import { AppDescription } from "@/components/AppDescription";
 import { DeveloperDrawer } from "@/components/DeveloperDrawer";
+import { EmptyPanel } from "@/components/EmptyPanel";
 import { EvidenceAuditPanel } from "@/components/EvidenceAuditPanel";
-import { FeedbackHistoryPanel, type FeedbackHistoryEntry } from "@/components/FeedbackHistoryPanel";
+import { FeedbackHistoryPanel } from "@/components/FeedbackHistoryPanel";
 import { GeneratedItemsTable } from "@/components/GeneratedItemsTable";
 import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
 import { PFAPanel } from "@/components/PFAPanel";
@@ -25,41 +26,11 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InsetPanel, SurfaceCard } from "@/components/ui/surface-card";
 import { useToast } from "@/components/ui/use-toast";
 import { type ProgressEvent } from "@/lib/api";
-import { fetchRunStatus, formToRequest, generateItemsStream, GenerateError } from "@/lib/generate";
+import { formToRequest, generateItemsStream, GenerateError } from "@/lib/generate";
 import type { InstrumentSetupFormValues } from "@/lib/schemas";
 import type { FinalOutput, UserRequest } from "@/lib/types";
-
-type UiStep = "setup" | "run" | "results";
-type RunKind = "setup" | "refinement";
-
-interface ActiveRunState {
-  threadId: string;
-  runId?: string;
-  status: "running" | "complete" | "error";
-  kind: RunKind;
-  feedback: string;
-  updatedAt: string;
-}
-
-interface PersistedUiSession {
-  threadIdInput: string;
-  step: UiStep;
-  submittedSetup: InstrumentSetupFormValues | null;
-  result: FinalOutput | null;
-  humanFeedback: string;
-  feedbackHistory: FeedbackHistoryEntry[];
-  lastRequestJson: string | null;
-  lastResponseJson: string | null;
-  activeRun: ActiveRunState | null;
-}
-
-const SESSION_STORAGE_KEY = "mapig-ui-session-v2";
-
-function isFinalOutput(value: unknown): value is FinalOutput {
-  if (!value || typeof value !== "object") return false;
-  const obj = value as Record<string, unknown>;
-  return Array.isArray(obj.final_items) && typeof obj.audit === "object" && obj.audit !== null;
-}
+import { useRunRecovery } from "@/hooks/useRunRecovery";
+import { useSessionPersistence, type RunKind } from "@/hooks/useSessionPersistence";
 
 function deriveRunKind(request: UserRequest): RunKind {
   return (request.previous_items?.length ?? 0) > 0 ? "refinement" : "setup";
@@ -68,16 +39,27 @@ function deriveRunKind(request: UserRequest): RunKind {
 export default function HomePage() {
   const { toast } = useToast();
   const formRef = React.useRef<{ setErrorsFromApi: (detail: unknown) => void } | null>(null);
-  const [hasRestored, setHasRestored] = React.useState(false);
-  const [threadIdInput, setThreadIdInput] = React.useState("");
-  const [step, setStep] = React.useState<UiStep>("setup");
-  const [submittedSetup, setSubmittedSetup] = React.useState<InstrumentSetupFormValues | null>(null);
-  const [result, setResult] = React.useState<FinalOutput | null>(null);
-  const [humanFeedback, setHumanFeedback] = React.useState("");
-  const [feedbackHistory, setFeedbackHistory] = React.useState<FeedbackHistoryEntry[]>([]);
-  const [activeRun, setActiveRun] = React.useState<ActiveRunState | null>(null);
-  const [lastRequestJson, setLastRequestJson] = React.useState<string | null>(null);
-  const [lastResponseJson, setLastResponseJson] = React.useState<string | null>(null);
+  const {
+    hasRestored,
+    threadIdInput,
+    setThreadIdInput,
+    step,
+    setStep,
+    submittedSetup,
+    setSubmittedSetup,
+    result,
+    setResult,
+    humanFeedback,
+    setHumanFeedback,
+    feedbackHistory,
+    setFeedbackHistory,
+    activeRun,
+    setActiveRun,
+    lastRequestJson,
+    setLastRequestJson,
+    lastResponseJson,
+    setLastResponseJson,
+  } = useSessionPersistence();
   const [progress, setProgress] = React.useState<ProgressState>({
     currentNode: null,
     displayName: null,
@@ -325,180 +307,19 @@ export default function HomePage() {
     setStep("setup");
   }, [resetProgress]);
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (!raw) {
-        setHasRestored(true);
-        return;
-      }
-      const saved = JSON.parse(raw) as PersistedUiSession;
-      setThreadIdInput(saved.threadIdInput ?? "");
-      setSubmittedSetup(saved.submittedSetup ?? null);
-      setResult(saved.result ?? null);
-      setHumanFeedback(saved.humanFeedback ?? "");
-      setFeedbackHistory(Array.isArray(saved.feedbackHistory) ? saved.feedbackHistory : []);
-      setLastRequestJson(saved.lastRequestJson ?? null);
-      setLastResponseJson(saved.lastResponseJson ?? null);
-      setActiveRun(saved.activeRun ?? null);
-
-      if (saved.activeRun?.status === "running" && saved.activeRun.threadId) {
-        setStep("run");
-      } else if (saved.result) {
-        setStep("results");
-      } else {
-        setStep(saved.step ?? "setup");
-      }
-    } catch {
-      // ignore corrupted session payload
-    } finally {
-      setHasRestored(true);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (!hasRestored || typeof window === "undefined") return;
-    const payload: PersistedUiSession = {
-      threadIdInput,
-      step,
-      submittedSetup,
-      result,
-      humanFeedback,
-      feedbackHistory,
-      lastRequestJson,
-      lastResponseJson,
-      activeRun,
-    };
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
-  }, [
-    activeRun,
-    feedbackHistory,
+  useRunRecovery({
     hasRestored,
-    humanFeedback,
-    lastRequestJson,
-    lastResponseJson,
-    result,
-    step,
-    submittedSetup,
-    threadIdInput,
-  ]);
-
-  React.useEffect(() => {
-    if (!hasRestored) return;
-    if (!activeRun?.threadId || activeRun.status !== "running") return;
-    if (mutation.isPending) return;
-
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const status = await fetchRunStatus(activeRun.threadId);
-        if (cancelled) return;
-
-        if (status.status === "running") {
-          setStep("run");
-          setProgress({
-            currentNode: status.current_node ?? null,
-            displayName: status.display_name ?? null,
-            iteration: status.iteration ?? 0,
-            status: "running",
-          });
-          setActiveRun((prev) =>
-            prev
-              ? {
-                ...prev,
-                threadId: status.thread_id,
-                runId: status.run_id,
-                status: "running",
-                updatedAt: status.updated_at ?? new Date().toISOString(),
-              }
-              : prev
-          );
-          return;
-        }
-
-        if (status.status === "complete" && isFinalOutput(status.final_output)) {
-          setResult(status.final_output);
-          setStep("results");
-          setThreadIdInput(status.thread_id);
-          setProgress({
-            currentNode: "finalize_node",
-            displayName: "Finalizing",
-            iteration: status.final_output.audit.iteration_count,
-            status: "complete",
-          });
-          setActiveRun((prev) =>
-            prev
-              ? {
-                ...prev,
-                threadId: status.thread_id,
-                runId: status.run_id,
-                status: "complete",
-                updatedAt: status.updated_at ?? new Date().toISOString(),
-              }
-              : prev
-          );
-          appendHistoryEntry(status.final_output, activeRun.kind, activeRun.feedback);
-          setLastResponseJson(JSON.stringify(status.final_output, null, 2));
-          toast({ title: "Session recovered", description: "Recovered a completed run.", variant: "default" });
-          return;
-        }
-
-        if (status.status === "error") {
-          setProgress((prev) => ({
-            ...prev,
-            status: "error",
-            errorMessage: status.error || "Run failed while session was disconnected.",
-          }));
-          setActiveRun((prev) =>
-            prev
-              ? {
-                ...prev,
-                runId: status.run_id,
-                status: "error",
-                updatedAt: status.updated_at ?? new Date().toISOString(),
-              }
-              : prev
-          );
-          toast({
-            title: "Recovered session state",
-            description: status.error || "The previous run ended with an error.",
-            variant: "default",
-          });
-        }
-      } catch (error) {
-        const err = error as GenerateError;
-        if (err.status === 404) {
-          // Server restarted — in-memory registry lost this thread.
-          // Clear stale running state so user returns to setup.
-          setActiveRun((prev) =>
-            prev ? { ...prev, status: "error", updatedAt: new Date().toISOString() } : prev
-          );
-          setStep("setup");
-          setProgress((prev) => ({
-            ...prev,
-            status: "idle",
-          }));
-        } else {
-          setProgress((prev) => ({
-            ...prev,
-            status: "error",
-            errorMessage: "Could not fetch run status.",
-          }));
-        }
-      }
-    };
-
-    void poll();
-    const timer = window.setInterval(() => {
-      void poll();
-    }, 2500);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [activeRun, appendHistoryEntry, hasRestored, mutation.isPending, toast]);
+    activeRun,
+    isMutationPending: mutation.isPending,
+    appendHistoryEntry,
+    toast,
+    setStep,
+    setProgress,
+    setActiveRun,
+    setResult,
+    setThreadIdInput,
+    setLastResponseJson,
+  });
 
   const jumpToResults = React.useCallback(() => {
     if (result) {
@@ -513,7 +334,7 @@ export default function HomePage() {
   }, [activeRun, result]);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-[#0B2A34] via-[#0F3743] to-[#1A4A53]">
+    <main className="min-h-[calc(100vh-4rem)] bg-app-gradient">
       <div className="mx-auto w-full max-w-[1680px] space-y-7 p-4 pb-8 lg:p-6">
         <AppDescription
           onPrimaryCta={() => setStep("setup")}
@@ -617,14 +438,7 @@ export default function HomePage() {
                 {result ? (
                   <GeneratedItemsTable items={result.final_items} fullOutput={result} />
                 ) : (
-                  <SurfaceCard>
-                    <CardHeader className="border-b border-border/60">
-                      <CardTitle className="text-base md:text-lg">Generated Items</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-5">
-                      <p className="text-sm text-muted-foreground">No generated items yet.</p>
-                    </CardContent>
-                  </SurfaceCard>
+                  <EmptyPanel title="Generated Items">No generated items yet.</EmptyPanel>
                 )}
 
                 {/* Qualitative interview probes (opt-in) */}
@@ -641,18 +455,11 @@ export default function HomePage() {
                     defaultExpanded
                   />
                 ) : (
-                  <SurfaceCard className="border-lime-300/70">
-                    <CardHeader className="border-b border-border/60">
-                      <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                        Correlation Analysis
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-5">
-                      <p className="text-sm text-muted-foreground">
-                        Requires 3+ items for correlation analysis.
-                      </p>
-                    </CardContent>
-                  </SurfaceCard>
+                  <EmptyPanel title="Correlation Analysis" className="border-lime-300/70">
+                    {result && result.final_items.length >= 3
+                      ? "Correlation analytics did not complete for this run."
+                      : "Requires 3+ items for correlation analysis."}
+                  </EmptyPanel>
                 )}
               </div>
 
@@ -675,36 +482,22 @@ export default function HomePage() {
                   <ComparisonPanel
                     convergentInstrument={result.comparison_instruments[0]}
                     discriminantInstrument={result.comparison_instruments[1]}
-                    convergentScore={result.convergent_validity_score ?? 0.5}
+                    convergentScore={result.convergent_validity_score ?? null}
                     crossConstruct={result.cross_construct_analysis}
                     defaultExpanded
                   />
                 ) : (
-                  <SurfaceCard className="border-lime-300/70">
-                    <CardHeader className="border-b border-border/60">
-                      <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                        Instrument Comparison
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-5">
-                      <p className="text-sm text-muted-foreground">
-                        Requires 3+ items for instrument comparison analytics.
-                      </p>
-                    </CardContent>
-                  </SurfaceCard>
+                  <EmptyPanel title="Instrument Comparison" className="border-lime-300/70">
+                    {result && result.final_items.length >= 3
+                      ? "Instrument comparison did not complete for this run."
+                      : "Requires 3+ items for instrument comparison analytics."}
+                  </EmptyPanel>
                 )}
 
                 {result ? (
                   <EvidenceAuditPanel audit={result.audit} />
                 ) : (
-                  <SurfaceCard>
-                    <CardHeader className="border-b border-border/60">
-                      <CardTitle className="text-base md:text-lg">Evidence and Audit</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-5">
-                      <p className="text-sm text-muted-foreground">Run generation to load evidence and audit details.</p>
-                    </CardContent>
-                  </SurfaceCard>
+                  <EmptyPanel title="Evidence and Audit">Run generation to load evidence and audit details.</EmptyPanel>
                 )}
 
                 <FeedbackHistoryPanel

@@ -71,6 +71,7 @@ export function Stepper({ current }: StepperProps) {
           return (
             <InsetPanel
               key={step.id}
+              aria-current={status === "active" ? "step" : undefined}
               className={cn(
                 "overflow-visible p-4 transition-all duration-300",
                 status === "active" && colors.cardAccent,

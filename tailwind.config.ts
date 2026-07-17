@@ -35,7 +35,8 @@ const config: Config = {
         "destructive-foreground": "var(--destructive-foreground)",
       },
       fontFamily: {
-        sans: ["system-ui", "Segoe UI", "Roboto", "sans-serif"],
+        sans: ["var(--font-sans)", "system-ui", "Segoe UI", "Roboto", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       borderRadius: {
         "2xl": "1rem",

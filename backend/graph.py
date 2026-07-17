@@ -1746,6 +1746,32 @@ def _run_synthetic_pilot_safe(state: GraphState) -> dict:
         return {}
 
 
+def _run_qualitative_safe(state: GraphState) -> dict:
+    """Synchronous qualitative-question generation for asyncio.to_thread.
+
+    Returns {'qualitative_questions': [...], 'qualitative_warnings': [...]}
+    on success, empty dict when the toggle is off or generation failed."""
+    user_request = state.get("user_request")
+    if not user_request or not getattr(user_request, "include_qualitative", False):
+        return {}
+    try:
+        from backend.agents.qualitative_generator import generate_qualitative_questions
+
+        questions, warnings, usage = generate_qualitative_questions(
+            user_request,
+            state.get("facet_mapping"),
+            state.get("evidence") or [],
+        )
+        logger.info(
+            "QUALITATIVE tokens input=%d output=%d",
+            usage.input_tokens, usage.output_tokens,
+        )
+        return {"qualitative_questions": questions, "qualitative_warnings": warnings}
+    except Exception as e:
+        logger.error(f"Qualitative generation failed: {e}", exc_info=True)
+        return {}
+
+
 async def analytics_dispatch_node(state: GraphState) -> GraphState:
     """Run analytics in parallel using asyncio.gather, then merge results.
 
@@ -1782,16 +1808,18 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             asyncio.to_thread(comparison_node, state),
             asyncio.to_thread(_run_pfa_analytics_safe, state),
             asyncio.to_thread(_run_synthetic_pilot_safe, state),
+            asyncio.to_thread(_run_qualitative_safe, state),
             return_exceptions=True,
         )
 
-        correlation_result, comparison_result, pfa_result_dict, synthetic_result = results
+        correlation_result, comparison_result, pfa_result_dict, synthetic_result, qualitative_result = results
         logger.info(
-            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s synthetic=%s",
+            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s synthetic=%s qualitative=%s",
             "ok" if isinstance(correlation_result, dict) else type(correlation_result).__name__,
             "ok" if isinstance(comparison_result, dict) else type(comparison_result).__name__,
             "ok" if isinstance(pfa_result_dict, dict) and pfa_result_dict.get("pfa_result") else "missing",
             "ok" if isinstance(synthetic_result, dict) and synthetic_result.get("synthetic_pilot") else "off",
+            "ok" if isinstance(qualitative_result, dict) and qualitative_result.get("qualitative_questions") else "off",
         )
 
         if isinstance(correlation_result, dict) and "final_output" in correlation_result:
@@ -1834,6 +1862,14 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             updated.synthetic_pilot = synthetic_result["synthetic_pilot"]
         elif isinstance(synthetic_result, Exception):
             logger.error(f"Synthetic pilot raised: {synthetic_result}")
+
+        if isinstance(qualitative_result, dict) and qualitative_result.get("qualitative_questions"):
+            updated.qualitative_questions = qualitative_result["qualitative_questions"]
+        elif isinstance(qualitative_result, Exception):
+            logger.error(f"Qualitative generation raised: {qualitative_result}")
+        if isinstance(qualitative_result, dict) and qualitative_result.get("qualitative_warnings"):
+            existing_warnings = list(updated.audit.warnings or [])
+            updated.audit.warnings = existing_warnings + qualitative_result["qualitative_warnings"]
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
         # Time-budget check: cross-construct requires 2 GPT-5.2 calls (~30-60s).

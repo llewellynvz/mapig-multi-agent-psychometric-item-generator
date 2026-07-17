@@ -202,7 +202,12 @@ def _search_perplexity_instrument(
         log.info("PERPLEXITY_INSTRUMENT_SEARCH success type=%s instrument=%s", search_type, instrument.name)
         return instrument
 
-    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError, ValidationError) as e:
+    except ValidationError as e:
+        # A schema/sanitization rejection swaps in a hardcoded default downstream;
+        # log it distinctly so that substitution is never silent.
+        log.warning("PERPLEXITY_INSTRUMENT_SEARCH rejected by validation, will fall back to defaults: %s", e)
+        return None
+    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError) as e:
         log.warning("PERPLEXITY_INSTRUMENT_SEARCH failed: %s", e)
         return None
 

@@ -230,6 +230,28 @@ export interface PersonaValidationResponse {
   summary: string;
 }
 
+// Phase 17: Synthetic-respondent pilot (flag-gated)
+
+export interface SyntheticPilotResult {
+  n_respondents: number;
+  n_items: number;
+  model_name: string;
+  scale_points: number;
+  /** Real Pearson correlations from the synthetic matrix, with Fisher-z 95% CIs. */
+  cells: CorrelationCell[];
+  cronbach_alpha: number | null;
+  omega_total: number | null;
+  parallel_analysis_n_factors: number | null;
+  observed_eigenvalues: number[];
+  threshold_eigenvalues: number[];
+  kmo: number | null;
+  bartlett_chi2: number | null;
+  bartlett_p: number | null;
+  failed_respondents: number;
+  /** Required honesty statement — rendered with every statistic in the panel. */
+  disclaimer: string;
+}
+
 export interface FinalOutput {
   final_items: FinalItem[];
   audit: AuditMetadata;
@@ -251,6 +273,9 @@ export interface FinalOutput {
   pfa_result?: PFAResult;
   expert_consensus?: ExpertConsensus;
   persona_validation?: PersonaValidationResponse;
+
+  // Phase 17: Synthetic-respondent pilot
+  synthetic_pilot?: SyntheticPilotResult;
 }
 
 export interface HealthResponse {

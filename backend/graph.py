@@ -1704,6 +1704,48 @@ def _run_pfa_analytics_safe(state: GraphState) -> dict:
         return {}
 
 
+def _run_synthetic_pilot_safe(state: GraphState) -> dict:
+    """Synchronous synthetic-respondent pilot for use inside asyncio.to_thread.
+
+    Returns {'synthetic_pilot': SyntheticPilotResult} on success, empty dict
+    when disabled, time-starved, or failed. Never raises."""
+    if not settings.SYNTHETIC_PILOT_ENABLED:
+        return {}
+    final_output = state.get("final_output")
+    if not final_output or len(final_output.final_items) < 2:
+        return {}
+    remaining = _remaining_seconds(state)
+    if remaining < settings.SYNTHETIC_PILOT_MIN_REMAINING_SECS:
+        logger.warning(
+            "SYNTHETIC_PILOT_BUDGET remaining=%.0fs (<%ds) — skipping",
+            remaining, settings.SYNTHETIC_PILOT_MIN_REMAINING_SECS,
+        )
+        return {}
+    try:
+        from backend.agents.synthetic_respondents import run_synthetic_pilot
+
+        facet_mapping = state.get("facet_mapping")
+        facet_names = (
+            [f.facet_name for f in facet_mapping.facets] if facet_mapping else []
+        )
+        result, usage = run_synthetic_pilot(
+            state["user_request"],
+            final_output.final_items,
+            facet_names,
+            n_respondents=settings.SYNTHETIC_N_RESPONDENTS,
+        )
+        if result is None:
+            return {}
+        logger.info(
+            "SYNTHETIC_PILOT tokens input=%d output=%d",
+            usage.input_tokens, usage.output_tokens,
+        )
+        return {"synthetic_pilot": result}
+    except Exception as e:
+        logger.error(f"Synthetic pilot failed: {e}", exc_info=True)
+        return {}
+
+
 async def analytics_dispatch_node(state: GraphState) -> GraphState:
     """Run analytics in parallel using asyncio.gather, then merge results.
 
@@ -1739,15 +1781,17 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             correlation_node(state),
             asyncio.to_thread(comparison_node, state),
             asyncio.to_thread(_run_pfa_analytics_safe, state),
+            asyncio.to_thread(_run_synthetic_pilot_safe, state),
             return_exceptions=True,
         )
 
-        correlation_result, comparison_result, pfa_result_dict = results
+        correlation_result, comparison_result, pfa_result_dict, synthetic_result = results
         logger.info(
-            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s",
+            "ANALYTICS_RESULTS correlation=%s comparison=%s pfa=%s synthetic=%s",
             "ok" if isinstance(correlation_result, dict) else type(correlation_result).__name__,
             "ok" if isinstance(comparison_result, dict) else type(comparison_result).__name__,
             "ok" if isinstance(pfa_result_dict, dict) and pfa_result_dict.get("pfa_result") else "missing",
+            "ok" if isinstance(synthetic_result, dict) and synthetic_result.get("synthetic_pilot") else "off",
         )
 
         if isinstance(correlation_result, dict) and "final_output" in correlation_result:
@@ -1785,6 +1829,11 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
         if not updated.pfa_result and state.get("pfa_pruning_result"):
             logger.info("PFA_ANALYTICS using pruning_result as fallback")
             updated.pfa_result = state.get("pfa_pruning_result")
+
+        if isinstance(synthetic_result, dict) and synthetic_result.get("synthetic_pilot"):
+            updated.synthetic_pilot = synthetic_result["synthetic_pilot"]
+        elif isinstance(synthetic_result, Exception):
+            logger.error(f"Synthetic pilot raised: {synthetic_result}")
 
         # Phase 2: cross-construct (needs comparison_instruments from phase 1)
         # Time-budget check: cross-construct requires 2 GPT-5.2 calls (~30-60s).

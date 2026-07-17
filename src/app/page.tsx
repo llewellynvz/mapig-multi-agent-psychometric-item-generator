@@ -10,6 +10,7 @@ import { FeedbackHistoryPanel, type FeedbackHistoryEntry } from "@/components/Fe
 import { GeneratedItemsTable } from "@/components/GeneratedItemsTable";
 import { HumanFeedbackPanel } from "@/components/HumanFeedbackPanel";
 import { PFAPanel } from "@/components/PFAPanel";
+import { SyntheticPilotPanel } from "@/components/SyntheticPilotPanel";
 import { ExpertPanelCard } from "@/components/ExpertPanelCard";
 import { PersonaValidationCard } from "@/components/PersonaValidationCard";
 import { InstrumentSetupForm } from "@/components/InstrumentSetupForm";
@@ -711,6 +712,14 @@ export default function HomePage() {
             {/* Pseudo-Factor Analysis full-width row (centerpiece structural result) */}
             {result && result.pfa_result && result.pfa_result.loadings.length > 0 && (
               <PFAPanel pfa={result.pfa_result} />
+            )}
+
+            {/* Synthetic-respondent pilot full-width row (flag-gated, simulated data) */}
+            {result && result.synthetic_pilot && (
+              <SyntheticPilotPanel
+                pilot={result.synthetic_pilot}
+                itemTexts={result.final_items.map(item => item.item_text)}
+              />
             )}
 
           </section>

@@ -53,6 +53,10 @@ ALLOWED_CHECKPOINT_TYPES: list[tuple[str, str]] = [
     ("backend.schemas", "ExpertConsensus"),
     ("backend.schemas", "PersonaRating"),
     ("backend.schemas", "PersonaValidationResponse"),
+    # Phase 17: Synthetic-respondent pilot
+    ("backend.schemas", "SyntheticPilotResult"),
+    # Phase 18: Qualitative questions
+    ("backend.schemas", "QualitativeQuestion"),
 ]
 
 

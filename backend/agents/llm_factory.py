@@ -74,6 +74,111 @@ def get_azure_chat_model() -> AzureChatOpenAI:
     )
 
 
+# TEMPORARY — remove after Azure evaluation
+@lru_cache(maxsize=4)
+def get_azure_test_chat_model(deployment: str) -> AzureChatOpenAI:
+    """Create (and cache) an AzureChatOpenAI client authenticated via Azure AD certificate."""
+    if not settings.AZURE_OPENAI_ENDPOINT:
+        raise RuntimeError(
+            "AZURE_TEST_OVERRIDE is enabled but AZURE_OPENAI_ENDPOINT is not set. "
+            "Set it in .env, then restart the backend."
+        )
+
+    from backend.agents.azure_auth import (
+        azure_token_provider,
+        azure_token_provider_async,
+        get_azure_credential,
+    )
+
+    get_azure_credential()
+
+    return AzureChatOpenAI(
+        azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+        azure_deployment=deployment,
+        api_version=settings.AZURE_OPENAI_API_VERSION,
+        azure_ad_token_provider=azure_token_provider,
+        azure_ad_async_token_provider=azure_token_provider_async,
+        max_retries=3,
+        timeout=45,
+    )
+
+
+# TEMPORARY — remove after Azure evaluation
+def _azure_test_route(
+    agent_name: str,
+    model_provider: str,
+    use_chatgpt_critics: bool,
+) -> Optional[AzureChatOpenAI]:
+    """Mirror of the get_chat_model_for_agent decision tree for the Azure test override.
+
+    Returns None for Claude-bound agents so the caller falls through to the
+    normal allocation logic unchanged.
+    """
+    if settings.AZURE_TEST_SCOPE == "all_agents":
+        return get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+
+    CRITIC_AGENTS = ["linguistic_reviewer", "bias_reviewer", "content_reviewer", "critic"]
+
+    if use_chatgpt_critics and agent_name in CRITIC_AGENTS:
+        return get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+
+    if agent_name == "item_writer":
+        return None
+
+    if settings.AGENT_MODEL_OVERRIDES_ENABLED and agent_name in AGENT_MODEL_OVERRIDES:
+        override_provider, _ = AGENT_MODEL_OVERRIDES[agent_name]
+        if override_provider == "openai":
+            return get_azure_test_chat_model(settings.AZURE_CHEAP_DEPLOYMENT)
+        return None
+
+    if model_provider == "openai":
+        return get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+
+    return None
+
+
+# TEMPORARY — remove after Azure evaluation
+def _get_azure_test_analytics_model() -> AzureChatOpenAI:
+    """Azure-hosted replacement for the GPT-5.2 analytics client."""
+    if not settings.AZURE_OPENAI_ENDPOINT:
+        raise RuntimeError(
+            "AZURE_TEST_OVERRIDE is enabled but AZURE_OPENAI_ENDPOINT is not set. "
+            "Set it in .env, then restart the backend."
+        )
+
+    from backend.agents.azure_auth import (
+        azure_token_provider,
+        azure_token_provider_async,
+        get_azure_credential,
+    )
+
+    get_azure_credential()
+
+    kwargs = {
+        "azure_endpoint": settings.AZURE_OPENAI_ENDPOINT,
+        "azure_deployment": settings.AZURE_FRONTIER_DEPLOYMENT,
+        "api_version": settings.AZURE_OPENAI_API_VERSION,
+        "azure_ad_token_provider": azure_token_provider,
+        "azure_ad_async_token_provider": azure_token_provider_async,
+        "max_tokens": 25000,
+        "temperature": 0.2,
+        "max_retries": 2,
+        "timeout": 30,
+    }
+
+    from pydantic import ValidationError
+
+    try:
+        return AzureChatOpenAI(reasoning_effort="high", **kwargs)
+    except (TypeError, ValidationError):
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "AzureChatOpenAI rejected reasoning_effort='high'; creating analytics client without it"
+        )
+        return AzureChatOpenAI(**kwargs)
+
+
 @lru_cache(maxsize=2)
 def get_claude_chat_model(model: str = "claude-opus-4-6") -> ChatAnthropic:
     """Create (and cache) the Claude ChatAnthropic client.
@@ -115,7 +220,7 @@ def get_validator_model() -> ChatAnthropic:
     return get_claude_chat_model(model=settings.VALIDATOR_MODEL)
 
 
-def get_gpt52_analytics_model() -> ChatOpenAI:
+def get_gpt52_analytics_model() -> Union[ChatOpenAI, AzureChatOpenAI]:
     """Get GPT-5.2 reasoning model for analytics tasks.
 
     Configured with hardcoded high reasoning effort per user decision.
@@ -128,6 +233,9 @@ def get_gpt52_analytics_model() -> ChatOpenAI:
     Raises:
         ValueError: If OPENAI_API_KEY not configured
     """
+    if settings.AZURE_TEST_OVERRIDE:
+        return _get_azure_test_analytics_model()
+
     if not settings.OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY required for GPT-5.2 analytics")
 
@@ -180,6 +288,11 @@ def get_chat_model_for_agent(
     Raises:
         ValueError: If required API key missing for selected provider
     """
+    if settings.AZURE_TEST_OVERRIDE:
+        azure_model = _azure_test_route(agent_name, model_provider, use_chatgpt_critics)
+        if azure_model is not None:
+            return azure_model
+
     # Define critic agents that can be switched to ChatGPT
     # NOTE: validator excluded — always uses Claude (Sonnet first, Opus on retry)
     # to prevent lazy identical-score evaluations from GPT models

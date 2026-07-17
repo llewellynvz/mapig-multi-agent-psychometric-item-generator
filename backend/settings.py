@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT: Optional[str] = Field(default=None)
     AZURE_OPENAI_API_VERSION: str = "2023-06-01-preview"
 
+    # TEMPORARY: Azure test override (remove after evaluation)
+    AZURE_TEST_OVERRIDE: bool = False
+    AZURE_TEST_SCOPE: Literal["openai_agents", "all_agents"] = "openai_agents"
+    AZURE_TENANT_ID: Optional[str] = None
+    AZURE_CLIENT_ID: Optional[str] = None
+    AZURE_CLIENT_CERT_PATH: Optional[str] = None
+    AZURE_CLIENT_CERT_PASSWORD: Optional[str] = None
+    AZURE_FRONTIER_DEPLOYMENT: str = "gpt-5.1"
+    AZURE_CHEAP_DEPLOYMENT: str = "gpt-5.4-mini"
+
     # Anthropic Claude (used for validation)
     CLAUDE_API_KEY: Optional[str] = Field(default=None)
     VALIDATOR_MODEL: str = "claude-opus-4-6"  # Highest accuracy for validation
@@ -162,6 +172,13 @@ class Settings(BaseSettings):
         'AZURE_OPENAI_API_KEY',
         'AZURE_OPENAI_DEPLOYMENT',
         'AZURE_OPENAI_API_VERSION',
+        'AZURE_TEST_SCOPE',
+        'AZURE_TENANT_ID',
+        'AZURE_CLIENT_ID',
+        'AZURE_CLIENT_CERT_PATH',
+        'AZURE_CLIENT_CERT_PASSWORD',
+        'AZURE_FRONTIER_DEPLOYMENT',
+        'AZURE_CHEAP_DEPLOYMENT',
         'CLAUDE_API_KEY',
         'VALIDATOR_MODEL',
         'SEARCH_PROVIDER',

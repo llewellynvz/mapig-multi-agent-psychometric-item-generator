@@ -9,6 +9,7 @@ import { PrimaryButton } from "@/components/ui/action-buttons";
 import { CorrelationHeatmap } from "./CorrelationHeatmap";
 import { CorrelationSummaryCard } from "./CorrelationSummaryCard";
 import { CorrelationTooltip } from "./CorrelationTooltip";
+import { MethodBadge } from "./MethodBadge";
 import type { CorrelationMatrix, CorrelationCell } from "@/lib/types";
 import {
   exportCorrelationMatrixToCsv,
@@ -132,7 +133,8 @@ export function CorrelationPanel({
             ) : (
               <ChevronRight className="h-4 w-4" />
             )}
-            Correlation Analysis
+            Semantic Similarity Analysis
+            <MethodBadge variant="predata" />
           </CardTitle>
         </CardHeader>
 

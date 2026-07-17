@@ -151,7 +151,7 @@ export function CorrelationHeatmap({
         <span className="shrink-0 text-xs font-medium text-[#006d7c]">1.0</span>
       </div>
       <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
-        Light = weak correlation, Dark = strong correlation
+        Light = low semantic similarity, Dark = high semantic similarity
       </p>
     </div>
   );

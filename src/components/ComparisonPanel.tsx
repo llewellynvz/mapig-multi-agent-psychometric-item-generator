@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { InstrumentCard } from "./InstrumentCard";
+import { MethodologyNote } from "./MethodologyNote";
 import type { ComparisonInstrument, CrossConstructComparison } from "@/lib/types";
 
 export interface ComparisonPanelProps {
@@ -27,7 +28,9 @@ export function ComparisonPanel({
   const discriminantCorrelation = crossConstruct?.construct_pairs?.[0]?.estimated_correlation;
   const showDiscriminantWarning = discriminantCorrelation !== undefined && discriminantCorrelation > 0.85;
   const discriminantWarningText = showDiscriminantWarning
-    ? `High overlap detected (r = ${discriminantCorrelation.toFixed(2)})`
+    ? discriminantInstrument.validity_method === "embedding"
+      ? `High overlap detected (similarity = ${discriminantCorrelation.toFixed(2)})`
+      : `High overlap detected (LLM-estimated r = ${discriminantCorrelation.toFixed(2)})`
     : undefined;
 
   return (
@@ -60,24 +63,22 @@ export function ComparisonPanel({
               instrument={convergentInstrument}
               label="Convergent Validity"
               score={convergentScore}
-              scoreLabel="Convergent Score"
+              scoreLabel="Convergent alignment (pre-data)"
             />
 
             <InstrumentCard
               instrument={discriminantInstrument}
               label="Discriminant Validity"
               score={discriminantCorrelation}
-              scoreLabel="r"
+              scoreLabel="LLM-estimated r"
               showWarning={showDiscriminantWarning}
               warningText={discriminantWarningText}
             />
           </div>
 
-          <div className="mt-5 pt-4 border-t border-border/40">
-            <p className="text-[11px] italic text-muted-foreground/70">
-              Only instrument metadata is stored. No copyrighted item text is retrieved or displayed.
-            </p>
-          </div>
+          <MethodologyNote>
+            Only instrument metadata is stored. No copyrighted item text is retrieved or displayed.
+          </MethodologyNote>
         </CardContent>
       )}
     </SurfaceCard>

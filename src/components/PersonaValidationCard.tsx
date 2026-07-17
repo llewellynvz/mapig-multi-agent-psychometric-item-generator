@@ -5,6 +5,7 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, Users } from "lucide-react";
+import { MethodBadge } from "./MethodBadge";
 import type { PersonaValidationResponse } from "@/lib/types";
 
 export interface PersonaValidationCardProps {
@@ -36,6 +37,7 @@ export function PersonaValidationCard({ validation }: PersonaValidationCardProps
           <CardTitle className="text-base md:text-lg flex items-center gap-2">
             <Users className="h-4 w-4 text-[#a7d12b]" />
             Persona Validation
+            <MethodBadge variant="llm" />
           </CardTitle>
           <div className="flex items-center gap-3">
             <Badge

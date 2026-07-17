@@ -3,6 +3,8 @@
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SurfaceCard } from "@/components/ui/surface-card";
 import { AlertTriangle } from "lucide-react";
+import { MethodBadge } from "./MethodBadge";
+import { MethodologyNote } from "./MethodologyNote";
 import type { CorrelationMatrix } from "@/lib/types";
 
 export interface CorrelationSummaryCardProps {
@@ -54,7 +56,10 @@ export function CorrelationSummaryCard({ matrix }: CorrelationSummaryCardProps) 
   return (
     <SurfaceCard className="mt-4 border-lime-300/70">
       <CardHeader className="border-b border-border/60">
-        <CardTitle className="text-base">Quality Metrics</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base">
+          Quality Metrics
+          <MethodBadge variant="predata" />
+        </CardTitle>
       </CardHeader>
       <CardContent className="pt-5">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -89,12 +94,7 @@ export function CorrelationSummaryCard({ matrix }: CorrelationSummaryCardProps) 
           </div>
         </div>
 
-        {/* Disclaimer */}
-        <div className="mt-4 pt-4 border-t border-border/30">
-          <p className="text-[11px] italic text-muted-foreground/70">
-            {matrix.disclaimer}
-          </p>
-        </div>
+        <MethodologyNote>{matrix.disclaimer}</MethodologyNote>
 
         {matrix.redundancy_flags && matrix.redundancy_flags.length > 0 && (
           <div className="mt-4 pt-4 border-t border-border/30">

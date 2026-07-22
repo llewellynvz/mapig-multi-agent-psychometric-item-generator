@@ -117,3 +117,4 @@ REVIEW.md
 
 # Local planning docs (never commit)
 docs/PRD.md
+gsd-pipeline.sh

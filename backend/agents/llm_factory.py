@@ -101,7 +101,7 @@ def get_azure_test_chat_model(deployment: str) -> AzureChatOpenAI:
         azure_ad_token_provider=azure_token_provider,
         azure_ad_async_token_provider=azure_token_provider_async,
         max_retries=3,
-        timeout=45,
+        timeout=180,
     )
 
 

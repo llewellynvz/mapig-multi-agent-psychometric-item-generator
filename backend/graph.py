@@ -206,7 +206,7 @@ def _utc_now() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
 
 
-_VERCEL_MAX_DURATION = 300  # seconds (from vercel.json maxDuration)
+_VERCEL_MAX_DURATION = 1800
 
 
 def _remaining_seconds(state: GraphState) -> float:

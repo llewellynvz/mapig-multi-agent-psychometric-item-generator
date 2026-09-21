@@ -76,9 +76,12 @@ def get_azure_chat_model() -> AzureChatOpenAI:
     )
 
 
+AZURE_CLIENT_TIMEOUT_SECONDS = 180
+
+
 # TEMPORARY — remove after Azure evaluation
-@lru_cache(maxsize=4)
-def get_azure_test_chat_model(deployment: str) -> AzureChatOpenAI:
+@lru_cache(maxsize=8)
+def get_azure_test_chat_model(deployment: str, timeout: int) -> AzureChatOpenAI:
     """Create (and cache) an AzureChatOpenAI client authenticated via Azure AD certificate."""
     if not settings.AZURE_OPENAI_ENDPOINT:
         raise RuntimeError(
@@ -101,7 +104,7 @@ def get_azure_test_chat_model(deployment: str) -> AzureChatOpenAI:
         azure_ad_token_provider=azure_token_provider,
         azure_ad_async_token_provider=azure_token_provider_async,
         max_retries=3,
-        timeout=180,
+        timeout=timeout,
     )
 
 
@@ -116,13 +119,30 @@ def _azure_test_route(
     Returns None for Claude-bound agents so the caller falls through to the
     normal allocation logic unchanged.
     """
+    deployment = _azure_deployment_for(agent_name, model_provider, use_chatgpt_critics)
+    if deployment is None:
+        return None
+    return get_azure_test_chat_model(deployment, _client_timeout_for(agent_name))
+
+
+def _client_timeout_for(agent_name: str) -> int:
+    if agent_name == "meta_editor":
+        return settings.META_EDITOR_TIMEOUT_SECONDS
+    return AZURE_CLIENT_TIMEOUT_SECONDS
+
+
+def _azure_deployment_for(
+    agent_name: str,
+    model_provider: str,
+    use_chatgpt_critics: bool,
+) -> Optional[str]:
     if settings.AZURE_TEST_SCOPE == "all_agents":
-        return get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+        return settings.AZURE_FRONTIER_DEPLOYMENT
 
     CRITIC_AGENTS = ["linguistic_reviewer", "bias_reviewer", "content_reviewer", "critic"]
 
     if use_chatgpt_critics and agent_name in CRITIC_AGENTS:
-        return get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+        return settings.AZURE_FRONTIER_DEPLOYMENT
 
     if agent_name == "item_writer":
         return None
@@ -130,11 +150,11 @@ def _azure_test_route(
     if settings.AGENT_MODEL_OVERRIDES_ENABLED and agent_name in AGENT_MODEL_OVERRIDES:
         override_provider, _ = AGENT_MODEL_OVERRIDES[agent_name]
         if override_provider == "openai":
-            return get_azure_test_chat_model(settings.AZURE_CHEAP_DEPLOYMENT)
+            return settings.AZURE_CHEAP_DEPLOYMENT
         return None
 
     if model_provider == "openai":
-        return get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+        return settings.AZURE_FRONTIER_DEPLOYMENT
 
     return None
 

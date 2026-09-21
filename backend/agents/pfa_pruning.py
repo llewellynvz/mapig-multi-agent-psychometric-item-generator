@@ -5,9 +5,10 @@ target_count is reached or all remaining items load cleanly per the 4-rule
 retention check (Suárez-Álvarez et al., 2026).
 
 Hard constraints:
-- For multi-dimensional constructs, never drop the last remaining item of any
-  facet (preserves facet coverage). For unidimensional constructs (a single
-  facet) this rule is uninformative and is bypassed.
+- For multi-dimensional constructs, never drop a facet below ``min_per_facet``
+  items (default 1, the request's ``min_items_per_facet``), so facet coverage
+  survives pruning. For unidimensional constructs (a single facet) this rule is
+  uninformative and is bypassed.
 - Cap iterations at PFA_PRUNING_MAX_ITERS to bound cost.
 - Optional time-budget guard to break the loop when the Vercel budget runs low.
 """
@@ -72,6 +73,7 @@ def prune_items(
     target_count: int,
     max_iters: Optional[int] = None,
     deadline: Optional[float] = None,
+    min_per_facet: int = 1,
 ) -> Tuple[List[DraftItem], List[int], PFAResult]:
     """Iteratively prune items via PFA until target_count reached or all clean.
 
@@ -79,6 +81,7 @@ def prune_items(
         items: Over-generated pool of items.
         facet_mapping: Used by PFA to derive expected factor structure + labels.
         target_count: Desired final count.
+        min_per_facet: Floor no facet is pruned below (multi-dimensional only).
         max_iters: Override settings.PFA_PRUNING_MAX_ITERS for testing.
         deadline: Optional Unix timestamp (time.time() + budget) after which
             the loop must stop to preserve the Vercel budget for downstream
@@ -179,19 +182,21 @@ def prune_items(
             facet_counts = _facet_counts(current)
             for cand in candidates:
                 facet_key = cand.facet_name or ""
-                if facet_counts.get(facet_key, 0) > 1:
+                if facet_counts.get(facet_key, 0) > min_per_facet:
                     item_to_drop_idx = cand.item_index
                     break
                 else:
                     logger.warning(
-                        "PFA pruning: would drop weak item idx=%d facet=%s, but it's the last "
-                        "remaining for that facet — skipping (facet preservation constraint).",
-                        cand.item_index, facet_key,
+                        "PFA pruning: would drop weak item idx=%d facet=%s, but that facet is at "
+                        "its floor of %d — skipping (facet preservation constraint).",
+                        cand.item_index, facet_key, min_per_facet,
                     )
 
         if item_to_drop_idx is None:
             logger.info(
-                "PFA pruning: no droppable candidates (all weak items are the last in their facet). Stopping."
+                "PFA pruning: no droppable candidates (every weak item's facet is at the floor of %d). "
+                "Stopping with %d items against target=%d.",
+                min_per_facet, len(current), target_count,
             )
             break
 

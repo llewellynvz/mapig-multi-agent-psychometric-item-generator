@@ -345,6 +345,9 @@ def _check_warnings(result: RunResult, fo: dict) -> None:
     ur = fo.get("user_request")
     if ur:
         expected = ur.get("item_count", 0)
+        facets = {item.get("facet_name") for item in items if item.get("facet_name")}
+        if len(facets) > 1:
+            expected = max(expected, len(facets) * ur.get("min_items_per_facet", 1))
     if expected and result.item_count != expected:
         result.warnings.append(
             f"Item count mismatch: expected {expected}, got {result.item_count}"

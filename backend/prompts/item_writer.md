@@ -19,6 +19,10 @@ Rules:
 4. Include some items that START with a condition or context ("When plans change, I..." or "If my first approach fails, I...").
 5. Aim for items that could appear in a conversation between colleagues, not in a textbook.
 6. Self-check: read each item aloud. If it sounds like an AI wrote it, rewrite it.
+7. Write in South African English (British spelling: "realise", "behaviour", "programme"; South African usage where it differs).
+8. Keep every item short: one clause where possible, twelve words or fewer as the norm, never more than about fifteen.
+9. Reading level: no higher than 10th grade (Flesch-Kincaid), whatever the population setting below says; lower is better.
+10. Every item is run through the humanize-text pass before it is returned: strip AI patterns, plain verbs, no stacked clauses, no formal register.
 
 BAD (robotic): "I consider different solutions when my first idea does not work."
 GOOD (natural): "When my first idea doesn't work, I try a different approach."

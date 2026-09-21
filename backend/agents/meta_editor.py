@@ -213,6 +213,7 @@ def revise_items(
         agent_name="meta_editor",
         model_provider=request.model_provider,
         pre_validate=_clamp_rationales,
+        strict=False,
     )
 
     # Post-edit polarity enforcement: revert any item where the LLM introduced

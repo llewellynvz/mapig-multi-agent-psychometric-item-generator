@@ -60,6 +60,15 @@ class UserRequest(BaseModel):
         description="Number of items to generate. Minimum 2, maximum 50.",
     )
 
+    min_items_per_facet: conint(ge=1, le=10) = Field(
+        default=1,
+        description=(
+            "Floor the PFA pruner never takes a facet below (multi-dimensional constructs). "
+            "When facets times this floor exceeds item_count, the floor wins and more items "
+            "than item_count are returned."
+        ),
+    )
+
     constraints: List[str] = Field(
         default_factory=list,
         description="Hard constraints for item writing (reading level, no idioms, etc.).",

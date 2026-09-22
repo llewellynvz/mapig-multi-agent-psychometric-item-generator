@@ -21,7 +21,7 @@ from backend.agents.bias_reviewer import review_bias
 from backend.agents.critic import decide as critic_decide
 from backend.agents.item_writer import write_items
 from backend.agents.linguistic_reviewer import review_linguistic
-from backend.agents.meta_editor import revise_items
+from backend.agents.meta_editor import DISCARDED_PASS_PREFIX, revise_items
 from backend.agents.retrieval_agent import retrieve_evidence
 from backend.agents.llm_utils import TokenUsage
 from backend.schemas import (
@@ -206,7 +206,7 @@ def _utc_now() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
 
 
-_VERCEL_MAX_DURATION = 300  # seconds (from vercel.json maxDuration)
+_VERCEL_MAX_DURATION = 1800
 
 
 def _remaining_seconds(state: GraphState) -> float:
@@ -893,6 +893,9 @@ def meta_editor_node(state: GraphState) -> GraphState:
             usage = TokenUsage(model_name="fallback")
 
         token_update = _accumulate_tokens(state, usage)
+        summary = resp.revision_plan.summary or ""
+        if summary.startswith(DISCARDED_PASS_PREFIX):
+            token_update["audit_warnings"] = [*state.get("audit_warnings", []), summary]
 
         # Snapshot current comments before clearing so full history is preserved
         snapshot = IterationSnapshot(
@@ -916,15 +919,38 @@ def meta_editor_node(state: GraphState) -> GraphState:
         }
 
 
+def _droppable_position(
+    current: list,
+    scores: dict[int, float],
+    original_index_of: list[int],
+    min_per_facet: int,
+    is_unidimensional: bool,
+) -> int | None:
+    facet_counts: dict[str, int] = {}
+    for it in current:
+        key = it.facet_name or ""
+        facet_counts[key] = facet_counts.get(key, 0) + 1
+    by_score = sorted(range(len(current)), key=lambda i: scores.get(original_index_of[i], 0.0))
+    for pos in by_score:
+        facet_key = current[pos].facet_name or ""
+        if is_unidimensional or facet_counts.get(facet_key, 0) > min_per_facet:
+            return pos
+    return None
+
+
 def _fallback_trim_to_target(
     items: list,
     target: int,
     validation_results: list,
+    min_per_facet: int = 1,
+    is_unidimensional: bool = False,
 ) -> tuple[list, list[int]]:
     """Trim items to target count by validator weighted_score when PFA cannot.
 
-    Drops the lowest-scoring items first while never removing the last item of
-    a facet (facet coverage mirrors prune_items). Returns (kept, dropped_indices).
+    Drops the lowest-scoring items first while never taking a facet below
+    ``min_per_facet`` (facet coverage mirrors prune_items, including its
+    unidimensional bypass); when every facet is at its floor the trim stops
+    short of target. Returns (kept, dropped_indices).
     """
     scores: dict[int, float] = {}
     for v in validation_results:
@@ -937,24 +963,16 @@ def _fallback_trim_to_target(
     dropped: list[int] = []
 
     while len(current) > target:
-        facet_counts: dict[str, int] = {}
-        for it in current:
-            key = it.facet_name or ""
-            facet_counts[key] = facet_counts.get(key, 0) + 1
-
-        candidates = sorted(
-            range(len(current)),
-            key=lambda i: scores.get(original_index_of[i], 0.0),
+        drop_pos = _droppable_position(
+            current, scores, original_index_of, min_per_facet, is_unidimensional
         )
-        drop_pos = None
-        for pos in candidates:
-            facet_key = current[pos].facet_name or ""
-            if facet_counts.get(facet_key, 0) > 1 or len(facet_counts) <= 1:
-                drop_pos = pos
-                break
         if drop_pos is None:
-            drop_pos = candidates[0]
-
+            logger.warning(
+                "PFA_PRUNING_FALLBACK stopped at %d items (target=%d): every facet is at "
+                "its floor of %d",
+                len(current), target, min_per_facet,
+            )
+            break
         dropped.append(original_index_of[drop_pos])
         del current[drop_pos]
         del original_index_of[drop_pos]
@@ -983,6 +1001,10 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
 
         items = state.get("draft_items", [])
         target = state["user_request"].item_count
+        min_per_facet = state["user_request"].min_items_per_facet
+        is_unidimensional = bool(
+            getattr(state.get("facet_mapping"), "is_unidimensional", False)
+        )
 
         # Compute deadline: stop pruning when remaining < PFA_PRUNING_MIN_REMAINING_SECS
         rem = _remaining_seconds(state)
@@ -1019,10 +1041,15 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
                 facet_mapping=state.get("facet_mapping"),
                 target_count=target,
                 deadline=deadline,
+                min_per_facet=min_per_facet,
             )
             if len(kept) > target:
                 kept, extra_dropped = _fallback_trim_to_target(
-                    kept, target, state.get("validation_results") or []
+                    kept,
+                    target,
+                    state.get("validation_results") or [],
+                    min_per_facet,
+                    is_unidimensional,
                 )
                 dropped = dropped + extra_dropped
                 logger.warning(
@@ -1038,7 +1065,11 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
             logger.error("PFA pruning failed: %s", e, exc_info=True)
             if len(items) > target:
                 kept, dropped = _fallback_trim_to_target(
-                    items, target, state.get("validation_results") or []
+                    items,
+                    target,
+                    state.get("validation_results") or [],
+                    min_per_facet,
+                    is_unidimensional,
                 )
                 logger.warning(
                     "PFA_PRUNING_FALLBACK after exception: trimmed %d items by validation score",

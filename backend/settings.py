@@ -133,6 +133,7 @@ class Settings(BaseSettings):
     PFA_PRUNING_MAX_ITERS: int = 5
     # Time guard for the pruning loop (in seconds) — break if remaining budget below this.
     PFA_PRUNING_MIN_REMAINING_SECS: int = 30
+    META_EDITOR_TIMEOUT_SECONDS: int = 120
     PFA_RMSR_GOOD: float = 0.05
     PFA_RECOVERY_GOOD: float = 0.80
     PFA_RECOVERY_ACCEPTABLE: float = 0.60

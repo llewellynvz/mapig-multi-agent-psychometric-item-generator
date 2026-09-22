@@ -134,6 +134,7 @@ def invoke_structured_with_usage(
     use_cache_control: bool = True,
     use_chatgpt_critics: bool = False,
     pre_validate: Optional[Callable[[dict], dict]] = None,
+    strict: Optional[bool] = True,
 ) -> Tuple[SchemaT, TokenUsage]:
     """
     Invoke the configured LLM and return validated structured output WITH token usage.
@@ -152,6 +153,9 @@ def invoke_structured_with_usage(
         use_chatgpt_critics: Use ChatGPT for critic agents (cost comparison mode)
         pre_validate: Optional callable to transform raw JSON dict before Pydantic
                       validation. Used for field-level fixups (e.g. truncating strings).
+        strict: Sent to the provider as-is: True requests strict structured output
+                (default), False sends strict=false, None omits the flag so the
+                provider's own default applies.
 
     Returns:
         Tuple of (validated response instance, token usage)
@@ -236,12 +240,17 @@ def invoke_structured_with_usage(
     try:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.*")
+            structured_kwargs = {"include_raw": True}
+            if strict is not None:
+                structured_kwargs["strict"] = strict
             try:
-                runnable = llm.with_structured_output(schema, strict=True, include_raw=True)
+                runnable = llm.with_structured_output(schema, **structured_kwargs)
             except TypeError:
+                if strict is None:
+                    raise
                 logger.warning(
-                    "STRUCTURED_OUTPUT strict=True not supported for model=%s, using non-strict",
-                    model_name,
+                    "STRUCTURED_OUTPUT strict=%s not supported for model=%s, omitting the flag",
+                    strict, model_name,
                 )
                 runnable = llm.with_structured_output(schema, include_raw=True)
 

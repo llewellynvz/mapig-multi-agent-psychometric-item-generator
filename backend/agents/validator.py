@@ -235,9 +235,14 @@ def validate_items(
 
         if settings.AZURE_TEST_OVERRIDE and settings.AZURE_TEST_SCOPE == "all_agents":
             # TEMPORARY — remove after Azure evaluation
-            from backend.agents.llm_factory import get_azure_test_chat_model
+            from backend.agents.llm_factory import (
+                AZURE_CLIENT_TIMEOUT_SECONDS,
+                get_azure_test_chat_model,
+            )
 
-            model = get_azure_test_chat_model(settings.AZURE_FRONTIER_DEPLOYMENT)
+            model = get_azure_test_chat_model(
+                settings.AZURE_FRONTIER_DEPLOYMENT, AZURE_CLIENT_TIMEOUT_SECONDS
+            )
             model_name = settings.AZURE_FRONTIER_DEPLOYMENT
         elif attempt >= 2:
             # Retry: Opus with higher temperature to force score differentiation.

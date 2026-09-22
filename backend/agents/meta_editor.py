@@ -21,6 +21,100 @@ logger = logging.getLogger("lmaig.meta_editor")
 MetaEditorPhase = Literal["iterative", "expert_revision"]
 
 _RATIONALE_MAX = 350
+DISCARDED_PASS_PREFIX = "Meta-editor pass discarded"
+
+
+def _discarded(items: List[DraftItem], reason: str) -> MetaEditorResponse:
+    return MetaEditorResponse(
+        revision_plan=RevisionPlan(summary=f"{DISCARDED_PASS_PREFIX}: {reason}; items returned unchanged."),
+        revised_items=list(items),
+    )
+
+
+def _with_original_structure(originals: List[DraftItem], revised: List[DraftItem]) -> List[DraftItem]:
+    """The editor owns wording, rationale and citations; construct, facet and polarity stay the writer's."""
+    return [
+        rev.model_copy(
+            update={
+                "construct_name": orig.construct_name,
+                "facet_name": orig.facet_name,
+                "polarity": orig.polarity,
+            }
+        )
+        for orig, rev in zip(originals, revised)
+    ]
+
+
+def _round_trip_breach(originals: List[DraftItem], revised: List[DraftItem]) -> Optional[str]:
+    if len(revised) != len(originals):
+        return f"returned {len(revised)} items for {len(originals)} sent"
+    for idx, (orig, rev) in enumerate(zip(originals, revised)):
+        if rev.facet_name and orig.facet_name and rev.facet_name != orig.facet_name:
+            return f"item {idx} came back under facet {rev.facet_name!r} instead of {orig.facet_name!r}"
+    return None
+
+
+def _distinct_wordings(items: List[DraftItem]) -> int:
+    return len({it.item_text.strip().lower() for it in items})
+
+
+def _mock_revision(items: List[DraftItem]) -> MetaEditorResponse:
+    stems = [
+        "I feel accepted by the people I work with.",
+        "I can be myself at work without negative consequences.",
+        "I feel included in important conversations at work.",
+        "People at work value my contributions.",
+        "I feel like I fit in with my team.",
+        "I feel connected to my workplace community.",
+    ]
+    revised = [
+        DraftItem(
+            item_text=stems[idx % len(stems)],
+            construct_name=it.construct_name,
+            rationale="Reworded to increase content coverage and reduce redundancy.",
+            evidence_citations=it.evidence_citations,
+            facet_name=it.facet_name,
+            polarity=it.polarity,
+        )
+        for idx, it in enumerate(items)
+    ]
+    edits = []
+    if items:
+        edits.append(
+            RevisionEdit(
+                item_index=0,
+                reason="Reduce redundancy and improve content coverage.",
+                before=items[0].item_text,
+                after=revised[0].item_text,
+            )
+        )
+    return MetaEditorResponse(revision_plan=RevisionPlan(edits=edits), revised_items=revised)
+
+
+def _accepted_pass(
+    request: UserRequest,
+    items: List[DraftItem],
+    resp: MetaEditorResponse,
+    iteration: int,
+    phase: MetaEditorPhase,
+) -> MetaEditorResponse:
+    breach = _round_trip_breach(items, resp.revised_items)
+    if breach:
+        logger.warning(
+            "META_EDITOR_ROUND_TRIP_BREACH iteration=%d phase=%s: %s; keeping the original items",
+            iteration, phase, breach,
+        )
+        return _discarded(items, breach)
+    enforced_items = _enforce_positive_keying(
+        request, items, _with_original_structure(items, resp.revised_items)
+    )
+    if _distinct_wordings(enforced_items) < _distinct_wordings(items):
+        logger.warning(
+            "META_EDITOR_DUPLICATE_ITEMS iteration=%d phase=%s; keeping the original items",
+            iteration, phase,
+        )
+        return _discarded(items, "the pass left two items with the same wording")
+    return resp.model_copy(update={"revised_items": enforced_items})
 
 
 def _truncate_rationale(text: str, max_len: int = _RATIONALE_MAX) -> str:
@@ -144,43 +238,7 @@ def revise_items(
         len(items), iteration, total_comments, phase,
     )
     if settings.APP_MODE == "mock":
-
-        # Deterministic revision: diversify stems.
-        revised: List[DraftItem] = []
-        stems = [
-            "I feel accepted by the people I work with.",
-            "I can be myself at work without negative consequences.",
-            "I feel included in important conversations at work.",
-            "People at work value my contributions.",
-            "I feel like I fit in with my team.",
-            "I feel connected to my workplace community.",
-        ]
-        for idx, it in enumerate(items):
-            new_text = stems[idx % len(stems)]
-            revised.append(
-                DraftItem(
-                    item_text=new_text,
-                    construct_name=it.construct_name,
-                    rationale="Reworded to increase content coverage and reduce redundancy.",
-                    evidence_citations=it.evidence_citations,
-                )
-            )
-
-        edits = []
-        if items:
-            edits.append(
-                RevisionEdit(
-                    item_index=0,
-                    reason="Reduce redundancy and improve content coverage.",
-                    before=items[0].item_text,
-                    after=revised[0].item_text,
-                )
-            )
-
-        return MetaEditorResponse(
-            revision_plan=RevisionPlan(edits=edits),
-            revised_items=revised,
-        ), TokenUsage()
+        return _mock_revision(items), TokenUsage()
 
     system_prompt = load_prompt("meta_editor.md")
 
@@ -213,12 +271,6 @@ def revise_items(
         agent_name="meta_editor",
         model_provider=request.model_provider,
         pre_validate=_clamp_rationales,
+        strict=None,
     )
-
-    # Post-edit polarity enforcement: revert any item where the LLM introduced
-    # a negation despite a "Positively keyed only" constraint.
-    enforced_items = _enforce_positive_keying(request, items, resp.revised_items)
-    if enforced_items is not resp.revised_items:
-        resp = resp.model_copy(update={"revised_items": enforced_items})
-
-    return resp, usage
+    return _accepted_pass(request, items, resp, iteration, phase), usage

@@ -366,6 +366,29 @@ PERPLEXITY_API_KEY=pplx-...
 PERPLEXITY_DOMAIN_FILTER=doi.org,psycnet.apa.org,link.springer.com,sciencedirect.com,onlinelibrary.wiley.com,tandfonline.com,journals.sagepub.com,academic.oup.com,cambridge.org
 ```
 
+#### Frontend API configuration
+
+The browser resolves the backend base URL in `src/lib/api.ts`:
+
+| Setting | Browser calls |
+| --- | --- |
+| `NEXT_PUBLIC_API_PROXY=1` | `/api/mapig/*` (same-origin Next.js proxy, see below) |
+| `NEXT_PUBLIC_API_URL=<url>` | `<url>/v1/*` (an empty value means same-origin) |
+| neither, on a Vercel build | same-origin `/v1/*` (rewritten to the Python function by `vercel.json`) |
+| neither, locally | `http://localhost:8000/v1/*` |
+
+`NEXT_PUBLIC_*` values are inlined into the browser bundle at build time, so rebuild after changing them.
+
+**Using `MAPIG_API_KEY` (optional API-key gate).** The backend rejects `/v1/*` generation, status and evaluation calls without a matching `X-API-Key` header when `MAPIG_API_KEY` is set. The browser never holds the key, so enable the server-side proxy:
+
+```env
+MAPIG_API_KEY=some-long-random-string   # server-only; never NEXT_PUBLIC_*
+NEXT_PUBLIC_API_PROXY=1                 # browser -> /api/mapig/* (Next.js route handler)
+MAPIG_BACKEND_URL=http://localhost:8000 # server-only; where the proxy forwards to
+```
+
+The proxy (`src/app/api/mapig/[...path]/route.ts`) forwards only `/v1/*` and `/healthz`, adds `X-API-Key`, passes through `X-Thread-ID`, the query string, status and body, streams the SSE progress feed unbuffered, and cancels the backend request if the browser disconnects. `MAPIG_BACKEND_URL` defaults to `NEXT_PUBLIC_API_URL`, then `https://$VERCEL_URL` on Vercel, then `http://localhost:8000`.
+
 ### 3. Run locally
 
 ```bash
@@ -394,13 +417,16 @@ pytest -W error           # zero-warning gate (treat warnings as errors)
 pytest tests/test_smoke.py -v   # end-to-end mock-mode pipeline test
 ```
 
-### Frontend type-check + build
+### Frontend type-check, lint + build
 
 ```bash
 npm run type-check
+npm run lint              # ESLint 9 flat config (eslint.config.mjs, eslint-config-next)
 npm run build
 npm test                  # Vitest component tests
 ```
+
+`next lint` was removed in Next.js 16, so `npm run lint` calls `eslint .` directly. The config extends `eslint-config-next` (core-web-vitals + TypeScript), including the React Compiler rules from `eslint-plugin-react-hooks`.
 
 ### Playwright end-to-end
 
@@ -509,8 +535,8 @@ MAPIG ships as a **single Vercel project** — Next.js at the repo root, FastAPI
    SEARCH_PROVIDER=perplexity
    PERPLEXITY_API_KEY=pplx-...
    PERPLEXITY_DOMAIN_FILTER=doi.org,psycnet.apa.org,link.springer.com,sciencedirect.com,onlinelibrary.wiley.com,tandfonline.com,journals.sagepub.com,academic.oup.com,cambridge.org
-   NEXT_PUBLIC_API_URL=https://your-project.vercel.app
    ```
+   `NEXT_PUBLIC_API_URL` is not needed: a Vercel build defaults the browser to same-origin `/v1/*`. Set it only to point the frontend at a backend on another origin.
 3. Push to main → Vercel auto-deploys (PR previews work too).
 
 ### Operational notes
@@ -518,6 +544,7 @@ MAPIG ships as a **single Vercel project** — Next.js at the repo root, FastAPI
 - **Vercel Pro plan recommended** (300s function timeout). On Hobby (10s), the pipeline will time out.
 - **Typical run**: 60–250s depending on iteration count.
 - **In-memory checkpointing**: sessions don't survive cold starts. If a session is lost, the frontend gracefully prompts to start over.
+- **API-key gate**: to use `MAPIG_API_KEY` in production, also set `NEXT_PUBLIC_API_PROXY=1` (and optionally `MAPIG_BACKEND_URL`), then redeploy. The browser then calls the Next.js proxy at `/api/mapig/*`, which adds the key server-side. This adds a second function hop per request (Next.js function -> Python function), so each run is billed for two concurrent function invocations and both are bound by the 300s limit. If Vercel Deployment Protection is enabled, the proxy's call to `https://$VERCEL_URL` is blocked; set `MAPIG_BACKEND_URL` to an unprotected (e.g. production) domain in that case.
 - **Cold-start install**: ~2s on cached wheels (Vercel caches Python packages between deploys). The runtime venv at `/tmp/_vc_deps` is rebuilt per cold start — that's standard Vercel Python behavior, not a bug.
 
 ---

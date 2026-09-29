@@ -10,7 +10,9 @@ adjacent statistics come from the same embedding space.
 """
 
 import logging
-from typing import List, Optional
+import threading
+from collections import OrderedDict
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from openai import AsyncOpenAI, OpenAI
@@ -21,6 +23,12 @@ from backend.settings import settings
 logger = logging.getLogger("lmaig")
 
 EMBEDDING_MODEL = settings.EMBEDDING_MODEL
+
+
+class EmbeddingsUnavailable(RuntimeError):
+    """No embedding credentials are configured (e.g. APP_MODE=mock without an
+    OPENAI_API_KEY). Raised before any client is built so callers can degrade
+    quietly instead of logging an SDK traceback."""
 
 
 # TEMPORARY — remove with the Azure evaluation switch
@@ -45,7 +53,10 @@ def active_embedding_model(requested: Optional[str] = None) -> str:
 
 
 def _embedding_target(model: Optional[str]) -> tuple:
-    """Return (client_kwargs, model_name, is_azure) for an embeddings call."""
+    """Return (client_kwargs, model_name, is_azure) for an embeddings call.
+
+    Raises EmbeddingsUnavailable when no embedding credentials are configured.
+    """
     deployment = _azure_embedding_deployment()
     if deployment:  # TEMPORARY — remove with the Azure evaluation switch
         return (
@@ -55,6 +66,10 @@ def _embedding_target(model: Optional[str]) -> tuple:
             },
             deployment,
             True,
+        )
+    if not settings.OPENAI_API_KEY:
+        raise EmbeddingsUnavailable(
+            "embeddings unavailable: OPENAI_API_KEY is not set and no Azure embedding deployment is configured"
         )
     return (
         {
@@ -66,17 +81,80 @@ def _embedding_target(model: Optional[str]) -> tuple:
     )
 
 
+# Embedding calls are small; don't inherit the SDK's 600s default timeout.
+_EMBED_TIMEOUT_SECONDS = 30.0
+_EMBED_MAX_RETRIES = 2
+
+
+# One run embeds the same item texts many times over (dedup, UVA, every PFA
+# pruning iteration, correlation, EGA). Keep recent vectors so each distinct
+# text costs one network call. Vectors are kept at full float64 precision
+# (~24KB for a 3072-dim model, so the full cache stays near 25MB), keyed by
+# endpoint and model so an Azure deployment never serves vectors from another
+# space.
+_EMBED_CACHE_MAX = 1024
+_embed_cache: "OrderedDict[Tuple[str, str, str], np.ndarray]" = OrderedDict()
+_embed_cache_lock = threading.Lock()
+
+
+def clear_embedding_cache() -> None:
+    with _embed_cache_lock:
+        _embed_cache.clear()
+
+
+def _cache_space(kwargs: dict, model_name: str) -> Tuple[str, str]:
+    endpoint = kwargs.get("azure_endpoint") or kwargs.get("base_url") or ""
+    return str(endpoint), model_name
+
+
+def _cache_lookup(space: Tuple[str, str], items: List[str]) -> Dict[str, np.ndarray]:
+    with _embed_cache_lock:
+        found = {}
+        for text in items:
+            key = (*space, text)
+            vec = _embed_cache.get(key)
+            if vec is not None:
+                _embed_cache.move_to_end(key)
+                found[text] = vec
+        return found
+
+
+def _cache_store(space: Tuple[str, str], texts: List[str], vectors: List[List[float]]) -> Dict[str, np.ndarray]:
+    stored = {text: np.asarray(vec, dtype=np.float64) for text, vec in zip(texts, vectors)}
+    with _embed_cache_lock:
+        for text, vec in stored.items():
+            _embed_cache[(*space, text)] = vec
+            _embed_cache.move_to_end((*space, text))
+        while len(_embed_cache) > _EMBED_CACHE_MAX:
+            _embed_cache.popitem(last=False)
+    return stored
+
+
+def _missing_texts(items: List[str], cached: Dict[str, np.ndarray]) -> List[str]:
+    """Distinct texts not in the cache, in first-seen order."""
+    return [t for t in dict.fromkeys(items) if t not in cached]
+
+
+def _assemble(items: List[str], vectors: Dict[str, np.ndarray]) -> np.ndarray:
+    return np.array([vectors[t] for t in items])
+
+
 async def embed_items(items: List[str], model: Optional[str] = None) -> np.ndarray:
-    """Get embeddings for all items in a single API call.
+    """Get embeddings for all items, with at most one API call.
 
     Args:
         items: List of item texts to embed
         model: OpenAI embedding model name; defaults to settings.EMBEDDING_MODEL.
     """
     kwargs, model_name, is_azure = _embedding_target(model)
+    space = _cache_space(kwargs, model_name)
+    cached = _cache_lookup(space, items)
+    missing = _missing_texts(items, cached)
+    if not missing:
+        return _assemble(items, cached)
     logger.info(
-        "EMBED_ITEMS calling embeddings model=%s provider=%s items=%d",
-        model_name, "azure" if is_azure else "openai", len(items),
+        "EMBED_ITEMS calling embeddings model=%s provider=%s items=%d cached=%d",
+        model_name, "azure" if is_azure else "openai", len(missing), len(items) - len(missing),
     )
     if is_azure:  # TEMPORARY — remove with the Azure evaluation switch
         from openai import AsyncAzureOpenAI
@@ -84,17 +162,23 @@ async def embed_items(items: List[str], model: Optional[str] = None) -> np.ndarr
         from backend.agents.azure_auth import azure_token_provider_async
 
         client = AsyncAzureOpenAI(
-            azure_ad_token_provider=azure_token_provider_async, **kwargs
+            azure_ad_token_provider=azure_token_provider_async,
+            timeout=_EMBED_TIMEOUT_SECONDS, max_retries=_EMBED_MAX_RETRIES, **kwargs
         )
     else:
-        client = AsyncOpenAI(**kwargs)
-    response = await client.embeddings.create(
-        model=model_name,
-        input=items,
-    )
+        client = AsyncOpenAI(
+            timeout=_EMBED_TIMEOUT_SECONDS, max_retries=_EMBED_MAX_RETRIES, **kwargs
+        )
+    # Close the per-call client so its HTTP connection pool isn't leaked
+    async with client:
+        response = await client.embeddings.create(
+            model=model_name,
+            input=missing,
+        )
     # Sort by index to ensure order matches input
     sorted_data = sorted(response.data, key=lambda x: x.index)
-    return np.array([e.embedding for e in sorted_data])
+    fetched = _cache_store(space, missing, [e.embedding for e in sorted_data])
+    return _assemble(items, {**cached, **fetched})
 
 
 def embed_items_sync(items: List[str], model: Optional[str] = None) -> np.ndarray:
@@ -103,21 +187,33 @@ def embed_items_sync(items: List[str], model: Optional[str] = None) -> np.ndarra
     Used by PFA estimator when called from sync graph nodes.
     """
     kwargs, model_name, is_azure = _embedding_target(model)
+    space = _cache_space(kwargs, model_name)
+    cached = _cache_lookup(space, items)
+    missing = _missing_texts(items, cached)
+    if not missing:
+        return _assemble(items, cached)
     logger.info(
-        "EMBED_ITEMS_SYNC calling embeddings model=%s provider=%s items=%d",
-        model_name, "azure" if is_azure else "openai", len(items),
+        "EMBED_ITEMS_SYNC calling embeddings model=%s provider=%s items=%d cached=%d",
+        model_name, "azure" if is_azure else "openai", len(missing), len(items) - len(missing),
     )
     if is_azure:  # TEMPORARY — remove with the Azure evaluation switch
         from openai import AzureOpenAI
 
         from backend.agents.azure_auth import azure_token_provider
 
-        client = AzureOpenAI(azure_ad_token_provider=azure_token_provider, **kwargs)
+        client = AzureOpenAI(
+            azure_ad_token_provider=azure_token_provider,
+            timeout=_EMBED_TIMEOUT_SECONDS, max_retries=_EMBED_MAX_RETRIES, **kwargs
+        )
     else:
-        client = OpenAI(**kwargs)
-    response = client.embeddings.create(model=model_name, input=items)
+        client = OpenAI(
+            timeout=_EMBED_TIMEOUT_SECONDS, max_retries=_EMBED_MAX_RETRIES, **kwargs
+        )
+    with client:
+        response = client.embeddings.create(model=model_name, input=missing)
     sorted_data = sorted(response.data, key=lambda x: x.index)
-    return np.array([e.embedding for e in sorted_data])
+    fetched = _cache_store(space, missing, [e.embedding for e in sorted_data])
+    return _assemble(items, {**cached, **fetched})
 
 
 def compute_cosine_similarity_matrix(embeddings: np.ndarray) -> np.ndarray:

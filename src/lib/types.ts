@@ -197,6 +197,8 @@ export interface ExpertConsensus {
   /** Krippendorff's α (nominal) on bucketed verdicts — measures whether
    *  experts agree on the bottom-line accept/revise/reject decision. */
   irr_verdict_alpha?: number | null;
+  /** Every expert gave the same verdict on every item (verdict α undefined). */
+  verdicts_unanimous?: boolean;
   /** [Legacy] Pairwise Cohen's κ (linear-weighted, fixed 1-5 scale) on
    *  per-item scores. null = not estimable (zero variance). */
   irr_pairwise: Record<string, number | null>;

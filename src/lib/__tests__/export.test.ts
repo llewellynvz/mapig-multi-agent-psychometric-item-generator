@@ -130,6 +130,24 @@ describe('export functions', () => {
       expect(csv).toContain('"Captures anxiety, worry, and avoidance"');
     });
 
+    it('neutralises spreadsheet formula injection in text fields', () => {
+      const testData: FinalOutput = {
+        ...mockFinalOutput,
+        final_items: [
+          {
+            ...mockFinalOutput.final_items[0],
+            item_text: '=HYPERLINK("http://evil","x")',
+            rationale: '@SUM(A1)',
+          },
+        ],
+      };
+
+      const csv = exportToCsv(testData);
+      expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""x"")"`);
+      expect(csv).toContain(`'@SUM(A1)`);
+      expect(csv).not.toMatch(/(^|,)[=@]/m);
+    });
+
     it('includes review_feedback column with filtered comments', () => {
       const csv = exportToCsv(mockFinalOutput);
       const lines = csv.split('\r\n');

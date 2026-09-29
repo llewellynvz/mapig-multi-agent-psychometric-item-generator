@@ -4,6 +4,7 @@ import logging
 import asyncio
 import concurrent.futures
 import datetime as _dt
+import os as _os
 import time as _time
 import uuid
 from typing import Any, Dict, List, Literal, Optional
@@ -18,11 +19,13 @@ from backend.agents.sanitizer import (
     sanitize_user_request,
 )
 from backend.agents.bias_reviewer import review_bias
-from backend.agents.critic import decide as critic_decide
+from backend.agents.critic import _downgrade_construct_level_bias, decide as critic_decide
+from backend.agents.facet_utils import facet_key
 from backend.agents.item_writer import write_items
 from backend.agents.linguistic_reviewer import review_linguistic
 from backend.agents.meta_editor import DISCARDED_PASS_PREFIX, revise_items
 from backend.agents.retrieval_agent import retrieve_evidence
+from backend.agents.correlation_estimator import EmbeddingsUnavailable
 from backend.agents.llm_utils import TokenUsage
 from backend.schemas import (
     AbbreviatedRequest,
@@ -206,7 +209,11 @@ def _utc_now() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
 
 
-_VERCEL_MAX_DURATION = 1800
+# A local process has no function ceiling, so the budget is generous there.
+# On Vercel (which sets VERCEL=1) the function is killed at vercel.json's
+# maxDuration of 300s, and the time guards below must see that ceiling or
+# they never fire and the whole response is lost.
+_VERCEL_MAX_DURATION = 300 if _os.environ.get("VERCEL") else 1800
 
 
 def _remaining_seconds(state: GraphState) -> float:
@@ -330,6 +337,14 @@ def init_run(state: GraphState) -> GraphState:
             "gpt52_analytics_enabled": state.get("user_request").use_gpt52_analytics if state.get("user_request") and hasattr(state.get("user_request"), "use_gpt52_analytics") else False,
             "cache_read_tokens": 0,
             "cache_creation_tokens": 0,
+            # A reused X-Thread-ID restarts from START on top of the previous
+            # run's checkpoint; clear results that a skipped node would
+            # otherwise leak into this run (e.g. expert_revision_node applying
+            # the last run's consensus revisions to new items).
+            "persona_validation": None,
+            "pfa_pruning_result": None,
+            "pfa_dropped_indices": [],
+            "expert_consensus": None,
         }
 
 
@@ -439,6 +454,33 @@ def item_writer_node(state: GraphState) -> GraphState:
         }
 
 
+def _clean_validations(validations: List[ItemValidation], n_items: int) -> List[ItemValidation]:
+    seen: set[int] = set()
+    cleaned: List[ItemValidation] = []
+    for v in validations:
+        if 0 <= v.item_index < n_items and v.item_index not in seen:
+            seen.add(v.item_index)
+            cleaned.append(v)
+    if len(cleaned) != len(validations):
+        logger.warning(
+            "VALIDATION_INDEX_CLEANUP kept=%d of %d (out-of-range or duplicate item_index)",
+            len(cleaned), len(validations),
+        )
+    return cleaned
+
+
+def _attach_validations(items: List[DraftItem], validations: List[ItemValidation]) -> List[DraftItem]:
+    """Pin each validation to its item so it survives reordering downstream.
+
+    Pruning, fallback trimming and dedup all drop items, which shifts positions;
+    matching by position afterwards pairs items with another item's scores."""
+    by_index = {v.item_index: v for v in validations}
+    return [
+        it.model_copy(update={"validation_result": by_index[i]}) if i in by_index else it
+        for i, it in enumerate(items)
+    ]
+
+
 def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node", "reviewers_fanout_node"]]:
     """Validate draft items with LLM-as-judge scoring and route based on results."""
     with step("validation_node", state):
@@ -503,8 +545,29 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
         token_update = _accumulate_tokens(state, usage)
 
         # Store validation results and determine routing
-        validation_results = resp.validations
+        # item_index comes from the LLM: drop out-of-range and duplicate
+        # entries so every index maps to exactly one draft item. An item left
+        # without a validation gets finalize_node's explicit placeholder.
+        validation_results = _clean_validations(resp.validations, len(draft_items))
         failed = [v for v in validation_results if not v.accept]
+        scored = {v.item_index for v in validation_results}
+        unscored_count = sum(1 for i in range(len(draft_items)) if i not in scored)
+
+        def _flag_unscored(update: dict) -> dict:
+            """Items the validator never scored reach the reviewers unchecked;
+            say so instead of passing them off as validated."""
+            if not unscored_count:
+                return update
+            warning = (
+                f"{unscored_count} item(s) were not scored by the validator and "
+                "passed the quality gate unchecked."
+            )
+            logger.warning("QUALITY_GATE_UNSCORED %s", warning)
+            return {
+                **update,
+                "force_accepted_below_threshold": True,
+                "audit_warnings": [*state.get("audit_warnings", []), warning],
+            }
         max_attempts = 3
 
         if not failed:
@@ -532,11 +595,12 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                     persona_resp = None
 
             return Command(
-                update={
+                update=_flag_unscored({
+                    "draft_items": _attach_validations(draft_items, validation_results),
                     "validation_results": validation_results,
                     "persona_validation": persona_resp,
                     **token_update,
-                },
+                }),
                 goto="reviewers_fanout_node"
             )
 
@@ -584,23 +648,31 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                         "QUALITY_GATE_FALLBACK forced top-%d items below threshold scores=%s pass_threshold=%.1f",
                         len(passing), forced_scores, _PASS_THRESHOLD,
                     )
-                # Update draft_items to only include surviving items
-                surviving_indices = {v.item_index for v in passing}
-                draft_items = state.get("draft_items", [])
-                filtered_items = [item for i, item in enumerate(draft_items) if i in surviving_indices]
-                # Re-index items and validation results
-                reindexed_validations = []
-                for new_idx, v in enumerate(passing):
-                    v_copy = v.model_copy(update={"item_index": new_idx})
-                    reindexed_validations.append(v_copy)
+                # Keep surviving items in their original order (the top-3
+                # fallback above sorts by score), plus any item that has no
+                # validation at all: nothing says it failed, and finalize_node
+                # gives it an explicit placeholder.
+                by_index = {v.item_index: v for v in validation_results}
+                passing_indices = {v.item_index for v in passing}
+                kept_indices = [
+                    i for i in range(len(draft_items))
+                    if i in passing_indices or i not in by_index
+                ]
+                filtered_items = [draft_items[i] for i in kept_indices]
+                # Re-index validations to the kept items' new positions
+                reindexed_validations = [
+                    by_index[i].model_copy(update={"item_index": new_idx})
+                    for new_idx, i in enumerate(kept_indices)
+                    if i in by_index
+                ]
                 return Command(
-                    update={
-                        "draft_items": filtered_items,
+                    update=_flag_unscored({
+                        "draft_items": _attach_validations(filtered_items, reindexed_validations),
                         "validation_results": reindexed_validations,
                         "force_accepted_below_threshold": force_accepted_below_threshold,
                         "forced_scores": forced_scores,
                         **token_update,
-                    },
+                    }),
                     goto="reviewers_fanout_node"
                 )
 
@@ -614,12 +686,13 @@ def validation_node(state: GraphState) -> Command[Literal["regenerate_items_node
                     len(below_threshold), _PASS_THRESHOLD, forced_scores,
                 )
             return Command(
-                update={
+                update=_flag_unscored({
+                    "draft_items": _attach_validations(draft_items, validation_results),
                     "validation_results": validation_results,
                     "force_accepted_below_threshold": force_accepted_below_threshold,
                     "forced_scores": forced_scores,
                     **token_update,
-                },
+                }),
                 goto="reviewers_fanout_node"
             )
 
@@ -665,6 +738,11 @@ def regenerate_items_node(state: GraphState) -> GraphState:
         # Create modified request with feedback
         modified_request = state["user_request"].model_copy(deep=True)
         modified_request.human_feedback = feedback_text
+        # item_index comes from the LLM; an out-of-range index would crash the run.
+        failed_indices = [i for i in failed_indices if 0 <= i < len(draft_items)]
+        if not failed_indices:
+            logger.warning("REGENERATE skipped: no in-range failed item indices")
+            return {}
         modified_request.previous_items = [draft_items[i].item_text for i in failed_indices]
         modified_request.item_count = len(failed_indices)
 
@@ -846,6 +924,31 @@ def critic_node(state: GraphState) -> Command[Literal["meta_editor_node", "pfa_p
     )
 
 
+# Time kept back for the nodes after a meta-editor pass so a slow editor call
+# can't consume all of it: the critic loop still has PFA pruning, the expert
+# panel and finalize ahead of it; the expert-revision pass only has finalize.
+_META_EDITOR_RESERVE_SECONDS = 60
+_EXPERT_REVISION_RESERVE_SECONDS = 15
+_META_EDITOR_MIN_SECONDS = 20
+
+
+def _meta_editor_budget(state: GraphState, reserve: float) -> Optional[float]:
+    """Seconds a meta-editor call may take, retries included; None when too
+    little run time is left to attempt one."""
+    budget = _remaining_seconds(state) - reserve
+    return budget if budget >= _META_EDITOR_MIN_SECONDS else None
+
+
+def _unchanged_items(state: GraphState, summary: str) -> tuple:
+    return (
+        MetaEditorResponse(
+            revision_plan=RevisionPlan(summary=summary),
+            revised_items=state.get("draft_items", []),
+        ),
+        TokenUsage(model_name="fallback"),
+    )
+
+
 def meta_editor_node(state: GraphState) -> GraphState:
     with step("meta_editor_node", state):
         logger.info("ELAPSED %.0fs at meta_editor_node", _VERCEL_MAX_DURATION - _remaining_seconds(state))
@@ -858,7 +961,13 @@ def meta_editor_node(state: GraphState) -> GraphState:
         # Filter comments by severity threshold (≥3)
         severity_threshold = 3
         filtered_linguistic = [c for c in linguistic_comments if c.severity >= severity_threshold]
-        filtered_bias = [c for c in bias_comments if c.severity >= severity_threshold]
+        # The critic treats near-identical construct-level bias comments as
+        # non-actionable (severity 1); apply the same downgrade to the editor's
+        # input. State keeps the originals for the audit trail.
+        filtered_bias = [
+            c for c in _downgrade_construct_level_bias(list(bias_comments))
+            if c.severity >= severity_threshold
+        ]
         filtered_content = [c for c in content_comments if c.severity >= severity_threshold]
 
         # Log filtering effectiveness
@@ -875,22 +984,28 @@ def meta_editor_node(state: GraphState) -> GraphState:
                 f"content: {len(content_comments)}->{len(filtered_content)}"
             )
 
-        try:
-            resp, usage = revise_items(
-                request=state["user_request"],
-                items=state.get("draft_items", []),
-                linguistic_comments=filtered_linguistic,
-                bias_comments=filtered_bias,
-                content_comments=filtered_content,
-                iteration=state.get("iteration", 0),
+        budget = _meta_editor_budget(state, _META_EDITOR_RESERVE_SECONDS)
+        if budget is None:
+            logger.warning("META_EDITOR skipped: not enough run time left. Returning items unchanged.")
+            resp, usage = _unchanged_items(
+                state, "Meta-editor skipped: not enough run time left. Items returned unchanged."
             )
-        except Exception as e:
-            logger.error(f"META_EDITOR failed: {e}. Returning items unchanged.", exc_info=True)
-            resp = MetaEditorResponse(
-                revision_plan=RevisionPlan(summary=f"Meta-editor failed: {type(e).__name__}. Items returned unchanged."),
-                revised_items=state.get("draft_items", []),
-            )
-            usage = TokenUsage(model_name="fallback")
+        else:
+            try:
+                resp, usage = revise_items(
+                    request=state["user_request"],
+                    items=state.get("draft_items", []),
+                    linguistic_comments=filtered_linguistic,
+                    bias_comments=filtered_bias,
+                    content_comments=filtered_content,
+                    iteration=state.get("iteration", 0),
+                    time_budget_seconds=budget,
+                )
+            except Exception as e:
+                logger.error(f"META_EDITOR failed: {e}. Returning items unchanged.", exc_info=True)
+                resp, usage = _unchanged_items(
+                    state, f"Meta-editor failed: {type(e).__name__}. Items returned unchanged."
+                )
 
         token_update = _accumulate_tokens(state, usage)
         summary = resp.revision_plan.summary or ""
@@ -940,13 +1055,23 @@ def _enforce_facet_floor(
     dropped_set = set(dropped_indices)
     counts: dict[str, int] = {}
     for it in kept:
-        key = it.facet_name or ""
+        key = facet_key(it.facet_name)
         counts[key] = counts.get(key, 0) + 1
+
+    # Match facets on a normalized key but report them by their own name.
+    display: dict[str, str] = {}
+    for it in original:
+        display.setdefault(facet_key(it.facet_name), it.facet_name or "")
 
     dropped_by_facet: dict[str, list[int]] = {}
     for i in dropped_indices:
-        key = original[i].facet_name or ""
+        key = facet_key(original[i].facet_name)
         dropped_by_facet.setdefault(key, []).append(i)
+
+    # Include facets that dedup emptied entirely: they are absent from
+    # ``counts`` but are the ones most in need of restoring.
+    for it in original:
+        counts.setdefault(facet_key(it.facet_name), 0)
 
     restore: list[int] = []
     warnings: list[str] = []
@@ -959,7 +1084,7 @@ def _enforce_facet_floor(
         restore.extend(take)
         if len(take) < need:
             warnings.append(
-                f"facet '{key or '(none)'}' has {count} item(s) after dedup "
+                f"facet '{display.get(key) or '(none)'}' has {count} item(s) after dedup "
                 f"(floor {min_per_facet}); {len(take)} recoverable — facet remains "
                 f"under-identified"
             )
@@ -985,12 +1110,12 @@ def _droppable_position(
 ) -> int | None:
     facet_counts: dict[str, int] = {}
     for it in current:
-        key = it.facet_name or ""
+        key = facet_key(it.facet_name)
         facet_counts[key] = facet_counts.get(key, 0) + 1
     by_score = sorted(range(len(current)), key=lambda i: scores.get(original_index_of[i], 0.0))
     for pos in by_score:
-        facet_key = current[pos].facet_name or ""
-        if is_unidimensional or facet_counts.get(facet_key, 0) > min_per_facet:
+        key = facet_key(current[pos].facet_name)
+        if is_unidimensional or facet_counts.get(key, 0) > min_per_facet:
             return pos
     return None
 
@@ -1009,11 +1134,18 @@ def _fallback_trim_to_target(
     unidimensional bypass); when every facet is at its floor the trim stops
     short of target. Returns (kept, dropped_indices).
     """
-    scores: dict[int, float] = {}
-    for v in validation_results:
-        idx = getattr(v, "item_index", None)
-        if idx is not None:
-            scores[idx] = getattr(v, "weighted_score", 0.0) or 0.0
+    # Prefer the result pinned to each item: after PFA has pruned, positions
+    # in ``items`` no longer line up with validation item_index.
+    scores: dict[int, float] = {
+        pos: it.validation_result.weighted_score or 0.0
+        for pos, it in enumerate(items)
+        if getattr(it, "validation_result", None) is not None
+    }
+    if not scores:
+        for v in validation_results:
+            idx = getattr(v, "item_index", None)
+            if idx is not None:
+                scores[idx] = getattr(v, "weighted_score", 0.0) or 0.0
 
     current = list(items)
     original_index_of = list(range(len(items)))
@@ -1035,6 +1167,35 @@ def _fallback_trim_to_target(
         del original_index_of[drop_pos]
 
     return current, dropped
+
+
+def _dedup_pool(
+    items: list,
+    min_per_facet: int,
+    is_unidimensional: bool,
+) -> tuple[list, list[int], list[str]]:
+    """Drop near-duplicates from the pre-pruning pool without breaking the facet floor.
+
+    Returns ``(pool, pool_index, warnings)`` where ``pool_index[i]`` is the
+    position in ``items`` of ``pool[i]``. Any failure leaves the pool intact.
+    """
+    unchanged = (list(items), list(range(len(items))), [])
+    if not settings.DEDUP_ENABLED or len(items) < 3:
+        return unchanged
+    try:
+        from backend.agents.deduplicator import deduplicate_items
+
+        pool, dropped = deduplicate_items(items, threshold=settings.DEDUP_THRESHOLD)
+        warnings: list[str] = []
+        if dropped and not is_unidimensional:
+            pool, dropped, warnings = _enforce_facet_floor(pool, items, dropped, min_per_facet)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("PFA_PRUNING_DEDUP failed: %s", e)
+        return unchanged
+    if dropped:
+        logger.info("PFA_PRUNING_DEDUP dropped %d near-duplicate items: %s", len(dropped), dropped)
+    dropped_set = set(dropped)
+    return pool, [i for i in range(len(items)) if i not in dropped_set], warnings
 
 
 def pfa_pruning_node(state: GraphState) -> GraphState:
@@ -1077,29 +1238,50 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
             )
             return {}
 
+        # Dedup the over-generated pool first so pruning trims to target from
+        # distinct items. Deduping after pruning (finalize still does, as a
+        # safety net) shrank runs below the requested item_count.
+        pool, pool_index, warnings = _dedup_pool(items, min_per_facet, is_unidimensional)
+        kept_positions = set(pool_index)
+        dedup_dropped = [i for i in range(len(items)) if i not in kept_positions]
+        if len(pool) < target:
+            warnings.append(
+                f"{len(dedup_dropped)} near-duplicate item(s) removed; {len(pool)} "
+                f"distinct items remain of the {target} requested."
+            )
+        update: dict = {}
+        if warnings:
+            update["audit_warnings"] = [*state.get("audit_warnings", []), *warnings]
+
         try:
             from backend.agents.pfa_estimator import run_pfa
             from backend.agents.pfa_pruning import prune_items
 
-            if len(items) <= target:
+            if len(pool) <= target:
                 # No pruning needed but still emit a structural report so the UI shows the panel
                 logger.info(
                     "PFA pruning skipped: have %d items, target=%d — running PFA pass for structural report",
-                    len(items), target,
+                    len(pool), target,
                 )
-                pfa_result = run_pfa(items, facet_mapping=state.get("facet_mapping"))
+                pfa_result = run_pfa(pool, facet_mapping=state.get("facet_mapping"))
                 return {
+                    **update,
+                    "draft_items": pool,
                     "pfa_pruning_result": pfa_result,
-                    "pfa_dropped_indices": [],
+                    "pfa_dropped_indices": dedup_dropped,
                 }
 
             kept, dropped, pfa_result = prune_items(
-                items,
+                pool,
                 facet_mapping=state.get("facet_mapping"),
                 target_count=target,
                 deadline=deadline,
                 min_per_facet=min_per_facet,
             )
+            # prune_items reports positions in ``pool``; map them to ``items``.
+            pruned = set(dropped)
+            kept_index = [pool_index[i] for i in range(len(pool)) if i not in pruned]
+            dropped = [pool_index[i] for i in dropped]
             if len(kept) > target:
                 kept, extra_dropped = _fallback_trim_to_target(
                     kept,
@@ -1108,21 +1290,23 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
                     min_per_facet,
                     is_unidimensional,
                 )
-                dropped = dropped + extra_dropped
+                # The trim reports positions in ``kept``; map them to ``items``.
+                dropped = dropped + [kept_index[i] for i in extra_dropped]
                 logger.warning(
                     "PFA_PRUNING_FALLBACK trimmed %d items by validation score (PFA loadings unavailable or budget hit)",
                     len(extra_dropped),
                 )
             return {
+                **update,
                 "draft_items": kept,
                 "pfa_pruning_result": pfa_result,
-                "pfa_dropped_indices": dropped,
+                "pfa_dropped_indices": sorted(dedup_dropped + dropped),
             }
         except Exception as e:
             logger.error("PFA pruning failed: %s", e, exc_info=True)
-            if len(items) > target:
+            if len(pool) > target:
                 kept, dropped = _fallback_trim_to_target(
-                    items,
+                    pool,
                     target,
                     state.get("validation_results") or [],
                     min_per_facet,
@@ -1132,8 +1316,12 @@ def pfa_pruning_node(state: GraphState) -> GraphState:
                     "PFA_PRUNING_FALLBACK after exception: trimmed %d items by validation score",
                     len(dropped),
                 )
-                return {"draft_items": kept, "pfa_dropped_indices": dropped}
-            return {}
+                return {
+                    **update,
+                    "draft_items": kept,
+                    "pfa_dropped_indices": sorted(dedup_dropped + [pool_index[i] for i in dropped]),
+                }
+            return {**update, "draft_items": pool, "pfa_dropped_indices": dedup_dropped}
 
 
 def expert_panel_node(state: GraphState) -> GraphState:
@@ -1194,6 +1382,10 @@ def expert_revision_node(state: GraphState) -> GraphState:
             logger.info("Expert revision skipped: no consensus revisions to apply")
             return {}
 
+        budget = _meta_editor_budget(state, _EXPERT_REVISION_RESERVE_SECONDS)
+        if budget is None:
+            logger.warning("Expert revision skipped: not enough run time left")
+            return {}
         try:
             resp, usage = revise_items(
                 request=state["user_request"],
@@ -1204,6 +1396,7 @@ def expert_revision_node(state: GraphState) -> GraphState:
                 iteration=state.get("iteration", 0),
                 phase="expert_revision",
                 expert_consensus_revisions=consensus.consensus_revisions,
+                time_budget_seconds=budget,
             )
             token_update = _accumulate_tokens(state, usage)
             logger.info(
@@ -1231,17 +1424,13 @@ def finalize_node(state: GraphState) -> GraphState:
         draft_items = state.get("draft_items", [])
         validation_results = state.get("validation_results", [])
 
-        # Create lookup dict for validation results
-        validation_lookup = {v.item_index: v for v in validation_results}
-
-        # Enrich items with validation data
+        # Enrich items with validation data. The validation gate pins each
+        # result onto its item; positions in validation_results are stale once
+        # pruning has dropped anything, so never match by position here.
         enriched_items = []
         for idx, item in enumerate(draft_items):
-            # Copy item and attach validation result if available
             enriched_item = item.model_copy(deep=True)
-            if idx in validation_lookup:
-                enriched_item.validation_result = validation_lookup[idx]
-            else:
+            if enriched_item.validation_result is None:
                 # LLM skipped this item — create a placeholder validation
                 logger.warning("FINALIZE_MISSING_VALIDATION item_index=%d — creating placeholder", idx)
                 enriched_item.validation_result = ItemValidation(
@@ -1522,6 +1711,9 @@ async def correlation_node(state: GraphState) -> GraphState:
             # For now, return updated FinalOutput
             return {"final_output": updated_final_output}
 
+        except EmbeddingsUnavailable as e:
+            logger.warning("Correlation analysis skipped: %s", e)
+            return {}
         except Exception as e:
             logger.error(f"Correlation analysis failed: {e}", exc_info=True)
             # Graceful failure: return empty dict, FinalOutput.correlation_matrix stays None
@@ -1904,10 +2096,10 @@ def _run_ega_semantic_safe(state: GraphState) -> dict:
         embeddings = embed_items_sync(
             [it.item_text for it in items], model=settings.EMBEDDING_MODEL
         )
-        polarity = np.array(
-            [1.0 if (it.polarity or "+") == "+" else -1.0 for it in items]
-        ).reshape(-1, 1)
-        sim = compute_cosine_similarity_matrix(embeddings * polarity)
+        # Unsigned embeddings: the network keeps only positive edges, so
+        # sign-flipping reverse-keyed items would cut them off from their
+        # same-topic siblings and report them as a separate dimension.
+        sim = compute_cosine_similarity_matrix(embeddings)
         network = build_semantic_network(sim)
         result = build_ega_result(network, "semantic_threshold")
         logger.info(
@@ -1915,6 +2107,9 @@ def _run_ega_semantic_safe(state: GraphState) -> dict:
             result.n_dimensions, len(result.redundant_pairs),
         )
         return {"ega_semantic": result}
+    except EmbeddingsUnavailable as e:
+        logger.warning("Semantic EGA skipped: %s", e)
+        return {}
     except Exception as e:
         logger.error(f"Semantic EGA failed: {e}", exc_info=True)
         return {}
@@ -2036,6 +2231,11 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             updated.comparison_instruments = comp_fo.comparison_instruments
             updated.plagiarism_flags = comp_fo.plagiarism_flags
             updated.convergent_validity_score = comp_fo.convergent_validity_score
+            # comparison_node records e.g. "Plagiarism check unavailable" on its
+            # own copy of the audit; carry any new warnings across.
+            for w in comp_fo.audit.warnings or []:
+                if w not in (updated.audit.warnings or []):
+                    updated.audit.warnings = list(updated.audit.warnings or []) + [w]
         elif isinstance(comparison_result, Exception):
             logger.error(f"Comparison analysis failed: {comparison_result}")
 
@@ -2093,7 +2293,11 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
                 for cell in pilot.cells:
                     pearson[cell.item_i_index, cell.item_j_index] = cell.correlation
                     pearson[cell.item_j_index, cell.item_i_index] = cell.correlation
-                network = build_ebic_glasso_network(pearson, pilot.n_respondents)
+                # Graphical lasso is CPU-bound; keep it off the event loop so
+                # the other run's SSE stream and /status stay responsive.
+                network = await asyncio.to_thread(
+                    build_ebic_glasso_network, pearson, pilot.n_respondents
+                )
                 if network is not None:
                     updated.ega_synthetic = build_ega_result(network, "ebic_glasso_synthetic")
                     logger.info(
@@ -2118,7 +2322,7 @@ async def analytics_dispatch_node(state: GraphState) -> GraphState:
             cross_state = dict(state)
             cross_state["final_output"] = updated
             try:
-                cross_result = cross_construct_node(cross_state)
+                cross_result = await asyncio.to_thread(cross_construct_node, cross_state)
                 if isinstance(cross_result, dict) and "final_output" in cross_result:
                     updated.cross_construct_analysis = cross_result["final_output"].cross_construct_analysis
             except Exception as e:

@@ -4,8 +4,8 @@ This module implements comparison of generated items against published scale ite
 using Claude Opus as an expert psychometrician judge.
 """
 
+import asyncio
 import logging
-import warnings
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.agents.llm_factory import get_chat_model_for_agent
 from backend.agents.prompt_loader import load_prompt
@@ -15,7 +15,7 @@ from backend.settings import settings
 logger = logging.getLogger(__name__)
 
 
-def compare_to_published_item(
+async def compare_to_published_item(
     generated_item: str,
     published_item: str,
     construct_name: str,
@@ -24,6 +24,8 @@ def compare_to_published_item(
     """Compare generated item to published scale item using LLM-as-judge.
 
     Mitigates position bias by evaluating both orderings and averaging scores.
+    Both orderings are awaited concurrently via ``ainvoke`` so the judge calls
+    never block the event loop of the async endpoint that drives them.
 
     Args:
         generated_item: The generated assessment item
@@ -42,18 +44,20 @@ def compare_to_published_item(
         return _mock_comparison_result(generated_item, published_item, construct_name)
 
     # Score both orderings to mitigate position bias
-    forward = _compare_single_direction(
-        generated_item, published_item, construct_name, model_provider, "generated vs published"
-    )
-    reverse = _compare_single_direction(
-        published_item, generated_item, construct_name, model_provider, "published vs generated"
+    forward, reverse = await asyncio.gather(
+        _compare_single_direction(
+            generated_item, published_item, construct_name, model_provider, "generated vs published"
+        ),
+        _compare_single_direction(
+            published_item, generated_item, construct_name, model_provider, "published vs generated"
+        ),
     )
 
     # Average scores
     return _average_comparison_results(forward, reverse)
 
 
-def _compare_single_direction(
+async def _compare_single_direction(
     candidate: str,
     reference: str,
     construct_name: str,
@@ -83,7 +87,7 @@ def _compare_single_direction(
     # PydanticSerializationUnexpectedValue warnings suppressed globally in
     # backend/__init__.py (see openai/openai-python#2872)
     runnable = model.with_structured_output(ComparisonResult, strict=False, include_raw=True)
-    response = runnable.invoke(messages)
+    response = await runnable.ainvoke(messages)
 
     # Null handling (same as validator.py)
     if isinstance(response, dict) and "parsed" in response:
@@ -122,7 +126,7 @@ def _average_comparison_results(forward: ComparisonResult, reverse: ComparisonRe
             score=(forward.psychometric_properties.score + reverse.psychometric_properties.score) / 2.0,
             reasoning=f"Forward: {forward.psychometric_properties.reasoning[:100]}... | Reverse: {reverse.psychometric_properties.reasoning[:100]}..."
         ),
-        overall_score=(forward.overall_score + reverse.overall_score) / 2.0
+        # overall_score is recomputed from the averaged dimensions by the schema
     )
 
 
@@ -149,5 +153,5 @@ def _mock_comparison_result(generated_item: str, published_item: str, construct_
             score=7.5,
             reasoning="Mock: Comparable difficulty level and discrimination potential"
         ),
-        overall_score=7.5  # Average of 8.0, 7.5, 7.0, 7.5
+        # overall_score (7.5) is recomputed from the dimensions by the schema
     )

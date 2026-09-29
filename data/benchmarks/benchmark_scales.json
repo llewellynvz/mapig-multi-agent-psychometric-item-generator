@@ -1,7 +1,7 @@
 [
   {
-    "name": "IPIP-NEO-60",
-    "author": "Goldberg et al.",
+    "name": "IPIP Big-Five Factor Markers",
+    "author": "Goldberg",
     "year": 1999,
     "domain": "personality",
     "citation": "Goldberg, L. R. (1999). A broad-bandwidth, public domain, personality inventory measuring the lower-level facets of several five-factor models. Personality Psychology in Europe, 7, 7-28.",
@@ -27,10 +27,10 @@
       "Feeling tired or having little energy",
       "Poor appetite or overeating"
     ],
-    "license": "Public Domain (Pfizer 2005)"
+    "license": "Copyright Pfizer Inc.; free to use, no permission required"
   },
   {
-    "name": "Social Connectedness Scale-Revised",
+    "name": "Social Connectedness Scale",
     "author": "Lee & Robbins",
     "year": 1995,
     "domain": "social",
@@ -60,11 +60,11 @@
     "license": "Free for research (author website)"
   },
   {
-    "name": "Attitude Toward the Environment Scale",
-    "author": "Milfont & Duckitt",
-    "year": 2010,
+    "name": "New Ecological Paradigm Scale (revised)",
+    "author": "Dunlap, Van Liere, Mertig, & Jones",
+    "year": 2000,
     "domain": "attitudes",
-    "citation": "Milfont, T. L., & Duckitt, J. (2010). The environmental attitudes inventory: A valid and reliable measure to assess the structure of environmental attitudes. Journal of Environmental Psychology, 30(1), 80-94.",
+    "citation": "Dunlap, R. E., Van Liere, K. D., Mertig, A. G., & Jones, R. E. (2000). Measuring endorsement of the New Ecological Paradigm: A revised NEP scale. Journal of Social Issues, 56(3), 425-442.",
     "items": [
       "Humans are severely abusing the environment.",
       "Humans have the right to modify the natural environment to suit their needs.",

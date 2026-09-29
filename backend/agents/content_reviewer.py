@@ -17,7 +17,7 @@ def review_content(request: AbbreviatedRequest, items: List[DraftItem], iteratio
         return ContentReviewResponse(comments=[]), TokenUsage()
 
     system_prompt = load_prompt("content_reviewer.md")
-    payload = {"user_request": request.model_dump(), "items": [i.model_dump() for i in items], "iteration": iteration}
+    payload = {"user_request": request.model_dump(), "items": [i.model_dump(exclude={"validation_result"}) for i in items], "iteration": iteration}
     if previous_comments and "content" in previous_comments:
         payload["previous_comments"] = previous_comments["content"]
 

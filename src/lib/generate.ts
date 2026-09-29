@@ -119,8 +119,38 @@ export async function generateItemsStream({
     throw new GenerateError(500, "No response body", "");
   }
 
-  let finalOutput: FinalOutput | null = null;
-  let errorMessage: string | null = null;
+  // Assigned inside handleLine; the casts stop TS narrowing these to `null`.
+  let finalOutput = null as FinalOutput | null;
+  let errorMessage = null as string | null;
+
+  const handleLine = (line: string) => {
+    if (!/^data: ?/.test(line)) return;
+    const data = line.replace(/^data: ?/, ""); // Remove "data:" prefix
+    let event: ProgressEvent;
+    try {
+      event = JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse SSE event:", e, data);
+      if (/"type"\s*:\s*"complete"/.test(data)) {
+        throw new GenerateError(
+          500,
+          "Received the final result but could not parse it.",
+          data
+        );
+      }
+      return;
+    }
+
+    if (onProgress) {
+      onProgress(event);
+    }
+
+    if (event.type === "complete" && event.data) {
+      finalOutput = event.data as FinalOutput;
+    } else if (event.type === "error") {
+      errorMessage = event.message || "Unknown error";
+    }
+  };
 
   try {
     while (true) {
@@ -130,28 +160,11 @@ export async function generateItemsStream({
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6); // Remove "data: " prefix
-          try {
-            const event: ProgressEvent = JSON.parse(data);
-            
-            if (onProgress) {
-              onProgress(event);
-            }
-
-            if (event.type === "complete" && event.data) {
-              finalOutput = event.data as FinalOutput;
-            } else if (event.type === "error") {
-              errorMessage = event.message || "Unknown error";
-            }
-          } catch (e) {
-            console.error("Failed to parse SSE event:", e, data);
-          }
-        }
-      }
+      lines.forEach(handleLine);
     }
+    // Flush any bytes/event left after the stream ends without a trailing newline.
+    buffer += decoder.decode();
+    buffer.split("\n").forEach(handleLine);
   } catch (e) {
     throw e;
   } finally {
@@ -189,6 +202,7 @@ export function formToRequest(values: {
   previous_items?: string[];
   model_provider?: "claude" | "openai";
   use_chatgpt_critics?: boolean;
+  use_gpt52_analytics?: boolean;
   is_unidimensional?: boolean;
   include_qualitative?: boolean;
 }): UserRequest {
@@ -203,7 +217,8 @@ export function formToRequest(values: {
     previous_items: values.previous_items?.length ? values.previous_items : undefined,
     model_provider: values.model_provider || "claude",
     use_chatgpt_critics: values.use_chatgpt_critics || false,
-    is_unidimensional: values.is_unidimensional ?? true,
+    use_gpt52_analytics: values.use_gpt52_analytics ?? false,
+    is_unidimensional: values.is_unidimensional ?? false,
     include_qualitative: values.include_qualitative ?? false,
   };
   if (values.cultural_group?.trim()) req.cultural_group = values.cultural_group.trim();

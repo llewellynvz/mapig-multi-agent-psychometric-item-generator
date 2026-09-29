@@ -204,8 +204,9 @@ def _downgrade_construct_level_bias(bias_comments: List[ReviewComment]) -> List[
             "CONSTRUCT_LEVEL_BIAS_DOWNGRADE mean_jaccard=%.2f comments=%d — downgrading to severity 1",
             mean_sim, len(bias_comments),
         )
-        for c in bias_comments:
-            c.severity = 1
+        # Copy rather than mutate: these objects live in graph state (callers
+        # pass a shallow list copy), and the meta-editor/audit need originals.
+        return [c.model_copy(update={"severity": 1}) for c in bias_comments]
     return bias_comments
 
 

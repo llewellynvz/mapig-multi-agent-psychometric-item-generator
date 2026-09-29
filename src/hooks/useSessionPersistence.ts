@@ -88,7 +88,11 @@ export function useSessionPersistence() {
       lastResponseJson,
       activeRun,
     };
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore storage failures (quota exceeded, storage disabled)
+    }
   }, [
     activeRun,
     feedbackHistory,

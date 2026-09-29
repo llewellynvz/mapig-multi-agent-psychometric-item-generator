@@ -11,7 +11,13 @@ Two honestly separated paths:
   method), then a partial-correlation network and seeded Louvain.
 
 UVA redundancy uses weighted topological overlap (Christensen, Garrido &
-Golino) with a 0.25 default threshold, on whichever network exists.
+Golino) with a 0.25 default threshold on a partial-correlation network: the
+glasso network on the statistical path, and the anti-image partial
+correlations of the cosine matrix on the semantic path (see
+semantic_uva_adjacency).
+
+Following Golino's EGA, singleton communities (e.g. isolated nodes) are not
+counted as dimensions.
 """
 
 from __future__ import annotations
@@ -29,6 +35,8 @@ LOUVAIN_SEED = 42
 SEMANTIC_EDGE_THRESHOLD = 0.30
 WTO_REDUNDANCY_THRESHOLD = 0.25
 EBIC_GAMMA = 0.5
+# Ridge used only when the cosine matrix is singular (exact duplicate items)
+UVA_PARTIAL_SHRINKAGE = 0.01
 
 
 def _louvain_communities(graph: nx.Graph) -> List[List[int]]:
@@ -40,12 +48,48 @@ def _louvain_communities(graph: nx.Graph) -> List[List[int]]:
     return [sorted(community) for community in sorted(communities, key=min)]
 
 
+def semantic_uva_adjacency(sim_matrix: np.ndarray) -> Optional[np.ndarray]:
+    """Absolute partial-correlation (anti-image) network of a cosine matrix,
+    the network UVA's wTO is computed on for the semantic path.
+
+    wTO is calibrated for sparse partial-correlation networks (Christensen et
+    al. use EBICglasso). On a dense zero-order cosine network every pair shares
+    all its neighbours, so wTO_ij ≈ sim_ij and the 0.25 threshold flags nearly
+    every pair (12 items with cosines 0.30-0.55: 66/66 flagged). Partialling
+    out the rest of the pool leaves only the similarity two items share with
+    each other and nobody else — high for near-duplicates, near 0 for ordinary
+    same-topic items. No N exists, so no EBIC regularization; a small ridge is
+    applied only when the matrix is singular. Sign-flip invariant after abs().
+    Returns None when the matrix cannot be inverted even with the ridge.
+    """
+    sim = np.asarray(sim_matrix, dtype=float).copy()
+    if sim.shape[0] < 3 or not np.isfinite(sim).all():
+        return None
+    np.fill_diagonal(sim, 1.0)
+    for shrink in (0.0, UVA_PARTIAL_SHRINKAGE):
+        shrunk = (1.0 - shrink) * sim + shrink * np.eye(sim.shape[0])
+        try:
+            if np.linalg.cond(shrunk) > 1e10:
+                continue
+            precision = np.linalg.inv(shrunk)
+        except np.linalg.LinAlgError:
+            continue
+        d = np.sqrt(np.abs(np.diag(precision)))
+        if not np.isfinite(precision).all() or np.any(d == 0):
+            continue
+        partial = -precision / np.outer(d, d)
+        np.fill_diagonal(partial, 0.0)
+        return np.abs(partial)
+    return None
+
+
 def build_semantic_network(
     sim_matrix: np.ndarray,
     threshold: float = SEMANTIC_EDGE_THRESHOLD,
 ) -> nx.Graph:
     """Thresholded weighted graph from a cosine-similarity matrix: edges keep
-    positive similarities at or above the threshold."""
+    positive similarities at or above the threshold. The partial-correlation
+    network UVA runs on is attached as graph.graph["uva_adjacency"]."""
     n_items = sim_matrix.shape[0]
     graph = nx.Graph()
     graph.add_nodes_from(range(n_items))
@@ -54,6 +98,9 @@ def build_semantic_network(
             weight = float(sim_matrix[i, j])
             if np.isfinite(weight) and weight >= threshold:
                 graph.add_edge(i, j, weight=weight)
+    uva_adjacency = semantic_uva_adjacency(sim_matrix)
+    if uva_adjacency is not None:
+        graph.graph["uva_adjacency"] = uva_adjacency
     return graph
 
 
@@ -177,9 +224,17 @@ def layout_positions(graph: nx.Graph) -> dict[int, Tuple[float, float]]:
 def analyze_network(
     graph: nx.Graph,
 ) -> Tuple[List[List[int]], List[Tuple[int, int, float]], dict[int, Tuple[float, float]]]:
-    """Communities, UVA-redundant pairs, and layout for a built network."""
-    communities = _louvain_communities(graph)
-    redundant = find_redundant_pairs(graph_to_adjacency(graph))
+    """Communities, UVA-redundant pairs, and layout for a built network.
+
+    Singleton communities (isolated nodes) are dropped, as in Golino's EGA
+    where unconnected items get no dimension membership. UVA runs on the
+    attached partial-correlation network when present (semantic path),
+    otherwise on the graph itself (already a glasso partial network)."""
+    communities = [c for c in _louvain_communities(graph) if len(c) > 1]
+    uva_adjacency = graph.graph.get("uva_adjacency")
+    if uva_adjacency is None:
+        uva_adjacency = graph_to_adjacency(graph)
+    redundant = find_redundant_pairs(uva_adjacency)
     positions = layout_positions(graph)
     return communities, redundant, positions
 
@@ -203,6 +258,14 @@ def build_ega_result(graph: nx.Graph, method: str):
     for community_index, community in enumerate(communities):
         for node in community:
             community_of[node] = community_index
+    # Unassigned (singleton) nodes: the schema requires a community index, so
+    # each gets its own index >= n_dimensions — outside `communities`, and not
+    # grouped with any other item.
+    next_unassigned = len(communities)
+    for node in sorted(graph.nodes):
+        if node not in community_of:
+            community_of[node] = next_unassigned
+            next_unassigned += 1
     nodes = [
         EGANode(
             item_index=int(node),

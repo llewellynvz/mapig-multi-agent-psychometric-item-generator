@@ -34,7 +34,8 @@ def krippendorff_alpha(ratings: np.ndarray, level: str = "ordinal") -> float:
     Returns:
         Krippendorff's α in [-∞, 1]. ≥0.8 strong, ≥0.667 acceptable, <0.4 poor.
         Returns NaN if there is insufficient data (need ≥ 2 raters and ≥ 2 items
-        with at least 2 valid observations each).
+        with at least 2 valid observations each), or when every valid rating
+        is the same value (expected disagreement 0 → α = 0/0, undefined).
     """
     arr = np.asarray(ratings, dtype=float)
     if arr.ndim != 2:
@@ -118,8 +119,9 @@ def krippendorff_alpha(ratings: np.ndarray, level: str = "ordinal") -> float:
     De = expected_sum / max(n_total * (n_total - 1), 1)
 
     if De == 0:
-        # Degenerate case: all values equal → perfect agreement
-        return 1.0
+        # No variation in the data: α = 1 − 0/0 is undefined (Krippendorff,
+        # 2018) — report NaN rather than claiming perfect agreement.
+        return float("nan")
 
     alpha = 1.0 - Do / De
     return float(alpha)
@@ -343,7 +345,8 @@ def krippendorff_alpha_nominal(ratings: list[list[str | int]]) -> float:
         ratings: 2D list of shape (n_raters, n_items). Use None for missing.
 
     Returns:
-        α in [-∞, 1]. NaN if insufficient data.
+        α in [-∞, 1]. NaN if insufficient data or if every rating is the same
+        category (expected disagreement 0 → undefined).
     """
     if not ratings or len(ratings) < 2:
         return float("nan")
@@ -411,5 +414,6 @@ def krippendorff_alpha_nominal(ratings: list[list[str | int]]) -> float:
     Do = observed_num / max(pair_count_total, 1)
     De = expected_sum / max(n_total * (n_total - 1), 1)
     if De == 0:
-        return 1.0
+        # Single category used throughout: α is undefined, not perfect
+        return float("nan")
     return float(1.0 - Do / De)

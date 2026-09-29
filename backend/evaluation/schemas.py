@@ -3,7 +3,11 @@
 Defines data models for benchmark scales and comparison results.
 """
 
-from pydantic import BaseModel, Field, field_validator
+import logging
+
+from pydantic import BaseModel, Field, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class ComparisonDimension(BaseModel):
@@ -29,39 +33,43 @@ class ComparisonResult(BaseModel):
         construct_fidelity: Construct measurement alignment
         stylistic_similarity: Tone and format similarity
         psychometric_properties: Item characteristics (difficulty, discrimination)
-        overall_score: Average of all 4 dimension scores
+        overall_score: Mean of the 4 dimension scores. Always recomputed from
+            the dimensions on validation: an LLM judge that reports an overall
+            score inconsistent with its own dimensions is corrected rather than
+            rejected, so one arithmetic slip cannot discard a whole comparison.
     """
     quality_parity: ComparisonDimension
     construct_fidelity: ComparisonDimension
     stylistic_similarity: ComparisonDimension
     psychometric_properties: ComparisonDimension
-    overall_score: float = Field(..., ge=1.0, le=10.0, description="Overall score (average of dimensions)")
+    overall_score: float = Field(
+        default=0.0,
+        description="Overall score (mean of the 4 dimension scores; recomputed from them)",
+    )
 
-    @field_validator('overall_score')
-    @classmethod
-    def validate_overall_is_average(cls, v, info):
-        """Ensure overall score is the average of all 4 dimensions."""
-        data = info.data
-        dimensions = [
-            data.get('quality_parity'),
-            data.get('construct_fidelity'),
-            data.get('stylistic_similarity'),
-            data.get('psychometric_properties')
-        ]
-
-        # Only validate if all dimensions are present
-        if all(dim is not None for dim in dimensions):
-            expected = sum(dim.score for dim in dimensions) / 4.0
-            if abs(v - expected) > 0.01:  # Allow small floating point differences
-                raise ValueError(f"Overall score {v} must be average of dimensions ({expected:.2f})")
-        return v
+    @model_validator(mode="after")
+    def recompute_overall_from_dimensions(self) -> "ComparisonResult":
+        """Set overall_score to the mean of the 4 dimension scores."""
+        expected = (
+            self.quality_parity.score
+            + self.construct_fidelity.score
+            + self.stylistic_similarity.score
+            + self.psychometric_properties.score
+        ) / 4.0
+        if abs(self.overall_score - expected) > 0.01:
+            logger.debug(
+                "Recomputing overall_score %.3f -> %.3f (mean of dimensions)",
+                self.overall_score, expected,
+            )
+        self.overall_score = expected
+        return self
 
 
 class BenchmarkScale(BaseModel):
     """Published assessment scale used for benchmarking.
 
     Attributes:
-        name: Scale name (e.g., "IPIP-NEO-60")
+        name: Scale name (e.g., "IPIP Big-Five Factor Markers")
         author: Original author(s)
         year: Publication year
         domain: Psychological domain (personality|clinical|social|organizational|attitudes)

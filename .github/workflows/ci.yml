@@ -39,5 +39,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run type-check
+      - run: npm run lint
       - run: npx vitest run
       - run: npm run build

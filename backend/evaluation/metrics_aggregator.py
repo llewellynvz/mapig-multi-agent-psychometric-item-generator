@@ -3,48 +3,82 @@ from backend.evaluation.schemas import ComparisonResult
 
 logger = logging.getLogger(__name__)
 
+# The four LLM-as-judge comparison dimensions, in reporting order. Metric
+# attributes and API keys are named after these so each score says what it
+# measures (earlier versions relabelled them as "agent performance",
+# "workflow efficiency", etc., which they never measured).
+DIMENSIONS = (
+    "quality_parity",
+    "construct_fidelity",
+    "stylistic_similarity",
+    "psychometric_properties",
+)
+
+
 class EvaluationMetrics:
-    """Aggregated evaluation metrics across 4 dimensions."""
+    """Mean LLM-as-judge scores (1-10) across the 4 comparison dimensions.
+
+    Attributes:
+        quality_parity_score: Clarity/precision relative to the published item
+        construct_fidelity_score: Alignment with the target construct
+        stylistic_similarity_score: Tone/format similarity to the published item
+        psychometric_properties_score: Judged difficulty/discrimination/bias
+        overall_score: Mean of the 4 dimension scores
+        total_comparisons: Number of item comparisons aggregated
+        evaluated_scales: Benchmark scales whose comparisons are included
+        failed_scales: Scales that could not be evaluated, as
+            ``{"name", "domain", "error"}`` dicts (excluded from the scores)
+        pairing_method: How generated items were paired with published items
+    """
 
     def __init__(
         self,
-        item_quality_score: float,
-        agent_performance_score: float,
-        workflow_efficiency_score: float,
-        construct_validity_score: float,
-        total_comparisons: int
+        quality_parity_score: float,
+        construct_fidelity_score: float,
+        stylistic_similarity_score: float,
+        psychometric_properties_score: float,
+        total_comparisons: int,
+        evaluated_scales: list[str] | None = None,
+        failed_scales: list[dict] | None = None,
+        pairing_method: str | None = None,
     ):
-        self.item_quality_score = item_quality_score
-        self.agent_performance_score = agent_performance_score
-        self.workflow_efficiency_score = workflow_efficiency_score
-        self.construct_validity_score = construct_validity_score
+        self.quality_parity_score = quality_parity_score
+        self.construct_fidelity_score = construct_fidelity_score
+        self.stylistic_similarity_score = stylistic_similarity_score
+        self.psychometric_properties_score = psychometric_properties_score
         self.total_comparisons = total_comparisons
+        self.evaluated_scales = list(evaluated_scales or [])
+        self.failed_scales = list(failed_scales or [])
+        self.pairing_method = pairing_method
         self.overall_score = (
-            item_quality_score +
-            agent_performance_score +
-            workflow_efficiency_score +
-            construct_validity_score
+            quality_parity_score +
+            construct_fidelity_score +
+            stylistic_similarity_score +
+            psychometric_properties_score
         ) / 4.0
+
+    def dimension_scores(self) -> dict[str, float]:
+        """Return ``{"<dimension>_score": value}`` for the 4 dimensions."""
+        return {f"{d}_score": getattr(self, f"{d}_score") for d in DIMENSIONS}
 
     def __repr__(self):
         return (
             f"EvaluationMetrics("
-            f"item_quality={self.item_quality_score:.2f}, "
-            f"agent_performance={self.agent_performance_score:.2f}, "
-            f"workflow_efficiency={self.workflow_efficiency_score:.2f}, "
-            f"construct_validity={self.construct_validity_score:.2f}, "
+            f"quality_parity={self.quality_parity_score:.2f}, "
+            f"construct_fidelity={self.construct_fidelity_score:.2f}, "
+            f"stylistic_similarity={self.stylistic_similarity_score:.2f}, "
+            f"psychometric_properties={self.psychometric_properties_score:.2f}, "
             f"overall={self.overall_score:.2f}, "
-            f"n={self.total_comparisons})"
+            f"n={self.total_comparisons}, "
+            f"failed_scales={len(self.failed_scales)})"
         )
 
 def aggregate_comparison_results(comparisons: list[ComparisonResult]) -> EvaluationMetrics:
-    """Aggregate comparison results into 4-dimensional evaluation metrics.
+    """Aggregate comparison results into per-dimension mean scores.
 
-    Dimension mapping:
-    - Item Quality: quality_parity (clarity, precision, professional construction)
-    - Agent Performance: construct_fidelity (accuracy of construct measurement)
-    - Workflow Efficiency: stylistic_similarity (consistency across items)
-    - Construct Validity: psychometric_properties (discrimination, bias avoidance)
+    Each metric is the mean of the judge dimension of the same name
+    (quality_parity, construct_fidelity, stylistic_similarity,
+    psychometric_properties); no dimension is relabelled.
 
     Args:
         comparisons: List of ComparisonResult from benchmark item comparisons
@@ -59,31 +93,20 @@ def aggregate_comparison_results(comparisons: list[ComparisonResult]) -> Evaluat
         raise ValueError("Cannot aggregate empty comparison list")
 
     n = len(comparisons)
-
-    # Dimension 1: Item Quality (quality parity)
-    item_quality = sum(c.quality_parity.score for c in comparisons) / n
-
-    # Dimension 2: Agent Performance (construct fidelity)
-    agent_performance = sum(c.construct_fidelity.score for c in comparisons) / n
-
-    # Dimension 3: Workflow Efficiency (stylistic similarity)
-    workflow_efficiency = sum(c.stylistic_similarity.score for c in comparisons) / n
-
-    # Dimension 4: Construct Validity (psychometric properties)
-    construct_validity = sum(c.psychometric_properties.score for c in comparisons) / n
+    means = {
+        d: sum(getattr(c, d).score for c in comparisons) / n
+        for d in DIMENSIONS
+    }
 
     logger.info(
         f"Aggregated {n} comparisons: "
-        f"Quality={item_quality:.2f}, "
-        f"Performance={agent_performance:.2f}, "
-        f"Efficiency={workflow_efficiency:.2f}, "
-        f"Validity={construct_validity:.2f}"
+        + ", ".join(f"{d}={v:.2f}" for d, v in means.items())
     )
 
     return EvaluationMetrics(
-        item_quality_score=item_quality,
-        agent_performance_score=agent_performance,
-        workflow_efficiency_score=workflow_efficiency,
-        construct_validity_score=construct_validity,
+        quality_parity_score=means["quality_parity"],
+        construct_fidelity_score=means["construct_fidelity"],
+        stylistic_similarity_score=means["stylistic_similarity"],
+        psychometric_properties_score=means["psychometric_properties"],
         total_comparisons=n
     )

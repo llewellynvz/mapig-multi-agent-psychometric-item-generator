@@ -184,6 +184,14 @@ export const InstrumentSetupForm = React.forwardRef<InstrumentSetupFormRef, Inst
       native_construct: saved.native_construct ?? "",
       example_item: saved.example_item ?? "",
       approved_domains: Array.isArray(saved.approved_domains) ? saved.approved_domains : [...DEFAULT_APPROVED_DOMAINS],
+      model_provider:
+        saved.model_provider === "claude" || saved.model_provider === "openai"
+          ? saved.model_provider
+          : defaultInstrumentSetup.model_provider,
+      use_chatgpt_critics: typeof saved.use_chatgpt_critics === "boolean" ? saved.use_chatgpt_critics : defaultInstrumentSetup.use_chatgpt_critics,
+      use_gpt52_analytics: typeof saved.use_gpt52_analytics === "boolean" ? saved.use_gpt52_analytics : defaultInstrumentSetup.use_gpt52_analytics,
+      is_unidimensional: typeof saved.is_unidimensional === "boolean" ? saved.is_unidimensional : defaultInstrumentSetup.is_unidimensional,
+      include_qualitative: typeof saved.include_qualitative === "boolean" ? saved.include_qualitative : defaultInstrumentSetup.include_qualitative,
     });
   }, [form]);
 

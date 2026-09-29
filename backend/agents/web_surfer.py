@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 import httpx
 
+from backend.agents.llm_utils import strip_code_fence
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import EvidenceChunk, RetrievalResponse, UserRequest
 from backend.settings import settings
@@ -37,6 +38,14 @@ def _domain_filter(request: UserRequest) -> List[str]:
 def _source_id(url: str) -> str:
     h = hashlib.sha256(url.encode("utf-8")).hexdigest()[:10]
     return f"web:{h}"
+
+
+def _evidence_key(chunk: EvidenceChunk) -> tuple:
+    """Dedup key for evidence chunks: (source_id or url, normalised quote/snippet
+    prefix). source_id is LLM-chosen and often blank, so it can't be the key alone."""
+    source = (chunk.source_id or chunk.url_or_docref or "").strip().lower()
+    text = " ".join((chunk.quote or chunk.snippet or "").lower().split())
+    return (source, text[:80])
 
 
 def _synthesize_theoretical_query(request: UserRequest, boundary: str, exclude: str) -> str:
@@ -96,15 +105,7 @@ def _process_perplexity_response(data: Dict[str, Any]) -> List[EvidenceChunk]:
         message_content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         if message_content:
             # Strip markdown code fences before JSON extraction
-            cleaned = message_content.strip()
-            if cleaned.startswith("```"):
-                # Remove opening fence (```json or ```)
-                first_newline = cleaned.find("\n")
-                if first_newline > 0:
-                    cleaned = cleaned[first_newline + 1:]
-                # Remove closing fence
-                if cleaned.rstrip().endswith("```"):
-                    cleaned = cleaned.rstrip()[:-3].rstrip()
+            cleaned = strip_code_fence(message_content)
 
             # Try parsing cleaned content directly first
             parsed = None
@@ -334,12 +335,14 @@ def surf(request: UserRequest) -> RetrievalResponse:
 
             retry_evidence = _process_perplexity_response(retry_data)
 
-            # Deduplicate by source_id (not URL — same URL can have multiple distinct evidence chunks)
-            seen_ids = {e.source_id for e in evidence}
+            # Deduplicate by (source, quote prefix) — not URL alone, since the same
+            # URL can carry multiple distinct evidence chunks
+            seen_keys = {_evidence_key(e) for e in evidence}
             for chunk in retry_evidence:
-                if chunk.source_id not in seen_ids:
+                key = _evidence_key(chunk)
+                if key not in seen_keys:
                     evidence.append(chunk)
-                    seen_ids.add(chunk.source_id)
+                    seen_keys.add(key)
 
             # Also supplement from search_results
             seen_urls = {e.url_or_docref for e in evidence}

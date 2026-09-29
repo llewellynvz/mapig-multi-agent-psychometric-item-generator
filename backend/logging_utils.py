@@ -1,13 +1,19 @@
 import logging
+import threading
 import time
+from collections import deque
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Iterator, Optional
 
 logger = logging.getLogger("lmaig")
 
-# Performance tracking
-_performance_log: Dict[str, list] = {}
+# Performance tracking. Steps run on several to_thread workers at once, so
+# updates take a lock; each step keeps only its most recent durations so a
+# long-lived server doesn't grow the log without bound.
+_PERFORMANCE_WINDOW = 500
+_performance_log: Dict[str, deque] = {}
+_performance_lock = threading.Lock()
 
 
 def emit_log_event(
@@ -61,9 +67,8 @@ def step(step_name: str, state: Optional[Dict[str, Any]] = None) -> Iterator[Non
         
         # Track performance for analysis
         key = f"{step_name}_iter{iteration}"
-        if key not in _performance_log:
-            _performance_log[key] = []
-        _performance_log[key].append(dur)
+        with _performance_lock:
+            _performance_log.setdefault(key, deque(maxlen=_PERFORMANCE_WINDOW)).append(dur)
         
         # Log if step is taking unusually long (>10s)
         if dur > 10.0:
@@ -73,7 +78,9 @@ def step(step_name: str, state: Optional[Dict[str, Any]] = None) -> Iterator[Non
 def get_performance_summary() -> Dict[str, Dict[str, float]]:
     """Get performance statistics for all steps."""
     summary = {}
-    for key, durations in _performance_log.items():
+    with _performance_lock:
+        snapshot = {key: list(durations) for key, durations in _performance_log.items()}
+    for key, durations in snapshot.items():
         if durations:
             summary[key] = {
                 "count": len(durations),
@@ -87,5 +94,5 @@ def get_performance_summary() -> Dict[str, Dict[str, float]]:
 
 def reset_performance_log():
     """Clear performance tracking (useful for testing)."""
-    global _performance_log
-    _performance_log = {}
+    with _performance_lock:
+        _performance_log.clear()

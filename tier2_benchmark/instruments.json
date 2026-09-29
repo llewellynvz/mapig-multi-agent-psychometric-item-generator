@@ -1,0 +1,82 @@
+{
+  "_note": "Tier 2 replication benchmark. Items are the standard published items for each instrument (from the original validation papers). EXACT wording and published loading matrices must be verified against the primary sources before any BRM write-up.",
+  "instruments": [
+    {
+      "id": "swls",
+      "name": "Satisfaction With Life Scale",
+      "citation": "Diener, Emmons, Larsen & Griffin (1985)",
+      "n_factors": 1,
+      "factors": ["Satisfaction with life"],
+      "items": [
+        {"text": "In most ways my life is close to my ideal.", "factor": 0, "polarity": "+"},
+        {"text": "The conditions of my life are excellent.", "factor": 0, "polarity": "+"},
+        {"text": "I am satisfied with my life.", "factor": 0, "polarity": "+"},
+        {"text": "So far I have gotten the important things I want in life.", "factor": 0, "polarity": "+"},
+        {"text": "If I could live my life over, I would change almost nothing.", "factor": 0, "polarity": "+"}
+      ]
+    },
+    {
+      "id": "grit-s",
+      "name": "Short Grit Scale",
+      "citation": "Duckworth & Quinn (2009)",
+      "n_factors": 2,
+      "factors": ["Consistency of Interests", "Perseverance of Effort"],
+      "items": [
+        {"text": "New ideas and projects sometimes distract me from previous ones.", "factor": 0, "polarity": "-"},
+        {"text": "I have difficulty maintaining my focus on projects that take more than a few months to complete.", "factor": 0, "polarity": "-"},
+        {"text": "I have been obsessed with a certain idea or project for a short time but later lost interest.", "factor": 0, "polarity": "-"},
+        {"text": "I often set a goal but later choose to pursue a different one.", "factor": 0, "polarity": "-"},
+        {"text": "I finish whatever I begin.", "factor": 1, "polarity": "+"},
+        {"text": "Setbacks don't discourage me.", "factor": 1, "polarity": "+"},
+        {"text": "I am diligent.", "factor": 1, "polarity": "+"},
+        {"text": "I am a hard worker.", "factor": 1, "polarity": "+"}
+      ]
+    },
+    {
+      "id": "uwes-9",
+      "name": "Utrecht Work Engagement Scale (9-item)",
+      "citation": "Schaufeli, Bakker & Salanova (2006)",
+      "n_factors": 3,
+      "factors": ["Vigor", "Dedication", "Absorption"],
+      "items": [
+        {"text": "At my work, I feel bursting with energy.", "factor": 0, "polarity": "+"},
+        {"text": "At my job, I feel strong and vigorous.", "factor": 0, "polarity": "+"},
+        {"text": "When I get up in the morning, I feel like going to work.", "factor": 0, "polarity": "+"},
+        {"text": "I am enthusiastic about my job.", "factor": 1, "polarity": "+"},
+        {"text": "My job inspires me.", "factor": 1, "polarity": "+"},
+        {"text": "I am proud of the work that I do.", "factor": 1, "polarity": "+"},
+        {"text": "I feel happy when I am working intensely.", "factor": 2, "polarity": "+"},
+        {"text": "I am immersed in my work.", "factor": 2, "polarity": "+"},
+        {"text": "I get carried away when I am working.", "factor": 2, "polarity": "+"}
+      ]
+    },
+    {
+      "id": "cbi",
+      "name": "Copenhagen Burnout Inventory",
+      "citation": "Kristensen, Borritz, Villadsen & Christensen (2005)",
+      "n_factors": 3,
+      "factors": ["Personal burnout", "Work-related burnout", "Client-related burnout"],
+      "items": [
+        {"text": "How often do you feel tired?", "factor": 0, "polarity": "+"},
+        {"text": "How often are you physically exhausted?", "factor": 0, "polarity": "+"},
+        {"text": "How often are you emotionally exhausted?", "factor": 0, "polarity": "+"},
+        {"text": "How often do you think: 'I can't take it anymore'?", "factor": 0, "polarity": "+"},
+        {"text": "How often do you feel worn out?", "factor": 0, "polarity": "+"},
+        {"text": "How often do you feel weak and susceptible to illness?", "factor": 0, "polarity": "+"},
+        {"text": "Is your work emotionally exhausting?", "factor": 1, "polarity": "+"},
+        {"text": "Do you feel burnt out because of your work?", "factor": 1, "polarity": "+"},
+        {"text": "Does your work frustrate you?", "factor": 1, "polarity": "+"},
+        {"text": "Do you feel worn out at the end of the working day?", "factor": 1, "polarity": "+"},
+        {"text": "Are you exhausted in the morning at the thought of another day at work?", "factor": 1, "polarity": "+"},
+        {"text": "Do you feel that every working hour is tiring for you?", "factor": 1, "polarity": "+"},
+        {"text": "Do you have enough energy for family and friends during leisure time?", "factor": 1, "polarity": "-"},
+        {"text": "Do you find it hard to work with clients?", "factor": 2, "polarity": "+"},
+        {"text": "Does it drain your energy to work with clients?", "factor": 2, "polarity": "+"},
+        {"text": "Do you find it frustrating to work with clients?", "factor": 2, "polarity": "+"},
+        {"text": "Do you feel that you give more than you get back when you work with clients?", "factor": 2, "polarity": "+"},
+        {"text": "Are you tired of working with clients?", "factor": 2, "polarity": "+"},
+        {"text": "Do you sometimes wonder how long you will be able to continue working with clients?", "factor": 2, "polarity": "+"}
+      ]
+    }
+  ]
+}

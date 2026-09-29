@@ -919,6 +919,63 @@ def meta_editor_node(state: GraphState) -> GraphState:
         }
 
 
+def _enforce_facet_floor(
+    kept: list,
+    original: list,
+    dropped_indices: list,
+    min_per_facet: int,
+) -> tuple[list, list[int], list[str]]:
+    """Restore dropped near-duplicates so no facet falls below ``min_per_facet``.
+
+    ``deduplicate_items`` removes near-duplicates without facet bookkeeping, so a
+    facet can collapse below its identification floor (3 items) and trigger a
+    Heywood case. Re-add the earliest-dropped items of any under-populated facet
+    (in original order) until every facet meets the floor. A facet that still
+    cannot reach the floor (its pre-dedup count was already below it) surfaces a
+    warning. Returns ``(final_items, still_dropped, warnings)``.
+    """
+    if min_per_facet <= 1 or not dropped_indices:
+        return kept, dropped_indices, []
+
+    dropped_set = set(dropped_indices)
+    counts: dict[str, int] = {}
+    for it in kept:
+        key = it.facet_name or ""
+        counts[key] = counts.get(key, 0) + 1
+
+    dropped_by_facet: dict[str, list[int]] = {}
+    for i in dropped_indices:
+        key = original[i].facet_name or ""
+        dropped_by_facet.setdefault(key, []).append(i)
+
+    restore: list[int] = []
+    warnings: list[str] = []
+    for key, count in counts.items():
+        if count >= min_per_facet:
+            continue
+        candidates = dropped_by_facet.get(key, [])
+        need = min_per_facet - count
+        take = candidates[:need]
+        restore.extend(take)
+        if len(take) < need:
+            warnings.append(
+                f"facet '{key or '(none)'}' has {count} item(s) after dedup "
+                f"(floor {min_per_facet}); {len(take)} recoverable — facet remains "
+                f"under-identified"
+            )
+
+    if not restore:
+        return kept, dropped_indices, warnings
+
+    restore_set = set(restore)
+    final = [
+        it for i, it in enumerate(original)
+        if i not in dropped_set or i in restore_set
+    ]
+    still_dropped = [i for i in dropped_indices if i not in restore_set]
+    return final, still_dropped, warnings
+
+
 def _droppable_position(
     current: list,
     scores: dict[int, float],
@@ -1330,8 +1387,51 @@ def finalize_node(state: GraphState) -> GraphState:
                 logger.warning("FINALIZE_PFA_FALLBACK failed: %s", e)
                 pfa_result_for_output = None
 
+        # Fix: drop near-duplicate items (embedding cosine > threshold) before
+        # final output. The meta-editor only catches exact-string duplicates, so
+        # near-duplicates from the item writer (esp. under overlapping facets)
+        # previously shipped straight through.
+        deduped_items = enriched_items
+        dedup_dropped: List[int] = []
+        if settings.DEDUP_ENABLED and len(enriched_items) >= 3:
+            try:
+                from backend.agents.deduplicator import deduplicate_items
+                deduped_items, dedup_dropped = deduplicate_items(
+                    enriched_items, threshold=settings.DEDUP_THRESHOLD,
+                )
+                if dedup_dropped:
+                    logger.warning(
+                        "FINALIZE_DEDUP dropped %d near-duplicate items: %s",
+                        len(dedup_dropped), dedup_dropped,
+                    )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("FINALIZE_DEDUP failed: %s", e)
+
+        # Fix: enforce the per-facet minimum item floor after dedup. Dedup
+        # removes near-duplicates without facet bookkeeping, so a facet can
+        # collapse below its identification floor (3 items → Heywood case).
+        # Restore dropped items for under-populated facets and surface a warning.
+        dedup_warnings: List[str] = []
+        if (
+            settings.DEDUP_ENABLED
+            and dedup_dropped
+            and not bool(getattr(state.get("facet_mapping"), "is_unidimensional", False))
+        ):
+            try:
+                _min_per_facet = int(getattr(user_request, "min_items_per_facet", 3) or 3)
+                deduped_items, dedup_dropped, dedup_warnings = _enforce_facet_floor(
+                    deduped_items, enriched_items, dedup_dropped, _min_per_facet,
+                )
+                for w in dedup_warnings:
+                    logger.warning("FINALIZE_FACET_FLOOR: %s", w)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("FINALIZE_FACET_FLOOR failed: %s", e)
+
+        if dedup_warnings:
+            audit.warnings = list(audit.warnings or []) + dedup_warnings
+
         out = FinalOutput(
-            final_items=enriched_items,
+            final_items=deduped_items,
             audit=audit,
             user_request=user_request,
             linguistic_feedback=linguistic_feedback,

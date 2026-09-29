@@ -63,6 +63,8 @@ class Settings(BaseSettings):
 
     # Anthropic Claude (used for validation)
     CLAUDE_API_KEY: Optional[str] = Field(default=None)
+    # When set, Claude routes through this OpenAI-compatible endpoint (e.g. OpenRouter)
+    CLAUDE_BASE_URL: Optional[str] = Field(default=None)
     VALIDATOR_MODEL: str = "claude-opus-4-6"  # Highest accuracy for validation
 
     # Web search (optional)
@@ -137,6 +139,11 @@ class Settings(BaseSettings):
     PFA_RMSR_GOOD: float = 0.05
     PFA_RECOVERY_GOOD: float = 0.80
     PFA_RECOVERY_ACCEPTABLE: float = 0.60
+
+    # Fix: drop near-duplicate items (embedding cosine) before final output.
+    # The meta-editor only catches exact-string duplicates.
+    DEDUP_ENABLED: bool = True
+    DEDUP_THRESHOLD: float = 0.85  # Cosine similarity at/above which two items are duplicates
 
     # Phase 15: Expert Panel
     EXPERT_PANEL_ENABLED: bool = True

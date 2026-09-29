@@ -1,0 +1,35 @@
+{
+  "swls": {
+    "citation": "Diener, Emmons, Larsen & Griffin (1985), Table 1 (Study 1, n=176)",
+    "factor_names": ["Satisfaction with life"],
+    "loadings": [[0.84], [0.77], [0.83], [0.72], [0.61]]
+  },
+  "grit-s": {
+    "citation": "Duckworth & Quinn (2009), Figure 1 (second-order CFA path diagram, Study 2, N=1554)",
+    "factor_names": ["Consistency of Interests", "Perseverance of Effort"],
+    "loadings": [
+      [0.61, 0.0], [0.69, 0.0], [0.74, 0.0], [0.67, 0.0],
+      [0.0, 0.80], [0.0, 0.37], [0.0, 0.74], [0.0, 0.56]
+    ]
+  },
+  "uwes-9": {
+    "citation": "Sinval, Pasian, Queirós & Marôco (2018), Frontiers in Psychology, Figure 1 (CFA, combined PT+BR N=1046). NOTE: original Schaufeli et al. 2006 paper publishes no item loadings; these are from a later validation study.",
+    "factor_names": ["Vigor", "Dedication", "Absorption"],
+    "loadings": [
+      [0.96, 0.0, 0.0], [0.96, 0.0, 0.0], [0.90, 0.0, 0.0],
+      [0.0, 0.95, 0.0], [0.0, 0.93, 0.0], [0.0, 0.85, 0.0],
+      [0.0, 0.0, 0.90], [0.0, 0.0, 0.84], [0.0, 0.0, 0.88]
+    ]
+  },
+  "cbi": {
+    "citation": "Fiorilli, De Stasio, Benevene, Iezzi, Pepe & Albanese (2015), TPM 22(4), Figure 1 (CFA M3a; Italian teachers). NOTE: original Kristensen et al. 2005 publishes no item loadings; 'client-related' adapted to 'student-related'; items 9 & 10 (work-related) were dropped in this study and have no published loading (null).",
+    "factor_names": ["Personal burnout", "Work-related burnout", "Client-related burnout"],
+    "loadings": [
+      [0.78, 0.0, 0.0], [0.87, 0.0, 0.0], [0.88, 0.0, 0.0], [0.73, 0.0, 0.0], [0.67, 0.0, 0.0], [0.61, 0.0, 0.0],
+      [0.0, 0.67, 0.0], [0.0, 0.81, 0.0],
+      null, null,
+      [0.0, 0.72, 0.0], [0.0, 0.67, 0.0], [0.0, 0.42, 0.0],
+      [0.0, 0.0, 0.61], [0.0, 0.0, 0.69], [0.0, 0.0, 0.68], [0.0, 0.0, 0.42], [0.0, 0.0, 0.71], [0.0, 0.0, 0.55]
+    ]
+  }
+}

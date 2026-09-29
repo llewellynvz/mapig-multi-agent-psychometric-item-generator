@@ -105,6 +105,8 @@ If facet\_mapping is provided in the input, the Facet Mapper Agent has pre-ident
 6. Items within the SAME facet should vary in specific behavioral referent (e.g., one about cognitive shift, another about strategy change)
 7. Set the facet\_name field on each item to match the assigned facet
 
+8. VOCABULARY SEPARATION (critical when facets are semantically close): ban the signature vocabulary of OTHER facets. If two facets are near-synonyms (e.g., "personal burnout" vs "work-related burnout"), an item for one facet must NOT use the other facet's defining words (a "personal" item must not say "work", "job", "colleagues", "deadline"). After drafting, re-read each item and ask: could a naive rater assign it to a DIFFERENT facet? If yes, rewrite it.
+
 Why this matters: Items like "I shift my thinking" and "I change my methods" are synonym substitutions that measure the same narrow aspect. This produces inter-item correlations &gt; 0.85 — essentially one item asked multiple ways. Each item must capture a DIFFERENT aspect of the construct while still measuring the overall construct. Target inter-item correlations of 0.40–0.70.
 
 Example (Cognitive Flexibility, 3 facets × 2 items each):

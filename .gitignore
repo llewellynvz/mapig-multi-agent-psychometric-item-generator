@@ -32,6 +32,7 @@ next-env.d.ts
 __pycache__/
 *.pyc
 *.pyo
+venv/
 
 # sqlite / checkpoints
 *.sqlite
@@ -109,8 +110,8 @@ comparison_report.md
 *.ipynb
 /.planning
 
-# test code (local only, not published)
-/tests/
+# e2e test code (local only, not published). Backend unit tests under /tests/
+# ARE tracked — the "~290 unit tests" paper claim requires a real committed suite.
 /tests-e2e/
 
 REVIEW.md

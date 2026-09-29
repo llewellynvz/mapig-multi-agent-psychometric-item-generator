@@ -411,6 +411,52 @@ def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool], n
     return aligned, flipped, np.array(signs)
 
 
+def _align_factor_order(
+    loadings: np.ndarray,
+    expected_assignments: Sequence[int],
+    n_factors: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Permute factor columns to match the expected facet order (Hungarian).
+
+    Oblique rotation (e.g., oblimin) returns factors in an arbitrary order, so
+    scoring `factor_recovery_rate` or `tuckers_congruence` against a facet-order
+    expected pattern mislabels a perfectly-recovered structure as unrecovered —
+    the CBI benchmark read 0.0 recovery purely from a column permutation, even
+    though the clusters were recovered exactly.
+
+    This aligns columns by assigning each recovered factor to the expected facet
+    that maximizes the summed |loading| of that facet's items, via the Hungarian
+    algorithm (scipy.optimize.linear_sum_assignment). Because |loadings| is used,
+    the assignment is also robust to sign reflection (a factor whose items load
+    with a consistent flipped sign still matches its facet).
+
+    Returns (aligned_loadings, column_permutation) where `aligned = loadings[:, perm]`
+    and `perm[f]` is the recovered column placed at expected facet `f`.
+    """
+    if n_factors <= 1:
+        return loadings, np.arange(n_factors)
+    try:
+        from scipy.optimize import linear_sum_assignment
+    except ImportError:
+        logger.warning("scipy unavailable — factor-order alignment skipped")
+        return loadings, np.arange(n_factors)
+
+    abs_l = np.abs(loadings)
+    cost = np.zeros((n_factors, n_factors), dtype=float)
+    for f in range(n_factors):
+        idx = [i for i, a in enumerate(expected_assignments) if a == f]
+        if idx:
+            # Negative so linear_sum_assignment (minimizer) maximizes |loading|.
+            cost[f, :] = -abs_l[idx, :].sum(axis=0)
+
+    _, col_ind = linear_sum_assignment(cost)
+    # col_ind[f] = recovered column assigned to expected facet f.
+    perm = np.asarray(col_ind, dtype=int)
+    if tuple(perm) != tuple(range(n_factors)):
+        logger.info("PFA_FACTOR_ORDER_ALIGNMENT permutation=%s", perm.tolist())
+    return loadings[:, perm], perm
+
+
 def _decide_verdict(
     rmsr: float,
     recovery: float,
@@ -676,6 +722,12 @@ def run_pfa(
             "PFA_SIGN_ALIGNMENT factor=%d flipped=%s dominant_idx=%d dominant_value=%.3f",
             j, was_flipped, dom_idx, dom_val,
         )
+
+    # 4d. Align factor ORDER to the expected facet order. Oblique rotation returns
+    # factors in an arbitrary order; without alignment, factor_recovery_rate and
+    # Tucker's congruence score a permuted solution as failure (CBI read 0.0).
+    loadings, factor_perm = _align_factor_order(loadings, expected_assignments, n_factors)
+    phi = phi[np.ix_(factor_perm, factor_perm)]
 
     # 5. Tucker's congruence vs expected pattern (one-hot). Sign should now be
     # naturally positive after alignment, but we still take abs() in the

@@ -1,0 +1,73 @@
+id,construct,source,facet,text
+SWLS-01,Satisfaction with Life,generated,satisfaction with life,My life is close to what I'd consider ideal
+SWLS-02,Satisfaction with Life,published,satisfaction with life,So far I have gotten the important things I want in life
+SWLS-03,Satisfaction with Life,published,satisfaction with life,I am satisfied with my life
+SWLS-04,Satisfaction with Life,generated,satisfaction with life,I am satisfied with my life right now
+SWLS-05,Satisfaction with Life,generated,satisfaction with life,"Overall, I'm satisfied with my life"
+SWLS-06,Satisfaction with Life,generated,satisfaction with life,The conditions of my life are good
+SWLS-07,Satisfaction with Life,generated,satisfaction with life,My life as a whole is going well
+SWLS-08,Satisfaction with Life,published,satisfaction with life,"If I could live my life over, I would change almost nothing"
+SWLS-09,Satisfaction with Life,published,satisfaction with life,In most ways my life is close to my ideal
+SWLS-10,Satisfaction with Life,published,satisfaction with life,The conditions of my life are excellent
+GRIT-01,Grit,published,perseverance of effort,I am a hard worker
+GRIT-02,Grit,generated,consistency of interests,My main goals stay the same from one year to the next
+GRIT-03,Grit,published,perseverance of effort,Setbacks don't discourage me
+GRIT-04,Grit,published,perseverance of effort,I am diligent
+GRIT-05,Grit,generated,perseverance of effort,"When things get difficult, I maintain my effort"
+GRIT-06,Grit,generated,consistency of interests,I have been working toward the same big goals for several years
+GRIT-07,Grit,generated,perseverance of effort,I keep working hard even when progress is slow
+GRIT-08,Grit,generated,consistency of interests,I stick with the same goals for years at a time
+GRIT-09,Grit,published,consistency of interests,I have difficulty maintaining my focus on projects that take more than a few months to complete
+GRIT-10,Grit,published,consistency of interests,I have been obsessed with a certain idea or project for a short time but later lost interest
+GRIT-11,Grit,generated,perseverance of effort,Setbacks motivate me to keep putting in effort
+GRIT-12,Grit,generated,perseverance of effort,I push through obstacles rather than giving up
+GRIT-13,Grit,published,perseverance of effort,I finish whatever I begin
+GRIT-14,Grit,generated,consistency of interests,I maintain the same life goals over time
+GRIT-15,Grit,published,consistency of interests,New ideas and projects sometimes distract me from previous ones
+GRIT-16,Grit,published,consistency of interests,I often set a goal but later choose to pursue a different one
+UWES-01,Work Engagement,generated,dedication,I find my work meaningful
+UWES-02,Work Engagement,generated,dedication,I'm proud of the work I do
+UWES-03,Work Engagement,published,dedication,My job inspires me
+UWES-04,Work Engagement,generated,vigor,"At work, I feel full of energy"
+UWES-05,Work Engagement,published,dedication,I am proud of the work that I do
+UWES-06,Work Engagement,published,absorption,I am immersed in my work
+UWES-07,Work Engagement,generated,vigor,"When I start working, I feel a burst of energy"
+UWES-08,Work Engagement,published,absorption,I feel happy when I am working intensely
+UWES-09,Work Engagement,generated,vigor,I feel physically strong and energized at work
+UWES-10,Work Engagement,generated,absorption,"When I'm working, I forget everything around me"
+UWES-11,Work Engagement,published,vigor,"At my job, I feel strong and vigorous"
+UWES-12,Work Engagement,generated,dedication,My work inspires me
+UWES-13,Work Engagement,published,vigor,"When I get up in the morning, I feel like going to work"
+UWES-14,Work Engagement,generated,absorption,I get completely absorbed in my work
+UWES-15,Work Engagement,generated,absorption,I focus so deeply that I tune out distractions
+UWES-16,Work Engagement,published,absorption,I get carried away when I am working
+UWES-17,Work Engagement,published,vigor,"At my work, I feel bursting with energy"
+UWES-18,Work Engagement,published,dedication,I am enthusiastic about my job
+BURNOUT-01,Burnout,published,client-related burnout,Do you sometimes wonder how long you will be able to continue working with clients?
+BURNOUT-02,Burnout,published,client-related burnout,Do you feel that you give more than you get back when you work with clients?
+BURNOUT-03,Burnout,published,work-related burnout,Are you exhausted in the morning at the thought of another day at work?
+BURNOUT-04,Burnout,generated,work-related burnout,My work leaves me exhausted
+BURNOUT-05,Burnout,generated,client-related burnout,Helping clients drains my energy
+BURNOUT-06,Burnout,published,work-related burnout,Is your work emotionally exhausting?
+BURNOUT-07,Burnout,published,personal burnout,How often do you feel weak and susceptible to illness?
+BURNOUT-08,Burnout,published,work-related burnout,Do you feel that every working hour is tiring for you?
+BURNOUT-09,Burnout,published,client-related burnout,Does it drain your energy to work with clients?
+BURNOUT-10,Burnout,published,work-related burnout,Do you feel worn out at the end of the working day?
+BURNOUT-11,Burnout,generated,client-related burnout,Working with clients drains my energy
+BURNOUT-12,Burnout,published,work-related burnout,Do you have enough energy for family and friends during leisure time?
+BURNOUT-13,Burnout,generated,personal burnout,I feel worn out from my work and daily responsibilities
+BURNOUT-14,Burnout,published,client-related burnout,Do you find it frustrating to work with clients?
+BURNOUT-15,Burnout,generated,client-related burnout,I feel exhausted after dealing with clients
+BURNOUT-16,Burnout,published,personal burnout,How often are you physically exhausted?
+BURNOUT-17,Burnout,published,client-related burnout,Do you find it hard to work with clients?
+BURNOUT-18,Burnout,published,personal burnout,How often are you emotionally exhausted?
+BURNOUT-19,Burnout,published,client-related burnout,Are you tired of working with clients?
+BURNOUT-20,Burnout,generated,work-related burnout,Thinking about my upcoming workday exhausts me
+BURNOUT-21,Burnout,published,personal burnout,How often do you feel worn out?
+BURNOUT-22,Burnout,generated,work-related burnout,I feel drained by the demands of my job
+BURNOUT-23,Burnout,published,work-related burnout,Do you feel burnt out because of your work?
+BURNOUT-24,Burnout,published,work-related burnout,Does your work frustrate you?
+BURNOUT-25,Burnout,generated,work-related burnout,Work wears me out
+BURNOUT-26,Burnout,published,personal burnout,How often do you feel tired?
+BURNOUT-27,Burnout,published,personal burnout,How often do you think: 'I can't take it anymore'?
+BURNOUT-28,Burnout,generated,personal burnout,I feel emotionally drained from my work experiences

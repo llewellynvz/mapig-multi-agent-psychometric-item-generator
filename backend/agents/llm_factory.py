@@ -200,15 +200,25 @@ def _get_azure_test_analytics_model() -> AzureChatOpenAI:
         return AzureChatOpenAI(**kwargs)
 
 
+def _to_openrouter_slug(model: str) -> str:
+    """Map internal model names (claude-sonnet-4-5) to OpenRouter slugs (anthropic/claude-sonnet-4.5)."""
+    head, sep, tail = model.rpartition("-")
+    if sep and tail.isdigit():
+        return f"anthropic/{head}.{tail}"
+    return f"anthropic/{model}"
+
+
 @lru_cache(maxsize=2)
-def get_claude_chat_model(model: str = "claude-opus-4-6") -> ChatAnthropic:
-    """Create (and cache) the Claude ChatAnthropic client.
+def get_claude_chat_model(model: str = "claude-opus-4-6", temperature: float = 0.2):
+    """Create (and cache) the Claude chat client.
+
+    When CLAUDE_BASE_URL is set, Claude routes through an OpenAI-compatible
+    endpoint (e.g. OpenRouter) using the OpenAI SDK, so we can run Claude
+    without a direct Anthropic key. Otherwise uses the native Anthropic SDK.
 
     Args:
         model: Claude model name (e.g., "claude-opus-4-6", "claude-sonnet-4-5")
-
-    Returns:
-        ChatAnthropic instance configured for the specified model
+        temperature: sampling temperature
 
     Raises:
         ValueError: If CLAUDE_API_KEY is not configured
@@ -216,12 +226,22 @@ def get_claude_chat_model(model: str = "claude-opus-4-6") -> ChatAnthropic:
     if not settings.CLAUDE_API_KEY:
         raise ValueError("CLAUDE_API_KEY required for Claude models")
 
-    # Enable prompt caching for cost savings
-    # Ref: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+    if settings.CLAUDE_BASE_URL:
+        # Route Claude through an OpenAI-compatible proxy (OpenRouter).
+        return ChatOpenAI(
+            model=_to_openrouter_slug(model),
+            api_key=settings.CLAUDE_API_KEY,
+            base_url=settings.CLAUDE_BASE_URL,
+            temperature=temperature,
+            max_retries=3,
+            timeout=45,
+        )
+
+    # Direct Anthropic path (prompt caching enabled)
     return ChatAnthropic(
         model=model,
         api_key=settings.CLAUDE_API_KEY,
-        temperature=0.2,
+        temperature=temperature,
         max_retries=3,
         timeout=45,
         # Enable prompt caching to reduce input token costs by ~50% for repeated prompts

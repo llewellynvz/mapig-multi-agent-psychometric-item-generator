@@ -246,17 +246,7 @@ def validate_items(
             model_name = settings.AZURE_FRONTIER_DEPLOYMENT
         elif attempt >= 2:
             # Retry: Opus with higher temperature to force score differentiation.
-            # Prompt caching enabled for system prompt (billing optimization only —
-            # human message differs per attempt, ensuring fresh evaluation).
-            from langchain_anthropic import ChatAnthropic
-            model = ChatAnthropic(
-                model="claude-opus-4-6",
-                api_key=settings.CLAUDE_API_KEY,
-                temperature=0.5,
-                max_retries=3,
-                timeout=80,
-                default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
-            )
+            model = get_claude_chat_model(model="claude-opus-4-6", temperature=0.5)
             model_name = "claude-opus-4-6"
             # Surface Sonnet → Opus transition explicitly in logs so we can
             # measure how often the smart_validation tier escalates.

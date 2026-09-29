@@ -17,6 +17,10 @@ from backend.evaluation.schemas import BenchmarkScale
 logger = logging.getLogger(__name__)
 
 
+# Anchored to the repo root so loading works whatever the working directory.
+_DEFAULT_PATH = Path(__file__).resolve().parents[2] / "data" / "benchmarks" / "benchmark_scales.json"
+
+
 def load_benchmark_scales(filepath: Path | None = None) -> list[BenchmarkScale]:
     """Load benchmark scales from JSON file.
 
@@ -31,7 +35,7 @@ def load_benchmark_scales(filepath: Path | None = None) -> list[BenchmarkScale]:
         FileNotFoundError: If benchmark scales file doesn't exist
     """
     if filepath is None:
-        filepath = Path("data/benchmarks/benchmark_scales.json")
+        filepath = _DEFAULT_PATH
 
     if not filepath.exists():
         raise FileNotFoundError(f"Benchmark scales file not found: {filepath}")
@@ -50,7 +54,7 @@ def save_benchmark_scales(scales: list[BenchmarkScale], filepath: Path | None = 
         filepath: Path to save (default: data/benchmarks/benchmark_scales.json)
     """
     if filepath is None:
-        filepath = Path("data/benchmarks/benchmark_scales.json")
+        filepath = _DEFAULT_PATH
 
     filepath.parent.mkdir(parents=True, exist_ok=True)
 

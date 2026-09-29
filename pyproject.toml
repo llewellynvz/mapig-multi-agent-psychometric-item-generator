@@ -32,6 +32,9 @@ packages = ["backend"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
+# Import the backend package from the repo root however pytest is launched
+# (CI runs plain `pytest tests/`, which does not put the root on sys.path).
+pythonpath = ["."]
 filterwarnings = [
     # OpenAI SDK's ParsedResponse has a 21-variant discriminated union.
     # Pydantic v2 emits UserWarning for each non-matching variant during serialization.

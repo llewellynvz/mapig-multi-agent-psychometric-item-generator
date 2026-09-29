@@ -14,6 +14,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import statistics
+import zlib
 from typing import List, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, conint
@@ -160,7 +161,8 @@ def _rate_items_for_persona(
         # Use a short label snippet in the interpretation to stay well under
         # the 1000-char schema limit regardless of how long the persona is.
         label_snippet = persona_label[:60].rsplit(" ", 1)[0]
-        offset = abs(hash(persona_label)) % 5
+        # zlib.crc32, not hash(): str hashing is salted per process
+        offset = zlib.crc32(persona_label.encode("utf-8")) % 5
         ratings = [
             _PersonaItemRating(
                 item_index=i,

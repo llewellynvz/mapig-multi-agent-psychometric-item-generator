@@ -23,13 +23,37 @@ AGENT_MODEL_OVERRIDES = {
     "synthetic_respondent": ("openai", "gpt-5.4-mini"),  # One cheap call per simulated respondent
 }
 
+# Default per-request client timeout; agents with long outputs (meta_editor)
+# get a larger budget via _agent_timeout().
+DEFAULT_CLIENT_TIMEOUT_SECONDS = 45
 
-@lru_cache(maxsize=3)
-def get_openai_chat_model(model: Optional[str] = None) -> ChatOpenAI:
+
+DEFAULT_CLIENT_MAX_RETRIES = 3
+
+
+def _agent_timeout(agent_name: str, default: int = DEFAULT_CLIENT_TIMEOUT_SECONDS) -> int:
+    """Default client timeout for an agent (part of the client cache key).
+
+    The meta-editor writes long outputs and gets its own timeout on every
+    path. Callers with a hard time budget (the meta-editor node) pass an
+    explicit timeout/max_retries to get_chat_model_for_agent instead."""
+    if agent_name == "meta_editor":
+        return settings.META_EDITOR_TIMEOUT_SECONDS
+    return default
+
+
+@lru_cache(maxsize=6)
+def get_openai_chat_model(
+    model: Optional[str] = None,
+    timeout: int = DEFAULT_CLIENT_TIMEOUT_SECONDS,
+    max_retries: int = DEFAULT_CLIENT_MAX_RETRIES,
+) -> ChatOpenAI:
     """Create (and cache) the OpenAI ChatOpenAI client.
 
     Args:
         model: Optional model name override. If not provided, uses settings.OPENAI_MODEL.
+        timeout: Per-request timeout in seconds.
+        max_retries: SDK retries after a failed or timed-out request.
 
     Returns:
         ChatOpenAI instance configured for the specified model
@@ -43,8 +67,8 @@ def get_openai_chat_model(model: Optional[str] = None) -> ChatOpenAI:
         "model": model_name,
         "api_key": settings.OPENAI_API_KEY,
         "temperature": 0.2,
-        "max_retries": 3,
-        "timeout": 45,
+        "max_retries": max_retries,
+        "timeout": timeout,
     }
     if settings.OPENAI_BASE_URL:
         kwargs["base_url"] = settings.OPENAI_BASE_URL
@@ -81,7 +105,9 @@ AZURE_CLIENT_TIMEOUT_SECONDS = 180
 
 # TEMPORARY — remove after Azure evaluation
 @lru_cache(maxsize=8)
-def get_azure_test_chat_model(deployment: str, timeout: int) -> AzureChatOpenAI:
+def get_azure_test_chat_model(
+    deployment: str, timeout: int, max_retries: int = DEFAULT_CLIENT_MAX_RETRIES
+) -> AzureChatOpenAI:
     """Create (and cache) an AzureChatOpenAI client authenticated via Azure AD certificate."""
     if not settings.AZURE_OPENAI_ENDPOINT:
         raise RuntimeError(
@@ -103,7 +129,7 @@ def get_azure_test_chat_model(deployment: str, timeout: int) -> AzureChatOpenAI:
         api_version=settings.AZURE_OPENAI_API_VERSION,
         azure_ad_token_provider=azure_token_provider,
         azure_ad_async_token_provider=azure_token_provider_async,
-        max_retries=3,
+        max_retries=max_retries,
         timeout=timeout,
     )
 
@@ -113,6 +139,8 @@ def _azure_test_route(
     agent_name: str,
     model_provider: str,
     use_chatgpt_critics: bool,
+    timeout: Optional[int] = None,
+    max_retries: int = DEFAULT_CLIENT_MAX_RETRIES,
 ) -> Optional[AzureChatOpenAI]:
     """Mirror of the get_chat_model_for_agent decision tree for the Azure test override.
 
@@ -122,13 +150,9 @@ def _azure_test_route(
     deployment = _azure_deployment_for(agent_name, model_provider, use_chatgpt_critics)
     if deployment is None:
         return None
-    return get_azure_test_chat_model(deployment, _client_timeout_for(agent_name))
-
-
-def _client_timeout_for(agent_name: str) -> int:
-    if agent_name == "meta_editor":
-        return settings.META_EDITOR_TIMEOUT_SECONDS
-    return AZURE_CLIENT_TIMEOUT_SECONDS
+    return get_azure_test_chat_model(
+        deployment, timeout or _agent_timeout(agent_name, AZURE_CLIENT_TIMEOUT_SECONDS), max_retries
+    )
 
 
 def _azure_deployment_for(
@@ -208,8 +232,13 @@ def _to_openrouter_slug(model: str) -> str:
     return f"anthropic/{model}"
 
 
-@lru_cache(maxsize=2)
-def get_claude_chat_model(model: str = "claude-opus-4-6", temperature: float = 0.2):
+@lru_cache(maxsize=6)
+def get_claude_chat_model(
+    model: str = "claude-opus-4-6",
+    temperature: float = 0.2,
+    timeout: int = DEFAULT_CLIENT_TIMEOUT_SECONDS,
+    max_retries: int = DEFAULT_CLIENT_MAX_RETRIES,
+):
     """Create (and cache) the Claude chat client.
 
     When CLAUDE_BASE_URL is set, Claude routes through an OpenAI-compatible
@@ -219,6 +248,7 @@ def get_claude_chat_model(model: str = "claude-opus-4-6", temperature: float = 0
     Args:
         model: Claude model name (e.g., "claude-opus-4-6", "claude-sonnet-4-5")
         temperature: sampling temperature
+        timeout: Per-request timeout in seconds
 
     Raises:
         ValueError: If CLAUDE_API_KEY is not configured
@@ -233,8 +263,8 @@ def get_claude_chat_model(model: str = "claude-opus-4-6", temperature: float = 0
             api_key=settings.CLAUDE_API_KEY,
             base_url=settings.CLAUDE_BASE_URL,
             temperature=temperature,
-            max_retries=3,
-            timeout=45,
+            max_retries=max_retries,
+            timeout=timeout,
         )
 
     # Direct Anthropic path (prompt caching enabled)
@@ -242,8 +272,8 @@ def get_claude_chat_model(model: str = "claude-opus-4-6", temperature: float = 0
         model=model,
         api_key=settings.CLAUDE_API_KEY,
         temperature=temperature,
-        max_retries=3,
-        timeout=45,
+        max_retries=max_retries,
+        timeout=timeout,
         # Enable prompt caching to reduce input token costs by ~50% for repeated prompts
         default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
     )
@@ -302,8 +332,13 @@ def get_chat_model_for_agent(
     agent_name: str,
     model_provider: str = "claude",
     use_chatgpt_critics: bool = False,
+    timeout: Optional[int] = None,
+    max_retries: Optional[int] = None,
 ) -> Union[ChatOpenAI, AzureChatOpenAI, ChatAnthropic]:
     """Get LLM for specific agent with smart model allocation.
+
+    ``timeout``/``max_retries`` override the agent's defaults, so a caller with
+    a hard time budget gets a client whose worst case fits inside it.
 
     Smart allocation for Claude provider:
     - validator agent: claude-opus-4-6 (highest accuracy for critical validation)
@@ -329,10 +364,15 @@ def get_chat_model_for_agent(
     Raises:
         ValueError: If required API key missing for selected provider
     """
+    retries = DEFAULT_CLIENT_MAX_RETRIES if max_retries is None else max_retries
     if settings.AZURE_TEST_OVERRIDE:
-        azure_model = _azure_test_route(agent_name, model_provider, use_chatgpt_critics)
+        azure_model = _azure_test_route(
+            agent_name, model_provider, use_chatgpt_critics, timeout, retries
+        )
         if azure_model is not None:
             return azure_model
+
+    timeout = timeout or _agent_timeout(agent_name)
 
     # Define critic agents that can be switched to ChatGPT
     # NOTE: validator excluded — always uses Claude (Sonnet first, Opus on retry)
@@ -342,29 +382,29 @@ def get_chat_model_for_agent(
     # Special case: ChatGPT critics toggle
     # When enabled, critic agents use ChatGPT (validator always stays on Claude)
     if use_chatgpt_critics and agent_name in CRITIC_AGENTS:
-        return get_openai_chat_model(model=settings.CHATGPT_CRITIC_MODEL)
+        return get_openai_chat_model(model=settings.CHATGPT_CRITIC_MODEL, timeout=timeout, max_retries=retries)
 
     # Ensure item writer ALWAYS uses Claude Sonnet (ignore toggle)
     if agent_name == "item_writer":
-        return get_claude_chat_model(model="claude-sonnet-4-5")
+        return get_claude_chat_model(model="claude-sonnet-4-5", timeout=timeout, max_retries=retries)
 
     # Check for agent-specific overrides
     if settings.AGENT_MODEL_OVERRIDES_ENABLED and agent_name in AGENT_MODEL_OVERRIDES:
         override_provider, override_model = AGENT_MODEL_OVERRIDES[agent_name]
         if override_provider == "openai":
-            return get_openai_chat_model(model=override_model)
+            return get_openai_chat_model(model=override_model, timeout=timeout, max_retries=retries)
         elif override_provider == "claude":
-            return get_claude_chat_model(model=override_model)
+            return get_claude_chat_model(model=override_model, timeout=timeout, max_retries=retries)
 
     # Default allocation based on provider
     if model_provider == "claude":
         if agent_name == "validator":
-            return get_claude_chat_model(model="claude-opus-4-6")
+            return get_claude_chat_model(model="claude-opus-4-6", timeout=timeout, max_retries=retries)
         else:
             # All other agents use Sonnet for cost optimization
-            return get_claude_chat_model(model="claude-sonnet-4-5")
+            return get_claude_chat_model(model="claude-sonnet-4-5", timeout=timeout, max_retries=retries)
     elif model_provider == "openai":
-        return get_openai_chat_model()
+        return get_openai_chat_model(timeout=timeout, max_retries=retries)
     else:
         raise ValueError(f"Unsupported model_provider: {model_provider}")
 

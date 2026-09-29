@@ -35,7 +35,7 @@ def review_linguistic(
 
     payload = {
         "user_request": request.model_dump(),
-        "items": [it.model_dump() for it in items],
+        "items": [it.model_dump(exclude={"validation_result"}) for it in items],
         "iteration": iteration,
     }
     if previous_comments and "linguistic" in previous_comments:

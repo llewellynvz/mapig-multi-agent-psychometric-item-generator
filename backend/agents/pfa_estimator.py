@@ -8,15 +8,18 @@ Method:
 2. Compute cosine similarity matrix → fill diagonal with 1.0 (treat as correlation).
 3. Sign-flip embeddings for reverse-keyed items (DraftItem.polarity == "-").
 4. Run EFA via factor-analyzer (oblimin rotation, is_corr_matrix=True).
-5. Compute Tucker's congruence vs expected pattern matrix (one-hot from facets).
+5. Compute Tucker's congruence vs expected pattern matrix (one-hot from facets,
+   signed by item keying: reverse-keyed items are expected to load negatively).
 6. Compute factor recovery rate.
 7. Apply 4-rule item retention check from Suárez-Álvarez et al. (2026):
     - Item loads on its parent factor (>= 0.30 absolute).
     - Loads higher on parent factor than on any other factor.
     - Parent loading > average of cross-loadings on other factors.
-    - Parent loading > average of all other items' loadings on the parent factor.
+    - Parent loading > average loading on the parent factor of items assigned
+      to other factors.
 8. Label factors via DAAL (Dominant Average Absolute Loading).
-9. Compute model-free fit indices: RMSR (residual matrix RMS), CAF (common-part).
+9. Compute model-free fit indices: RMSR (residual matrix RMS), CAF (common-part,
+   1 − KMO of the residual matrix; Lorenzo-Seva, Timmerman & Kiers, 2011).
 10. Emit a PFAResult.
 """
 
@@ -28,10 +31,12 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from backend.agents.correlation_estimator import (
+    EmbeddingsUnavailable,
     active_embedding_model,
     compute_cosine_similarity_matrix,
     embed_items_sync,
 )
+from backend.agents.facet_utils import facet_key
 from backend.schemas import (
     DraftItem,
     FacetMapperResponse,
@@ -62,16 +67,21 @@ def tuckers_congruence(A: np.ndarray, B: np.ndarray) -> np.ndarray:
 def build_expected_pattern(
     expected_factor_assignments: Sequence[int],
     n_factors: int,
+    keys: Optional[Sequence[float]] = None,
 ) -> np.ndarray:
     """Build a one-hot pattern matrix matching the expected factor structure.
 
-    Returns: (n_items × n_factors) matrix with 1.0 on each item's parent factor.
+    Returns: (n_items × n_factors) matrix with the item's key (+1, or −1 for a
+    reverse-keyed item) on its parent factor. Embeddings of reverse-keyed items
+    are sign-flipped, so they are expected to load negatively; an all-positive
+    target would score a perfectly keyed structure as incongruent. Items with
+    an out-of-range assignment (unmatched facet) get an all-zero row.
     """
     n = len(expected_factor_assignments)
     pattern = np.zeros((n, n_factors), dtype=float)
     for i, f in enumerate(expected_factor_assignments):
         if 0 <= f < n_factors:
-            pattern[i, f] = 1.0
+            pattern[i, f] = 1.0 if keys is None else float(np.sign(keys[i]) or 1.0)
     return pattern
 
 
@@ -122,21 +132,29 @@ def compute_retention_flags(
 ) -> List[Tuple[bool, List[str]]]:
     """Apply the 4-rule retention check from Suárez-Álvarez et al. (2026).
 
+    Rules use |loading|, so a reverse-keyed item loading negatively on its
+    factor (sign-flipped embedding) is judged by magnitude like any other.
+    Items with an out-of-range assignment (facet unmatched in the mapping) have
+    no expected parent, so only rule 1 applies, against their strongest factor:
+    an unmatched item that barely loads anywhere is still flagged weak, but a
+    well-loading one isn't penalised for a mislabelled facet.
+
     Returns list of (is_well_loaded, violation_names) per item.
     """
     abs_loadings = np.abs(loadings)
     n_items, n_factors = loadings.shape
     out: List[Tuple[bool, List[str]]] = []
-
-    # Per-factor: average absolute loading across all items (used in rule 4)
-    avg_per_factor_all_items = abs_loadings.mean(axis=0)
+    assignments = np.asarray(expected_factor_assignments, dtype=int)
 
     for i in range(n_items):
-        parent = (
-            expected_factor_assignments[i]
-            if 0 <= expected_factor_assignments[i] < n_factors
-            else 0
-        )
+        parent = int(assignments[i])
+        if not 0 <= parent < n_factors:
+            strongest = float(np.max(abs_loadings[i, :])) if n_factors else 0.0
+            if strongest < parent_min_abs:
+                out.append((False, ["rule1_below_parent_minimum"]))
+            else:
+                out.append((True, []))
+            continue
         parent_loading = abs_loadings[i, parent]
         violations: List[str] = []
 
@@ -155,10 +173,13 @@ def compute_retention_flags(
             if parent_loading <= mean_others_for_item:
                 violations.append("rule3_below_mean_cross_loadings")
 
-        # Rule 4: Parent loading > average of all other items' loadings on parent factor
-        if n_items > 1:
-            other_items_on_parent = np.delete(abs_loadings[:, parent], i)
-            mean_others_on_parent = float(np.mean(other_items_on_parent))
+        # Rule 4: Parent loading > average loading on the parent factor of the
+        # items assigned to OTHER factors. Including same-facet siblings would
+        # fail roughly the bottom half of any clean factor by construction.
+        # Skipped when no other-factor items exist (e.g. a single factor).
+        other_factor_items = (assignments != parent) & (assignments >= 0) & (assignments < n_factors)
+        if other_factor_items.any():
+            mean_others_on_parent = float(np.mean(abs_loadings[other_factor_items, parent]))
             if parent_loading <= mean_others_on_parent:
                 violations.append("rule4_below_avg_items_on_factor")
 
@@ -217,11 +238,18 @@ def label_factors_via_daal(
     return labels
 
 
+# Off-diagonal residuals below this are numerical noise from the EFA solver
+# (a saturated model reproduces the matrix to ~1e-7): CAF is then 1 by
+# definition, and KMO — whose partial correlations are scale-free — would read
+# structure into that noise.
+_CAF_EXACT_FIT_TOL = 1e-4
+
+
 def compute_model_fit(
     sim_matrix: np.ndarray,
     loadings: np.ndarray,
     phi: Optional[np.ndarray] = None,
-) -> Tuple[float, float, np.ndarray]:
+) -> Tuple[float, Optional[float], np.ndarray]:
     """Compute RMSR and CAF model-free fit indices.
 
     The model-implied matrix is ΛΦΛ' — for oblique rotations (oblimin) Φ is
@@ -229,14 +257,21 @@ def compute_model_fit(
     orthogonal or single-factor solutions.
 
     RMSR (Root Mean Square Residual): RMS of (sim - ΛΦΛ') off-diagonal.
-    CAF (Common part Accounted For): 1 - sum(residual_off_diag^2) / sum(sim_off_diag^2).
+    CAF (Common part Accounted For; Lorenzo-Seva, Timmerman & Kiers, 2011,
+    MBR 46(2)): 1 − KMO(E), where E = sim − ΛΦΛ' is the residual matrix with
+    the uniquenesses on its diagonal. KMO(E) near 0 means no common variance
+    is left in the residuals (CAF near 1); an under-factored solution leaves
+    shared variance behind and CAF drops. None when KMO(E) is not estimable
+    (singular residual matrix, or a Heywood case with a non-positive uniqueness).
 
-    Returns (rmsr, caf, residual_matrix).
+    Returns (rmsr, caf, residual_matrix) — the returned residual matrix has a
+    zeroed diagonal (off-diagonal residual correlations for display).
     """
     if phi is None:
         phi = np.eye(loadings.shape[1])
     reproduced = loadings @ phi @ loadings.T
-    residual = sim_matrix - reproduced
+    residual_full = sim_matrix - reproduced
+    residual = residual_full.copy()
     np.fill_diagonal(residual, 0.0)
 
     n = residual.shape[0]
@@ -246,13 +281,23 @@ def compute_model_fit(
     # Use upper triangle only (symmetric matrix; avoid double-counting)
     iu = np.triu_indices(n, k=1)
     res_off = residual[iu]
-    sim_off = sim_matrix[iu].copy()
 
     rmsr = float(np.sqrt(np.mean(res_off ** 2)))
 
-    sim_var = float(np.sum(sim_off ** 2))
-    caf = float(1.0 - np.sum(res_off ** 2) / sim_var) if sim_var > 0 else 1.0
-    caf = max(0.0, min(1.0, caf))
+    caf: Optional[float]
+    if float(np.max(np.abs(res_off))) < _CAF_EXACT_FIT_TOL:
+        caf = 1.0
+    elif np.any(np.diag(residual_full) <= 0):
+        caf = None
+    else:
+        # KMO is taken on E itself, uniquenesses on the diagonal, as in
+        # Lorenzo-Seva et al. (2011). That is deliberate, not a scaling slip:
+        # its partial correlations come out larger than the raw residuals by
+        # 1/sqrt(u_i u_j), so leftover noise reads as little common variance
+        # (CAF near 1). Standardizing E first puts pure-noise residuals at
+        # KMO ~0.5, which would score a correct model's CAF around 0.5.
+        kmo_residual = compute_semantic_kmo(residual_full)
+        caf = None if kmo_residual is None else float(min(1.0, max(0.0, 1.0 - kmo_residual)))
 
     return rmsr, caf, residual
 
@@ -317,20 +362,34 @@ def compute_semantic_kmo(sim: np.ndarray) -> Optional[float]:
     return r2 / (r2 + p2)
 
 
-def compute_pseudo_omega(loadings: np.ndarray, phi: Optional[np.ndarray] = None) -> Optional[float]:
+def compute_pseudo_omega(
+    loadings: np.ndarray,
+    phi: Optional[np.ndarray] = None,
+    keys: Optional[Sequence[float]] = None,
+) -> Optional[float]:
     """Omega-total from a factor solution: (Λ′1)′Φ(Λ′1) / [(Λ′1)′Φ(Λ′1) + Σ(1−diag(ΛΦΛ′))].
 
     General Φ-aware form — reduces to (Σλ)²/((Σλ)²+Σ(1−λ²)) for a single
     factor (Φ=1). Computed on PFA loadings, so it is a pre-data semantic
     estimate ("pseudo-omega"), not respondent-based reliability.
 
-    Returns None when not estimable: empty loadings, a Heywood case
-    (communality > 1 → negative uniqueness), or a degenerate denominator.
+    `keys` (+1/−1 per item) sign-corrects the loadings of reverse-keyed items
+    first — omega is defined for the reverse-scored total, and summing signed
+    loadings would let them cancel. Communalities are unaffected by the sign.
+
+    Returns None when not estimable: empty or non-finite loadings, a Heywood
+    case (communality > 1 → negative uniqueness), or a degenerate denominator.
     """
     if loadings.size == 0:
         return None
+    # NaN/inf would propagate to omega and fail PFAResult's ge/le validation
+    if not np.all(np.isfinite(loadings)) or (phi is not None and not np.all(np.isfinite(phi))):
+        logger.warning("PSEUDO_OMEGA not estimable: non-finite loadings/phi")
+        return None
     if phi is None:
         phi = np.eye(loadings.shape[1])
+    if keys is not None:
+        loadings = loadings * np.asarray(keys, dtype=float).reshape(-1, 1)
     col_sums = loadings.sum(axis=0)
     num = float(col_sums @ phi @ col_sums)
     communalities = np.diag(loadings @ phi @ loadings.T)
@@ -344,7 +403,8 @@ def compute_pseudo_omega(loadings: np.ndarray, phi: Optional[np.ndarray] = None)
     denom = num + float(uniquenesses.sum())
     if denom <= 0:
         return None
-    return num / denom
+    omega = num / denom
+    return omega if np.isfinite(omega) else None
 
 
 def _pca_eigh_loadings(sim: np.ndarray, n_factors: int) -> Tuple[np.ndarray, List[float]]:
@@ -364,7 +424,10 @@ def _pca_eigh_loadings(sim: np.ndarray, n_factors: int) -> Tuple[np.ndarray, Lis
     return loadings, [float(v) for v in eigvals]
 
 
-def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool], np.ndarray]:
+def _align_factor_signs(
+    loadings: np.ndarray,
+    keys: Optional[Sequence[float]] = None,
+) -> Tuple[np.ndarray, List[bool], np.ndarray]:
     """Reflect each factor column so its dominant loading is positive.
 
     Factor analysis has sign indeterminacy: F and -F are equivalent solutions
@@ -385,11 +448,20 @@ def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool], n
     Returns:
         (aligned_loadings, was_flipped_per_factor, sign_vector)
 
+    With `keys` (+1/−1 per item), the dominant loading is judged after
+    sign-correcting reverse-keyed items, so a factor whose largest loading is
+    a reverse-keyed item is oriented with its positively keyed items positive.
+
     The sign vector s (+1/-1 per factor) must conjugate any factor correlation
     matrix from the same solution: Φ_aligned = diag(s) Φ diag(s), otherwise
     ΛΦΛ' changes under reflection and fit indices are corrupted.
     """
     aligned = loadings.copy()
+    key_col = (
+        np.ones(aligned.shape[0])
+        if keys is None
+        else np.asarray(keys, dtype=float).reshape(-1)
+    )
     n_factors = aligned.shape[1]
     flipped: List[bool] = []
     signs: List[float] = []
@@ -400,7 +472,7 @@ def _align_factor_signs(loadings: np.ndarray) -> Tuple[np.ndarray, List[bool], n
             signs.append(1.0)
             continue
         dominant_idx = int(np.argmax(np.abs(col)))
-        dominant_value = float(col[dominant_idx])
+        dominant_value = float(col[dominant_idx] * key_col[dominant_idx])
         if dominant_value < 0:
             aligned[:, j] = -col
             flipped.append(True)
@@ -513,18 +585,38 @@ def _facet_assignments_from_mapping(
 ) -> Tuple[List[int], List[str]]:
     """Convert items + facet mapping into expected factor assignments + facet labels.
 
+    Facet names are matched case- and whitespace-insensitively. An item whose
+    facet_name still matches no facet gets assignment -1 (unmatched): it is
+    excluded from congruence/recovery and not flagged by the retention rules,
+    rather than silently counted as a member of factor 0. With a single facet
+    every item belongs to it, so no matching is needed.
+
     Returns (assignments, labels). If no facet_mapping, assigns all items to factor 0.
     """
     if not facet_mapping or not facet_mapping.facets:
         return [0] * len(items), ["Single Factor"]
 
     facet_names = [f.facet_name for f in facet_mapping.facets]
-    name_to_idx = {n: i for i, n in enumerate(facet_names)}
+    if len(facet_names) == 1:
+        return [0] * len(items), facet_names
+
+    name_to_idx: dict[str, int] = {}
+    for i, n in enumerate(facet_names):
+        name_to_idx.setdefault(facet_key(n), i)
 
     assignments: List[int] = []
-    for item in items:
-        idx = name_to_idx.get(item.facet_name or "", 0)
+    unmatched: List[int] = []
+    for i, item in enumerate(items):
+        idx = name_to_idx.get(facet_key(item.facet_name), -1)
+        if idx < 0:
+            unmatched.append(i)
         assignments.append(idx)
+    if unmatched:
+        logger.warning(
+            "PFA_FACET_UNMATCHED items=%s facet_names=%s — excluded from congruence, "
+            "recovery and retention flags (known facets: %s)",
+            unmatched, [items[i].facet_name for i in unmatched], facet_names,
+        )
     return assignments, facet_names
 
 
@@ -590,7 +682,10 @@ def run_pfa(
     try:
         embeddings = embed_items_sync(item_texts, model=requested_embedding_model)
     except Exception as e:
-        logger.error("PFA embedding failed: %s", e, exc_info=True)
+        if isinstance(e, EmbeddingsUnavailable):
+            logger.warning("PFA skipped: %s", e)
+        else:
+            logger.error("PFA embedding failed: %s", e, exc_info=True)
         return PFAResult(
             embedding_model=embedding_model,
             n_items=len(items),
@@ -712,7 +807,7 @@ def run_pfa(
     # solution where loadings on a factor are all-negative — equivalent up to
     # reflection but visually wrong (Mulaik 2010 ch. 7; Lorenzo-Seva &
     # ten Berge 2006). Convention: dominant loading must be positive.
-    loadings, sign_flips, sign_vector = _align_factor_signs(loadings)
+    loadings, sign_flips, sign_vector = _align_factor_signs(loadings, keys=polarities)
     phi = np.diag(sign_vector) @ phi @ np.diag(sign_vector)
     for j, was_flipped in enumerate(sign_flips):
         col_aligned = loadings[:, j]
@@ -729,12 +824,20 @@ def run_pfa(
     loadings, factor_perm = _align_factor_order(loadings, expected_assignments, n_factors)
     phi = phi[np.ix_(factor_perm, factor_perm)]
 
-    # 5. Tucker's congruence vs expected pattern (one-hot). Sign should now be
-    # naturally positive after alignment, but we still take abs() in the
-    # verdict band as a defensive safety net (per Lorenzo-Seva & ten Berge
-    # 2006 §3, only the magnitude carries fit information).
-    expected_pattern = build_expected_pattern(expected_assignments, n_factors)
-    congruence = tuckers_congruence(loadings, expected_pattern).tolist()
+    # 5. Tucker's congruence vs expected pattern (one-hot, signed by keying:
+    # reverse-keyed items' embeddings were flipped, so they should load
+    # negatively). Sign should now be naturally positive after alignment, but
+    # we still take abs() in the verdict band as a defensive safety net (per
+    # Lorenzo-Seva & ten Berge 2006 §3, only the magnitude carries fit
+    # information). Items with an unmatched facet have no target and are
+    # left out of the comparison entirely.
+    expected_pattern = build_expected_pattern(expected_assignments, n_factors, keys=polarities)
+    matched = np.array([0 <= a < n_factors for a in expected_assignments], dtype=bool)
+    congruence = (
+        tuckers_congruence(loadings[matched], expected_pattern[matched]).tolist()
+        if matched.any()
+        else []
+    )
     for j, c in enumerate(congruence):
         abs_c = abs(c)
         if abs_c >= settings.PFA_TUCKERS_THRESHOLD_EXCELLENT:
@@ -763,7 +866,8 @@ def run_pfa(
 
     # 9. Fit indices (ΛΦΛ' — Φ from the oblique solution, sign-conjugated)
     rmsr, caf, residual = compute_model_fit(sim, loadings, phi=phi)
-    pseudo_omega = compute_pseudo_omega(loadings, phi=phi)
+    # Omega on sign-corrected loadings (reverse-scored total), not signed ones
+    pseudo_omega = compute_pseudo_omega(loadings, phi=phi, keys=polarities)
     kmo_semantic = compute_semantic_kmo(sim)
     n_factors_suggested_kaiser = (
         int(sum(1 for e in eigenvalues if e > 1.0)) if eigenvalues else None
@@ -776,13 +880,20 @@ def run_pfa(
     factor_loadings: List[FactorLoading] = []
     for i, item in enumerate(items):
         is_well_loaded, violations = retention[i]
+        # Unmatched facet → no expected factor; the schema needs an index, so
+        # report the factor the item actually loads on.
+        parent_factor = (
+            int(expected_assignments[i])
+            if 0 <= expected_assignments[i] < n_factors
+            else int(primary_factors[i])
+        )
         factor_loadings.append(
             FactorLoading(
                 item_index=i,
                 item_text=item.item_text,
                 facet_name=item.facet_name,
                 loadings=[float(x) for x in loadings[i].tolist()],
-                parent_factor=int(expected_assignments[i]),
+                parent_factor=parent_factor,
                 primary_loading=float(primary_loadings[i]),
                 primary_factor=int(primary_factors[i]),
                 is_well_loaded=is_well_loaded,
@@ -820,9 +931,10 @@ def run_pfa(
         )
 
     logger.info(
-        "PFA_VERDICT solver=%s n_factors=%d recovery=%.3f rmsr=%.3f caf=%.3f "
+        "PFA_VERDICT solver=%s n_factors=%d recovery=%.3f rmsr=%.3f caf=%s "
         "mean_abs_congruence=%.3f congruence=%s verdict=%s identifiability=%s",
-        solver_used, n_factors, recovery, rmsr, caf,
+        solver_used, n_factors, recovery, rmsr,
+        f"{caf:.3f}" if caf is not None else "n/a",
         mean_abs_congruence,
         [round(c, 3) for c in congruence], verdict, identifiability,
     )
@@ -836,7 +948,7 @@ def run_pfa(
         tuckers_congruence=congruence,
         factor_recovery_rate=float(recovery),
         rmsr=float(rmsr),
-        caf=float(caf),
+        caf=float(caf) if caf is not None else None,
         eigenvalues=[float(e) for e in eigenvalues] if eigenvalues else [],
         residual_correlation_matrix=[
             [round(float(residual[i, j]), 4) for j in range(residual.shape[1])]

@@ -4,9 +4,9 @@ import json
 import logging
 import time
 import warnings
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from backend.agents.llm_utils import TokenUsage, _extract_token_usage
+from backend.agents.llm_utils import TokenUsage, _extract_token_usage, strip_code_fence
 from backend.agents.prompt_loader import load_prompt
 
 def _detect_identical_scores(validations: List[ItemValidation]) -> bool:
@@ -32,6 +32,64 @@ from backend.schemas import (
 from backend.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+_WEIGHTS = {"correspondence": 0.5, "distinctiveness": 0.25, "clarity": 0.15, "specificity": 0.10}
+_DIMENSION_NAME_VARIANTS = {
+    "construct_correspondence": "correspondence",
+    "construct correspondence": "correspondence",
+    "construct_distinctiveness": "distinctiveness",
+    "construct distinctiveness": "distinctiveness",
+}
+
+
+def _recalc_weighted_score(dimension_scores: List[DimensionScore]) -> Optional[float]:
+    """Recompute the weighted score from per-dimension scores.
+
+    Dimension names are normalised (case/whitespace, obvious variants) and only
+    the first score per dimension is used. Returns None if any weighted
+    dimension is missing, so callers can fall back to the LLM's value.
+    """
+    scores: Dict[str, int] = {}
+    for ds in dimension_scores:
+        name = (ds.dimension or "").strip().lower()
+        name = _DIMENSION_NAME_VARIANTS.get(name, name)
+        if name in _WEIGHTS and name not in scores:
+            scores[name] = ds.score
+    if len(scores) < len(_WEIGHTS):
+        return None
+    return sum(scores[d] * w for d, w in _WEIGHTS.items())
+
+
+def _realign_by_text(validations: List[ItemValidation], items: List[DraftItem]) -> None:
+    """Realign validation indices by text, in place.
+
+    When a validation's returned text doesn't match the item at its index but
+    exactly matches another, still-unclaimed item, the text identifies the
+    item better than an index that may be shifted (1-based) or duplicated.
+    Validations whose index and text already agree are never moved.
+    """
+
+    def _norm(text: str) -> str:
+        return " ".join((text or "").split()).casefold()
+
+    item_keys = [_norm(it.item_text) for it in items]
+    claimed = {
+        v.item_index for v in validations
+        if 0 <= v.item_index < len(items) and item_keys[v.item_index] == _norm(v.item_text)
+    }
+    for v in validations:
+        idx = v.item_index
+        if 0 <= idx < len(items) and item_keys[idx] == _norm(v.item_text):
+            continue
+        key = _norm(v.item_text)
+        target = next((i for i, k in enumerate(item_keys) if k == key and i not in claimed), None)
+        if target is not None:
+            logger.warning(
+                "VALIDATOR_INDEX_REALIGNED item_index=%d -> %d (matched item text)", idx, target,
+            )
+            v.item_index = target
+            claimed.add(target)
 
 
 _REASONING_MAX = 280
@@ -112,9 +170,7 @@ def _fallback_parse_validation(raw_message) -> ValidationResponse:
                     except json.JSONDecodeError:
                         continue
     elif isinstance(content, str):
-        text = content.strip()
-        if text.startswith("```"):
-            text = text.strip("`").replace("json", "", 1).strip()
+        text = strip_code_fence(content)
         try:
             raw_json = json.loads(text)
         except json.JSONDecodeError:
@@ -350,6 +406,8 @@ def validate_items(
                     f"Model: {model_name}, Attempt: {attempt}/3."
                 )
 
+        _realign_by_text(result.validations, items)
+
         # Post-validation text integrity check: override LLM-returned item_text
         # with the actual input text to prevent hallucinated substitutions.
         for v in result.validations:
@@ -364,10 +422,18 @@ def validate_items(
                     v.item_text = expected_text
 
         # Server-side weighted_score recalculation — LLMs often miscalculate
-        _WEIGHTS = {"correspondence": 0.5, "distinctiveness": 0.25, "clarity": 0.15, "specificity": 0.10}
         mismatches: List[Tuple[int, float, float]] = []
         for v in result.validations:
-            recalc = sum(ds.score * _WEIGHTS.get(ds.dimension, 0) for ds in v.dimension_scores)
+            recalc = _recalc_weighted_score(v.dimension_scores)
+            if recalc is None:
+                # Missing/unrecognised dimension: recomputing would zero its
+                # weight and falsely reject — trust the LLM's weighted_score.
+                logger.warning(
+                    "VALIDATOR_RECALC_SKIPPED item_index=%d dimensions=%s",
+                    v.item_index, [ds.dimension for ds in v.dimension_scores],
+                )
+                v.accept = v.weighted_score >= 7.0
+                continue
             # Small mismatches (<0.30) are LLM rounding noise; the recalc value
             # is the ground truth and is what we use. Aggregate into one INFO
             # log line instead of warning per item to reduce log noise.

@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
+from backend.agents.facet_utils import facet_key
 from backend.agents.llm_utils import invoke_structured_with_usage, TokenUsage
 from backend.agents.prompt_loader import load_prompt
 from backend.schemas import (
@@ -32,13 +33,17 @@ def _discarded(items: List[DraftItem], reason: str) -> MetaEditorResponse:
 
 
 def _with_original_structure(originals: List[DraftItem], revised: List[DraftItem]) -> List[DraftItem]:
-    """The editor owns wording, rationale and citations; construct, facet and polarity stay the writer's."""
+    """The editor owns wording, rationale and citations; construct, facet and polarity stay the writer's.
+
+    The validation result also travels with the item so later pruning and
+    dedup can't pair an item with another item's scores."""
     return [
         rev.model_copy(
             update={
                 "construct_name": orig.construct_name,
                 "facet_name": orig.facet_name,
                 "polarity": orig.polarity,
+                "validation_result": orig.validation_result,
             }
         )
         for orig, rev in zip(originals, revised)
@@ -49,7 +54,7 @@ def _round_trip_breach(originals: List[DraftItem], revised: List[DraftItem]) -> 
     if len(revised) != len(originals):
         return f"returned {len(revised)} items for {len(originals)} sent"
     for idx, (orig, rev) in enumerate(zip(originals, revised)):
-        if rev.facet_name and orig.facet_name and rev.facet_name != orig.facet_name:
+        if rev.facet_name and orig.facet_name and facet_key(rev.facet_name) != facet_key(orig.facet_name):
             return f"item {idx} came back under facet {rev.facet_name!r} instead of {orig.facet_name!r}"
     return None
 
@@ -67,14 +72,27 @@ def _mock_revision(items: List[DraftItem]) -> MetaEditorResponse:
         "I feel like I fit in with my team.",
         "I feel connected to my workplace community.",
     ]
+
+    def _stem(idx: int, facet: Optional[str]) -> str:
+        # Past the first pass through the stems, qualify each one with its facet
+        # and cycle number so every item keeps a distinct wording (mock runs
+        # would otherwise lose items to exact-string dedup).
+        stem = stems[idx % len(stems)]
+        cycle = idx // len(stems)
+        if cycle == 0:
+            return stem
+        context = (facet or "my day-to-day work").strip().lower()
+        return f"{stem[:-1]} when it comes to {context} (variant {cycle + 1})."
+
     revised = [
         DraftItem(
-            item_text=stems[idx % len(stems)],
+            item_text=_stem(idx, it.facet_name),
             construct_name=it.construct_name,
             rationale="Reworded to increase content coverage and reduce redundancy.",
             evidence_citations=it.evidence_citations,
             facet_name=it.facet_name,
             polarity=it.polarity,
+            validation_result=it.validation_result,
         )
         for idx, it in enumerate(items)
     ]
@@ -207,6 +225,21 @@ def _enforce_positive_keying(
     return out
 
 
+def _client_budget(time_budget_seconds: Optional[float]) -> Tuple[Optional[int], Optional[int]]:
+    """Timeout and SDK retries whose worst case, (retries + 1) × timeout, fits
+    in the budget; (None, None) keeps the client defaults when there is none.
+
+    The timeout is rounded down to a 15s step: it is part of the client cache
+    key, and an exact per-call value would build a new client every pass."""
+    if time_budget_seconds is None:
+        return None, None
+    step = 15
+    ceiling = min(settings.META_EDITOR_TIMEOUT_SECONDS, time_budget_seconds)
+    timeout = max(step, int(ceiling // step) * step)
+    retries = max(0, min(3, int(time_budget_seconds // timeout) - 1))
+    return timeout, retries
+
+
 def revise_items(
     request: UserRequest,
     items: List[DraftItem],
@@ -216,6 +249,7 @@ def revise_items(
     iteration: int,
     phase: MetaEditorPhase = "iterative",
     expert_consensus_revisions: Optional[RevisionPlan] = None,
+    time_budget_seconds: Optional[float] = None,
 ) -> Tuple[MetaEditorResponse, TokenUsage]:
 
     """Apply reviewer feedback and produce revised items + a revision plan.
@@ -231,6 +265,8 @@ def revise_items(
             (one-shot pass after expert panel; uses expert_consensus_revisions).
         expert_consensus_revisions: Required when phase="expert_revision". Lists
             items the expert panel flagged for refinement.
+        time_budget_seconds: Seconds this call may take in total, retries
+            included; None keeps the client defaults.
     """
     total_comments = len(linguistic_comments) + len(bias_comments) + len(content_comments)
     logger.info(
@@ -244,7 +280,7 @@ def revise_items(
 
     payload: Dict[str, Any] = {
         "user_request": request.model_dump(),
-        "items": [it.model_dump() for it in items],
+        "items": [it.model_dump(exclude={"validation_result"}) for it in items],
         "linguistic_comments": [c.model_dump() for c in linguistic_comments],
         "bias_comments": [c.model_dump() for c in bias_comments],
         "content_comments": [c.model_dump() for c in content_comments],
@@ -265,6 +301,7 @@ def revise_items(
         ("human", human_msg),
     ]
 
+    timeout, retries = _client_budget(time_budget_seconds)
     resp, usage = invoke_structured_with_usage(
         MetaEditorResponse,
         messages,
@@ -272,5 +309,7 @@ def revise_items(
         model_provider=request.model_provider,
         pre_validate=_clamp_rationales,
         strict=None,
+        client_timeout=timeout,
+        client_max_retries=retries,
     )
     return _accepted_pass(request, items, resp, iteration, phase), usage

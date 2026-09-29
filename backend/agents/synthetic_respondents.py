@@ -18,6 +18,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.agents.facet_utils import facet_key
 from backend.agents.llm_utils import TokenUsage, invoke_structured_with_usage
 from backend.agents.prompt_loader import load_prompt
 from backend.analytics.classical_stats import (
@@ -53,15 +54,45 @@ class _RespondentOutput(BaseModel):
     ratings: List[_RespondentRating] = Field(default_factory=list)
 
 
-def _parse_scale_points(response_scale: str) -> int:
-    """Extract the number of scale points from the user's free-text response
-    scale (e.g. '5-point Likert', '1-7 agreement'). Falls back to 5."""
-    match = re.search(r"(\d+)\s*[-–]?\s*point", response_scale, re.IGNORECASE)
-    if not match:
-        match = re.search(r"1\s*[-–]\s*(\d+)", response_scale)
+_POINT_RE = re.compile(r"(\d+)\s*[-–]?\s*point", re.IGNORECASE)
+# "1-7", "1 to 7", "0–10", "-3 to +3"; the separator is consumed before a sign.
+_RANGE_RE = re.compile(
+    r"(?<![\d.])([-+−]?\d{1,2})\s*(?:to|[-–—])\s*([-+−]?\d{1,2})(?![\d.])",
+    re.IGNORECASE,
+)
+# "Strongly disagree (1) ... Strongly agree (7)"
+_PAREN_ANCHOR_RE = re.compile(r"\(\s*([-+−]?\d{1,2})\s*\)")
+
+
+def _parse_scale(response_scale: str) -> Tuple[int, int]:
+    """Parse the user's free-text response scale into (scale_points, native_low).
+
+    Respondents always report ratings on 1..scale_points (validated 1..11 and
+    reverse-scored as (scale_points + 1) - x); native_low is the lowest label
+    on the scale as the user wrote it (0 for '0-10', -3 for '-3 to +3') so the
+    respondent prompt can map it onto 1. Falls back to (5, 1)."""
+    text = response_scale or ""
+    match = _POINT_RE.search(text)
     if match:
-        return max(2, min(11, int(match.group(1))))
-    return 5
+        return max(2, min(11, int(match.group(1)))), 1
+
+    def _int(value: str) -> int:
+        return int(value.replace("−", "-"))
+
+    bounds = [(_int(m.group(1)), _int(m.group(2))) for m in _RANGE_RE.finditer(text)]
+    anchors = [_int(v) for v in _PAREN_ANCHOR_RE.findall(text)]
+    if len(set(anchors)) >= 2:
+        bounds.append((min(anchors), max(anchors)))
+    for low, high in bounds:
+        if 2 <= high - low + 1 <= 11:
+            return high - low + 1, low
+    return 5, 1
+
+
+def _parse_scale_points(response_scale: str) -> int:
+    """Number of scale points in the user's free-text response scale
+    (e.g. '5-point Likert', '1 to 7', '0-10'). Falls back to 5."""
+    return _parse_scale(response_scale)[0]
 
 
 def _draw_traits(
@@ -96,8 +127,10 @@ def _trait_level_label(z: float) -> str:
 
 
 def _facet_index_for_item(item: DraftItem, facet_names: List[str]) -> int:
-    if item.facet_name and item.facet_name in facet_names:
-        return facet_names.index(item.facet_name)
+    keys = [facet_key(name) for name in facet_names]
+    key = facet_key(item.facet_name)
+    if key and key in keys:
+        return keys.index(key)
     return 0
 
 
@@ -129,6 +162,16 @@ def _rate_items_for_respondent(
     scale_points: int,
 ) -> Tuple[_RespondentOutput, TokenUsage]:
     system = load_prompt("synthetic_respondent.md")
+    parsed_points, native_low = _parse_scale(request.response_scale)
+    # Only mention the relabelling when the parse describes this scale.
+    relabel = ""
+    if native_low != 1 and parsed_points == scale_points:
+        native_high = native_low + scale_points - 1
+        relabel = (
+            f" The scale is labelled {native_low} to {native_high}: record "
+            f"{native_low} as 1, {native_low + 1} as 2, and so on up to "
+            f"{native_high} as {scale_points}."
+        )
     trait_profile = [
         {
             "facet": name,
@@ -142,6 +185,8 @@ def _rate_items_for_respondent(
         "construct_definition": request.construct_definition,
         "response_scale": request.response_scale,
         "scale_points": scale_points,
+        "rating_min": 1,
+        "rating_max": scale_points,
         "trait_profile": trait_profile,
         "items": [
             {
@@ -156,6 +201,8 @@ def _rate_items_for_respondent(
     human = (
         f"You are ONE respondent with this exact latent trait profile. Rate all "
         f"{len(items)} items on the {scale_points}-point scale described. "
+        f"Report every rating as an integer from 1 (lowest scale option) to "
+        f"{scale_points} (highest scale option).{relabel} "
         f"Anchor each rating on the trait level of the item's facet, respect "
         f"polarity, and vary ratings realistically (±1 point) across items of "
         f"the same facet.\n\nINPUT:\n{payload}"
@@ -266,6 +313,12 @@ def run_synthetic_pilot(
         )
         return None, usage
 
+    # Respondents answer reverse-keyed items as worded; score them before any
+    # statistic, or their negative loadings cancel and deflate alpha/omega.
+    reverse = [i for i, it in enumerate(items) if it.polarity == "-"]
+    if reverse:
+        matrix[:, reverse] = (scale_points + 1) - matrix[:, reverse]
+
     n_valid = matrix.shape[0]
     corr = pearson_matrix(matrix)
     cells: List[CorrelationCell] = []
@@ -304,7 +357,8 @@ def run_synthetic_pilot(
         parallel_analysis_n_factors=pa_n,
         observed_eigenvalues=observed_eigs,
         threshold_eigenvalues=threshold_eigs,
-        kmo=kmo(corr),
+        # KMO's anti-image needs an invertible matrix, which n <= k rules out.
+        kmo=kmo(corr) if n_valid > len(items) else None,
         bartlett_chi2=chi2,
         bartlett_p=p_value,
         failed_respondents=failed,

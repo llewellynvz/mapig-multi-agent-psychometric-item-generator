@@ -452,7 +452,11 @@ def run_expert_panel(
     # Round 1: parallel — uses concurrent.futures.wait with timeout in partial_mode
     round1_results: List[ExpertEvaluation] = []
     failed_round1_roles: List[str] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(roles)) as ex:
+    # No `with`: leaving a with-block calls shutdown(wait=True), which would block
+    # on a hung expert call past the hard deadline (fut.cancel() is a no-op on
+    # running futures). shutdown(wait=False) lets us return on time.
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=len(roles))
+    try:
         futures = {
             ex.submit(_run_expert_round1, r, label, request, items, evidence, pfa_result): r
             for r, label in roles
@@ -491,6 +495,8 @@ def run_expert_panel(
                     role, type(e).__name__, e,
                     exc_info=True,
                 )
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
 
     if not round1_results:
         logger.warning(
@@ -594,6 +600,17 @@ def run_expert_panel(
                 row.append("reject")
         bucketed_per_item.append(row)
 
+    # α is undefined when there is no variation at all; report that case
+    # explicitly as unanimous rather than leaving an unexplained null. Only
+    # items rated by 2+ experts count: with a single surviving rater α is
+    # undefined for lack of data, which is not agreement.
+    pairable = [
+        [row[c] for row in bucketed_per_item if row[c] is not None]
+        for c in range(matrix.shape[1])
+    ]
+    pairable = [col for col in pairable if len(col) >= 2]
+    verdicts_unanimous = bool(pairable) and len({v for col in pairable for v in col}) == 1
+
     try:
         irr_verdict_alpha = krippendorff_alpha_nominal(bucketed_per_item)
     except Exception as e:
@@ -642,6 +659,7 @@ def run_expert_panel(
             debate_revisions=debate_results,
             irr_alpha=None if np.isnan(irr_alpha) else float(round(irr_alpha, 4)),
             irr_verdict_alpha=None if np.isnan(irr_verdict_alpha) else float(round(irr_verdict_alpha, 4)),
+            verdicts_unanimous=verdicts_unanimous,
             irr_pairwise=irr_pairwise,
             irr_pairwise_spearman=irr_pairwise_spearman,
             consensus_revisions=consensus_plan,

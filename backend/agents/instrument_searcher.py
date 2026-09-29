@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Literal, Optional
 
 import httpx
@@ -16,6 +17,9 @@ from backend.schemas import ComparisonInstrument
 from backend.settings import settings
 
 log = logging.getLogger("lmaig.instrument_searcher")
+
+# Perplexity citation markers like "[1]" break first-'['/last-']' extraction
+_CITATION_MARKER_RE = re.compile(r"\[\d+\]")
 
 
 def _safe_int(val) -> Optional[int]:
@@ -172,14 +176,15 @@ def _search_perplexity_instrument(
             log.warning("PERPLEXITY_INSTRUMENT_SEARCH no content returned")
             return None
 
-        # Extract JSON from response
-        json_start = message_content.find("{")
-        json_end = message_content.rfind("}") + 1
+        # Extract JSON from response (citation markers stripped first)
+        json_source = _CITATION_MARKER_RE.sub("", message_content)
+        json_start = json_source.find("{")
+        json_end = json_source.rfind("}") + 1
         if json_start < 0 or json_end <= json_start:
             log.warning("PERPLEXITY_INSTRUMENT_SEARCH no JSON found in response")
             return None
 
-        json_str = message_content[json_start:json_end]
+        json_str = json_source[json_start:json_end]
         parsed = json.loads(json_str)
 
         # Check for blocked publishers
@@ -207,7 +212,11 @@ def _search_perplexity_instrument(
         # log it distinctly so that substitution is never silent.
         log.warning("PERPLEXITY_INSTRUMENT_SEARCH rejected by validation, will fall back to defaults: %s", e)
         return None
-    except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError, KeyError) as e:
+    except (
+        httpx.HTTPError, json.JSONDecodeError, KeyError, IndexError, AttributeError, TypeError,
+    ) as e:
+        # httpx.HTTPError covers timeouts, status errors and connect/read errors;
+        # IndexError/AttributeError/TypeError cover empty or malformed "choices".
         log.warning("PERPLEXITY_INSTRUMENT_SEARCH failed: %s", e)
         return None
 
@@ -278,6 +287,7 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
             if not content:
                 return None
 
+            content = _CITATION_MARKER_RE.sub("", content)
             arr_start = content.find("[")
             arr_end = content.rfind("]") + 1
             if arr_start < 0 or arr_end <= arr_start:
@@ -291,7 +301,9 @@ def _fetch_instrument_items(instrument: ComparisonInstrument) -> ComparisonInstr
             ):
                 return [it.strip() for it in items]
             return None
-        except (httpx.TimeoutException, httpx.HTTPStatusError, json.JSONDecodeError) as e:
+        except (
+            httpx.HTTPError, json.JSONDecodeError, IndexError, AttributeError, TypeError,
+        ) as e:
             log.warning("FETCH_ITEMS attempt failed for %s: %s", instrument.name, e)
             return None
 

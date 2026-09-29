@@ -100,7 +100,11 @@ class Settings(BaseSettings):
     # not authentication: when unset (default) every request is accepted.
     MAPIG_API_KEY: Optional[str] = None
 
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # 3000 is run_dev.py's frontend port; 9998 is `npm run dev`'s.
+    CORS_ORIGINS: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:9998,http://127.0.0.1:9998"
+    )
 
     def cors_origins(self) -> list[str]:
         """Return browser origins allowed to call the API cross-origin."""

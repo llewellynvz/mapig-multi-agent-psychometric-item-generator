@@ -4,14 +4,16 @@ import asyncio
 import datetime as _dt
 import json
 import logging
+import math
 import secrets
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from collections import OrderedDict
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
 logger = logging.getLogger("lmaig")
 
@@ -23,7 +25,15 @@ from backend.settings import STANDARD_ITEM_CONSTRAINTS, settings
 from backend.evaluation.baseline_runner import run_baseline_comparison, BaselineComparison
 from backend.checkpoint_config import create_checkpointer
 
-RUN_STATUS_REGISTRY: Dict[str, Dict[str, Any]] = {}
+# Ordered least-recently-updated first. Updated in place with move_to_end so
+# a /status read from the threadpool never finds a live run missing.
+RUN_STATUS_REGISTRY: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+_RUN_STATUS_MAX_ENTRIES = 200
+# A "running" entry not updated for this long belongs to a run that died
+# without reporting (client aborted before the stream started, worker killed).
+# The graph's budget is 1800s and soft, and the non-streaming path reports no
+# per-node progress, so leave generous headroom.
+_RUN_STATUS_STALE_SECONDS = 7200
 
 # Human-readable display names for pipeline nodes (sent via SSE events)
 _NODE_DISPLAY_NAMES: Dict[str, str] = {
@@ -48,6 +58,20 @@ _NODE_DISPLAY_NAMES: Dict[str, str] = {
     "cross_construct_node": "Analyzing cross-construct validity",
     "analytics_dispatch_node": "Running analytics suite",
 }
+
+
+def _json_safe(value: Any) -> Any:
+    """Replace NaN/inf with None so the payload is valid JSON.
+
+    One degenerate statistic would otherwise make json.dumps emit a bare NaN
+    (which the browser's JSON.parse rejects) or make JSONResponse raise."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
 
 
 def _utc_now_iso() -> str:
@@ -84,6 +108,30 @@ def _set_run_status(thread_id: str, run_id: str, **updates: Any) -> None:
     existing.update(updates)
     existing["updated_at"] = _utc_now_iso()
     RUN_STATUS_REGISTRY[thread_id] = existing
+    RUN_STATUS_REGISTRY.move_to_end(thread_id)
+    # Each entry holds a full final_output; evict the least recently updated
+    # entries so a long-lived server doesn't grow without bound. A live run is
+    # never evicted (its /status poll would 404 and the frontend would abandon
+    # it), nor is the entry just written.
+    excess = len(RUN_STATUS_REGISTRY) - _RUN_STATUS_MAX_ENTRIES
+    if excess > 0:
+        evictable = [
+            key for key, entry in RUN_STATUS_REGISTRY.items()
+            if key != thread_id and not _is_live(entry)
+        ][:excess]
+        for key in evictable:
+            del RUN_STATUS_REGISTRY[key]
+
+
+def _is_live(entry: Dict[str, Any]) -> bool:
+    if entry.get("status") != "running":
+        return False
+    try:
+        updated = _dt.datetime.fromisoformat(entry["updated_at"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    age = (_dt.datetime.now(tz=_dt.timezone.utc) - updated).total_seconds()
+    return age < _RUN_STATUS_STALE_SECONDS
 
 
 class _PydanticSerializationFilter(logging.Filter):
@@ -120,10 +168,10 @@ async def lifespan(app: FastAPI):
     # Custom types are pre-registered to eliminate "Deserializing unregistered type" warnings
     # and ensure forward compatibility with future LangGraph versions
     checkpointer = create_checkpointer()
+    app.state.checkpointer = checkpointer
     app.state.graph = build_graph(checkpointer=checkpointer)
 
     yield
-    # No cleanup needed for MemorySaver (in-memory only)
 
 
 app = FastAPI(
@@ -167,6 +215,46 @@ def _reject_if_at_capacity() -> None:
         )
 
 
+async def _discard_checkpoints(thread_id: str) -> None:
+    """Drop a finished run's checkpoints from the in-memory saver.
+
+    Every run restarts from START (init_run resets the run's state), so
+    nothing reads them afterwards, and MemorySaver would otherwise keep every
+    step of every run for the life of the process."""
+    checkpointer = getattr(app.state, "checkpointer", None)
+    if checkpointer is None:
+        return
+    try:
+        await checkpointer.adelete_thread(thread_id)
+    except Exception:  # noqa: BLE001 — cleanup must never fail a run
+        logger.warning("Checkpoint cleanup failed for thread %s", thread_id, exc_info=True)
+
+
+def _require_provider_credentials(request: UserRequest) -> None:
+    """Fail fast with a 400 when the selected provider has no API key.
+
+    Mock mode never calls a provider, and the Azure test override routes the
+    OpenAI-bound agents through Azure AD, so neither needs the key."""
+    if settings.APP_MODE == "mock":
+        return
+    if request.model_provider == "claude":
+        if not settings.CLAUDE_API_KEY:
+            raise HTTPException(
+                status_code=400,
+                detail="CLAUDE_API_KEY not configured. Add to .env or Vercel environment variables, or switch to OpenAI provider."
+            )
+    elif request.model_provider == "openai":
+        if not settings.OPENAI_API_KEY and not settings.AZURE_TEST_OVERRIDE:
+            raise HTTPException(
+                status_code=400,
+                detail="OPENAI_API_KEY not configured. Add to .env or Vercel environment variables."
+            )
+
+    # Analytics always need OpenAI for embeddings (correlation + plagiarism detection)
+    if not settings.OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY not configured — analytics (correlation, comparison) will be skipped")
+
+
 @app.get("/", include_in_schema=False)
 def root():
     """Redirect browser users to API docs so the app 'loads' when opening the backend URL."""
@@ -178,13 +266,15 @@ def healthz():
     return {"status": "ok", "mode": settings.APP_MODE}
 
 
-@app.get("/v1/performance-summary")
+@app.get("/v1/performance-summary", dependencies=[Depends(require_api_key)])
 def performance_summary():
     """Get performance statistics for all agent steps."""
     return get_performance_summary()
 
 
-@app.get("/v1/runs/{thread_id}/status")
+# Carries the run's full output (construct definition, items, audit), so it
+# sits behind the same key as the generation endpoints.
+@app.get("/v1/runs/{thread_id}/status", dependencies=[Depends(require_api_key)])
 def run_status(thread_id: str):
     state = RUN_STATUS_REGISTRY.get(thread_id)
     if state is None:
@@ -204,6 +294,7 @@ async def generate_items(
     if not hasattr(app.state, "graph"):
         raise HTTPException(status_code=503, detail="Graph not initialized")
     _reject_if_at_capacity()
+    _require_provider_credentials(request)
 
     thread_id = x_thread_id or str(uuid.uuid4())
     run_id = str(uuid.uuid4())
@@ -236,7 +327,14 @@ async def generate_items(
 
     try:
         async with _GENERATION_SLOTS:
-            result_state = await app.state.graph.ainvoke(initial_state, config=config)
+            # This path reports no per-node progress, so refresh the entry once
+            # the run actually starts; time spent queued must not count
+            # towards it looking stale.
+            _set_run_status(thread_id, run_id, status="running")
+            try:
+                result_state = await app.state.graph.ainvoke(initial_state, config=config)
+            finally:
+                await _discard_checkpoints(thread_id)
     except Exception as exc:
         _set_run_status(
             thread_id,
@@ -255,18 +353,18 @@ async def generate_items(
         )
         raise HTTPException(status_code=500, detail="Graph completed without final_output")
 
-    final_output = result_state["final_output"]
+    dumped = _json_safe(result_state["final_output"].model_dump(mode="json"))
     _set_run_status(
         thread_id,
         run_id,
         status="complete",
         current_node="finalize_node",
         display_name="Finalizing",
-        final_output=final_output.model_dump(),
+        final_output=dumped,
         error=None,
     )
 
-    return final_output
+    return JSONResponse(dumped)
 
 
 @app.post("/v1/generate-items-stream", dependencies=[Depends(require_api_key)])
@@ -282,24 +380,7 @@ async def generate_items_stream(
     if not hasattr(app.state, "graph"):
         raise HTTPException(status_code=503, detail="Graph not initialized")
     _reject_if_at_capacity()
-
-    # Validate API key for selected provider
-    if request.model_provider == "claude":
-        if not settings.CLAUDE_API_KEY:
-            raise HTTPException(
-                status_code=400,
-                detail="CLAUDE_API_KEY not configured. Add to .env or Vercel environment variables, or switch to OpenAI provider."
-            )
-    elif request.model_provider == "openai":
-        if not settings.OPENAI_API_KEY:
-            raise HTTPException(
-                status_code=400,
-                detail="OPENAI_API_KEY not configured. Add to .env or Vercel environment variables."
-            )
-
-    # Analytics always need OpenAI for embeddings (correlation + plagiarism detection)
-    if not settings.OPENAI_API_KEY:
-        logger.warning("OPENAI_API_KEY not configured — analytics (correlation, comparison) will be skipped")
+    _require_provider_credentials(request)
 
     thread_id = x_thread_id or str(uuid.uuid4())
     run_id = str(uuid.uuid4())
@@ -335,7 +416,15 @@ async def generate_items_stream(
 
         The slot is acquired as the generator's first statement: if the client
         aborts before streaming starts, an unstarted generator's body (and its
-        finally) never runs, so acquiring outside would leak the slot."""
+        finally) never runs, so acquiring outside would leak the slot.
+
+        Another run can take the last slot between the request-time capacity
+        check and here; report that instead of queueing behind it. There is
+        no await between locked() and acquire(), so the acquire can't block."""
+        if _GENERATION_SLOTS.locked():
+            _set_run_status(thread_id, run_id, status="error", error="Generation capacity reached")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Generation capacity reached (2 concurrent runs). Retry shortly.'})}\n\n"
+            return
         await _GENERATION_SLOTS.acquire()
         try:
             # Send initial event
@@ -344,6 +433,9 @@ async def generate_items_stream(
             # Track seen nodes globally: (node_name, iteration) tuples
             seen_nodes = set()
             last_iteration = -1
+            # Stream updates carry only the keys a node changed, so most omit
+            # "iteration"; remember the last one seen instead of assuming 0.
+            known_iteration = 0
             latest_final_output = None
 
             # Use astream to get incremental state updates
@@ -352,7 +444,8 @@ async def generate_items_stream(
                 for node_name, node_state in event.items():
                     if node_state is None:
                         continue
-                    current_iteration = node_state.get("iteration", 0)
+                    current_iteration = node_state.get("iteration", known_iteration)
+                    known_iteration = current_iteration
 
                     # Emit node start event (once per node per iteration)
                     if (node_name, current_iteration) not in seen_nodes:
@@ -404,7 +497,7 @@ async def generate_items_stream(
             # Stream fully consumed — send final output with all analytics data
             if latest_final_output is not None:
                 try:
-                    dumped = latest_final_output.model_dump(mode="json")
+                    dumped = _json_safe(latest_final_output.model_dump(mode="json"))
                 except Exception:
                     logger.exception("SSE final output model_dump failed")
                     raise
@@ -452,6 +545,7 @@ async def generate_items_stream(
             yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
         finally:
             _GENERATION_SLOTS.release()
+            await _discard_checkpoints(thread_id)
 
     return StreamingResponse(
         event_generator(),
@@ -465,35 +559,46 @@ async def generate_items_stream(
 
 
 @app.post("/v1/run-evaluation", tags=["evaluation"], dependencies=[Depends(require_api_key)])
-async def run_evaluation(model_provider: str = "claude") -> dict:
+async def run_evaluation(model_provider: Literal["claude", "openai"] = "claude") -> dict:
     """Run evaluation suite and return baseline comparison results.
 
     Args:
         model_provider: "claude" or "openai"
 
     Returns:
-        JSON with evaluation metrics and baseline comparison:
+        JSON with evaluation metrics and baseline comparison. Scores are named
+        after the LLM-judge dimension they average. While the baseline is the
+        synthetic reference, improvements are relative to it
+        (``improvement_basis``) and ``success`` is null with a reason; it is
+        false whenever any scale failed (see BaselineComparison).
         {
+          "baseline_source": "synthetic",
+          "improvement_basis": "synthetic_reference",
+          "mode": "live", "model_provider": "claude",
+          "pairing_method": "embedding_nearest_neighbor",
+          "evaluated_scales": ["IPIP Big-Five Factor Markers", ...],
+          "failed_scales": [{"name": ..., "domain": ..., "error": ...}],
           "current": {
-            "item_quality_score": 8.2,
-            "agent_performance_score": 8.5,
-            "workflow_efficiency_score": 8.1,
-            "construct_validity_score": 8.3,
+            "quality_parity_score": 8.2,
+            "construct_fidelity_score": 8.5,
+            "stylistic_similarity_score": 8.1,
+            "psychometric_properties_score": 8.3,
             "overall_score": 8.275,
             "total_comparisons": 25
           },
-          "baseline": { ... },
+          "baseline": { ...same keys; total_comparisons 0 when synthetic },
           "improvement": {
             "overall_improvement": 18.5,
-            "item_quality_improvement": 20.1,
-            "agent_performance_improvement": 22.3,
-            "workflow_efficiency_improvement": 15.2,
-            "construct_validity_improvement": 16.8
+            "quality_parity_improvement": 20.1,
+            "construct_fidelity_improvement": 22.3,
+            "stylistic_similarity_improvement": 15.2,
+            "psychometric_properties_improvement": 16.8
           },
           "success_criteria": {
             "meets_improvement_threshold": true,
             "all_dimensions_passing": true,
-            "success": true
+            "success": null,
+            "success_reason": "Baseline is a synthetic reference, ..."
           }
         }
     """
@@ -503,33 +608,34 @@ async def run_evaluation(model_provider: str = "claude") -> dict:
             comparison = await run_baseline_comparison(model_provider)
 
         return {
+            # "synthetic" while the baseline is a fixed reference (see
+            # _get_baseline_metrics), not a measured run.
+            "baseline_source": comparison.baseline_source,
+            "improvement_basis": comparison.improvement_basis,
+            "mode": settings.APP_MODE,
+            "model_provider": model_provider,
+            "pairing_method": comparison.current.pairing_method,
+            "evaluated_scales": comparison.current.evaluated_scales,
+            "failed_scales": comparison.current.failed_scales,
             "current": {
-                "item_quality_score": comparison.current.item_quality_score,
-                "agent_performance_score": comparison.current.agent_performance_score,
-                "workflow_efficiency_score": comparison.current.workflow_efficiency_score,
-                "construct_validity_score": comparison.current.construct_validity_score,
+                **comparison.current.dimension_scores(),
                 "overall_score": comparison.current.overall_score,
                 "total_comparisons": comparison.current.total_comparisons
             },
             "baseline": {
-                "item_quality_score": comparison.baseline.item_quality_score,
-                "agent_performance_score": comparison.baseline.agent_performance_score,
-                "workflow_efficiency_score": comparison.baseline.workflow_efficiency_score,
-                "construct_validity_score": comparison.baseline.construct_validity_score,
+                **comparison.baseline.dimension_scores(),
                 "overall_score": comparison.baseline.overall_score,
                 "total_comparisons": comparison.baseline.total_comparisons
             },
             "improvement": {
                 "overall_improvement": comparison.overall_improvement,
-                "item_quality_improvement": comparison.item_quality_improvement,
-                "agent_performance_improvement": comparison.agent_performance_improvement,
-                "workflow_efficiency_improvement": comparison.workflow_efficiency_improvement,
-                "construct_validity_improvement": comparison.construct_validity_improvement
+                **comparison.dimension_improvements,
             },
             "success_criteria": {
                 "meets_improvement_threshold": comparison.meets_improvement_threshold,
                 "all_dimensions_passing": comparison.all_dimensions_passing,
-                "success": comparison.success
+                "success": comparison.success,
+                "success_reason": comparison.success_reason,
             }
         }
     except Exception as e:

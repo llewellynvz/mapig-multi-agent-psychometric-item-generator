@@ -73,6 +73,10 @@ def bartlett_sphericity(
     if not np.isfinite(corr).all():
         return None, None
     k = corr.shape[0]
+    # With n <= k the sample correlation matrix is singular; slogdet then
+    # returns a huge negative log-determinant and a negative chi2.
+    if n <= k:
+        return None, None
     sign, logdet = np.linalg.slogdet(corr)
     if sign <= 0:
         return None, None
@@ -132,7 +136,8 @@ def efa_omega(data: np.ndarray, n_factors: int) -> Optional[float]:
     solution is degenerate (Heywood case)."""
     n, k = data.shape
     degrees_of_freedom = ((k - n_factors) ** 2 - (k + n_factors)) / 2
-    if k < 3 or n < 5 or n_factors < 1 or degrees_of_freedom < 0:
+    # n <= k makes the correlation matrix singular and the fit meaningless.
+    if k < 3 or n < 5 or n <= k or n_factors < 1 or degrees_of_freedom < 0:
         return None
     ensure_sklearn_compat()
     from factor_analyzer import FactorAnalyzer

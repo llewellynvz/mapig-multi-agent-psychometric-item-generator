@@ -19,9 +19,8 @@ import logging
 import time as _time
 from typing import List, Optional, Tuple
 
-import numpy as np
-
 from backend.agents.pfa_estimator import run_pfa
+from backend.agents.facet_utils import facet_key
 from backend.schemas import DraftItem, FacetMapperResponse, PFAResult
 from backend.settings import settings
 
@@ -31,7 +30,7 @@ logger = logging.getLogger("lmaig.pfa_pruning")
 def _facet_counts(items: List[DraftItem]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for it in items:
-        key = it.facet_name or ""
+        key = facet_key(it.facet_name)
         counts[key] = counts.get(key, 0) + 1
     return counts
 
@@ -40,26 +39,29 @@ def _uva_redundancy_scores(items: List[DraftItem]) -> dict[int, float]:
     """Per-item max weighted topological overlap (UVA) on the semantic network,
     computed once on the original pool. Used as a drop-priority tie-breaker:
     among near-equally weak items, the more redundant one drops first.
-    Returns an empty dict when embeddings are unavailable (e.g. mock mode)."""
+    Returns an empty dict when embeddings are unavailable (e.g. mock mode).
+
+    Embeddings are NOT polarity-flipped here: redundancy is about shared
+    content, and flipping would turn a reverse-keyed item's similarity to its
+    same-topic siblings negative and cut it out of the network. wTO runs on
+    the same partial-correlation network as the semantic EGA's UVA."""
     try:
         from backend.agents.correlation_estimator import (
             compute_cosine_similarity_matrix,
             embed_items_sync,
         )
         from backend.analytics.ega import (
-            SEMANTIC_EDGE_THRESHOLD,
+            semantic_uva_adjacency,
             weighted_topological_overlap,
         )
 
         embeddings = embed_items_sync(
             [it.item_text for it in items], model=settings.PFA_EMBEDDING_MODEL
         )
-        polarity = np.array(
-            [1.0 if (it.polarity or "+") == "+" else -1.0 for it in items]
-        ).reshape(-1, 1)
-        sim = compute_cosine_similarity_matrix(embeddings * polarity)
-        adjacency = np.where(sim >= SEMANTIC_EDGE_THRESHOLD, sim, 0.0)
-        np.fill_diagonal(adjacency, 0.0)
+        sim = compute_cosine_similarity_matrix(embeddings)
+        adjacency = semantic_uva_adjacency(sim)
+        if adjacency is None:
+            return {}
         wto = weighted_topological_overlap(adjacency)
         return {i: float(wto[i].max()) for i in range(len(items))}
     except Exception as e:
@@ -120,8 +122,6 @@ def prune_items(
     dropped_original_indices: List[int] = []
     redundancy_of: dict[int, float] = _uva_redundancy_scores(items)
 
-    last_result: Optional[PFAResult] = None
-
     for iteration in range(max_iters):
         if len(current) <= target_count:
             logger.info("PFA pruning hit target_count=%d at iteration=%d", target_count, iteration)
@@ -140,35 +140,37 @@ def prune_items(
                 break
 
         result = run_pfa(current, facet_mapping=facet_mapping)
-        last_result = result
 
         if not result.loadings:
             logger.warning("PFA pruning: PFA returned no loadings; aborting prune loop")
             break
 
-        # Prefer items that fail retention checks; if none, fall back to weakest-loaded.
-        # Continuing to drop until target_count is reached even when remaining items
-        # all "load cleanly" — the user requested a specific count.
-        weak = [fl for fl in result.loadings if not fl.is_well_loaded]
-        if weak:
-            candidates = weak
-        else:
-            # All items load cleanly but we still need to prune to target.
-            # Drop the lowest primary_loading item.
-            candidates = list(result.loadings)
+        # Prefer items that fail retention checks; then fall back to the
+        # weakest-loaded clean items. Continuing to drop until target_count is
+        # reached even when remaining items all "load cleanly" — the user
+        # requested a specific count. Clean items stay in the candidate list
+        # behind the weak ones, so a weak item blocked by its facet floor does
+        # not stop pruning while clean items in facets above the floor remain.
+        # Bucketed weakest-first (loadings rounded to 0.01); within a bucket
+        # the more UVA-redundant item drops first.
+        def _drop_order(fl):
+            return (
+                round(fl.primary_loading, 2),
+                -redundancy_of.get(original_index_of[fl.item_index], 0.0),
+            )
+
+        weak = sorted(
+            (fl for fl in result.loadings if not fl.is_well_loaded), key=_drop_order
+        )
+        clean = sorted(
+            (fl for fl in result.loadings if fl.is_well_loaded), key=_drop_order
+        )
+        candidates = weak + clean
+        if not weak:
             logger.info(
                 "PFA pruning iter=%d: all items load cleanly, dropping weakest by primary_loading",
                 iteration,
             )
-
-        # Bucketed weakest-first (loadings rounded to 0.01); within a bucket
-        # the more UVA-redundant item drops first.
-        candidates.sort(
-            key=lambda fl: (
-                round(fl.primary_loading, 2),
-                -redundancy_of.get(original_index_of[fl.item_index], 0.0),
-            )
-        )
 
         # Facet-preservation: only enforce for multi-dimensional constructs.
         # Unidimensional constructs have a single facet, so the rule reduces
@@ -181,20 +183,25 @@ def prune_items(
         else:
             facet_counts = _facet_counts(current)
             for cand in candidates:
-                facet_key = cand.facet_name or ""
-                if facet_counts.get(facet_key, 0) > min_per_facet:
+                if facet_counts.get(facet_key(cand.facet_name), 0) > min_per_facet:
                     item_to_drop_idx = cand.item_index
+                    if weak and cand.is_well_loaded:
+                        logger.info(
+                            "PFA pruning iter=%d: every weak item's facet is at its floor of %d — "
+                            "dropping weakest clean item idx=%d facet=%s instead.",
+                            iteration, min_per_facet, cand.item_index, cand.facet_name,
+                        )
                     break
-                else:
+                elif not cand.is_well_loaded:
                     logger.warning(
                         "PFA pruning: would drop weak item idx=%d facet=%s, but that facet is at "
                         "its floor of %d — skipping (facet preservation constraint).",
-                        cand.item_index, facet_key, min_per_facet,
+                        cand.item_index, cand.facet_name, min_per_facet,
                     )
 
         if item_to_drop_idx is None:
             logger.info(
-                "PFA pruning: no droppable candidates (every weak item's facet is at the floor of %d). "
+                "PFA pruning: no droppable candidates (every facet is at the floor of %d). "
                 "Stopping with %d items against target=%d.",
                 min_per_facet, len(current), target_count,
             )

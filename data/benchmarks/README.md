@@ -10,8 +10,8 @@ This directory contains 5 published assessment scales used as gold standards for
 
 ## Scales
 
-### 1. IPIP-NEO-60 (Personality)
-- **Author:** Goldberg et al. (1999)
+### 1. IPIP Big-Five Factor Markers (Personality)
+- **Author:** Goldberg (1999)
 - **Domain:** Big Five personality (Extraversion, Agreeableness, Conscientiousness, Neuroticism, Openness)
 - **License:** Public Domain
 - **Items:** 5 Extraversion items included
@@ -19,10 +19,10 @@ This directory contains 5 published assessment scales used as gold standards for
 ### 2. PHQ-9 (Clinical)
 - **Author:** Kroenke, Spitzer, & Williams (2001)
 - **Domain:** Depression severity
-- **License:** Public Domain (Pfizer made available in 2005)
+- **License:** Copyright Pfizer Inc.; free to use, no permission required
 - **Items:** 5 of 9 depression symptom items
 
-### 3. Social Connectedness Scale-Revised (Social)
+### 3. Social Connectedness Scale (Social)
 - **Author:** Lee & Robbins (1995)
 - **Domain:** Social belongingness
 - **License:** Research use with citation
@@ -34,8 +34,8 @@ This directory contains 5 published assessment scales used as gold standards for
 - **License:** Free for research (per author website)
 - **Items:** 5 items across pay, promotion, supervision facets
 
-### 5. Attitude Toward the Environment Scale (Attitudes)
-- **Author:** Milfont & Duckitt (2010)
+### 5. New Ecological Paradigm Scale, revised (Attitudes)
+- **Author:** Dunlap, Van Liere, Mertig, & Jones (2000)
 - **Domain:** Environmental attitudes
 - **License:** Research use with citation
 - **Items:** 5 items measuring environmental concern

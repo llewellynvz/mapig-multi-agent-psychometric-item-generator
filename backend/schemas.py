@@ -767,7 +767,15 @@ class RedundantPair(BaseModel):
 
     item_i_index: int = Field(..., ge=0)
     item_j_index: int = Field(..., ge=0)
-    wto: float = Field(..., ge=0.0, description="Weighted topological overlap; pairs at or above 0.25 are flagged")
+    wto: float = Field(
+        ...,
+        ge=0.0,
+        description=(
+            "Weighted topological overlap (on the partial-correlation network for the "
+            "semantic path, the glasso network for the synthetic path); pairs at or "
+            "above 0.25 are flagged"
+        ),
+    )
 
 
 class EGAResult(BaseModel):
@@ -919,6 +927,13 @@ class ExpertConsensus(BaseModel):
             "Krippendorff's α (nominal) on the experts' overall_verdict decisions. "
             "This is the right inter-rater metric for differing-rubric experts — "
             "asks 'do they agree on the bottom-line outcome?'"
+        ),
+    )
+    verdicts_unanimous: bool = Field(
+        default=False,
+        description=(
+            "True when every expert gave the same verdict on every item. Verdict α "
+            "is undefined (null) in that case because there is no variation."
         ),
     )
     irr_pairwise: Dict[str, Optional[float]] = Field(

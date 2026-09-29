@@ -128,12 +128,13 @@ export function ExpertPanelCard({ consensus }: ExpertPanelCardProps) {
   const finalEvals: ExpertEvaluation[] =
     consensus.debate_revisions.length > 0 ? consensus.debate_revisions : consensus.evaluations;
 
-  // Prefer verdict α as the headline metric — it's the meaningful one.
-  // Fall back to per-item α if verdict α is unavailable for some reason.
-  const headlineAlpha =
-    consensus.irr_verdict_alpha != null
-      ? consensus.irr_verdict_alpha
-      : consensus.irr_alpha;
+  // Prefer verdict α as the headline metric — it's the meaningful one. It is
+  // undefined (null) when every expert gave the same verdict on every item:
+  // that is complete agreement, not missing data, so say so. Otherwise fall
+  // back to per-item α and label it as such.
+  const unanimous = consensus.irr_verdict_alpha == null && consensus.verdicts_unanimous === true;
+  const usingVerdictAlpha = consensus.irr_verdict_alpha != null;
+  const headlineAlpha = usingVerdictAlpha ? consensus.irr_verdict_alpha : consensus.irr_alpha;
 
   return (
     <SurfaceCard className="mt-4 border-lime-300/70">
@@ -144,12 +145,20 @@ export function ExpertPanelCard({ consensus }: ExpertPanelCardProps) {
             Expert Face/Content Validity
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className={`tabular-nums ${irrColor(headlineAlpha)}`}>
-              α (verdict) = {headlineAlpha != null ? headlineAlpha.toFixed(2) : "—"}
-            </Badge>
-            <span className="text-[11px] uppercase font-medium text-muted-foreground/80">
-              {irrLabel(headlineAlpha)}
-            </span>
+            {unanimous ? (
+              <Badge variant="outline" className={irrColor(1)}>
+                Unanimous verdicts
+              </Badge>
+            ) : (
+              <>
+                <Badge variant="outline" className={`tabular-nums ${irrColor(headlineAlpha)}`}>
+                  α ({usingVerdictAlpha ? "verdict" : "per-item"}) = {headlineAlpha != null ? headlineAlpha.toFixed(2) : "—"}
+                </Badge>
+                <span className="text-[11px] uppercase font-medium text-muted-foreground/80">
+                  {irrLabel(headlineAlpha)}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>

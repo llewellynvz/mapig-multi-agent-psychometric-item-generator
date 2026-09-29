@@ -92,7 +92,7 @@ export default function HomePage() {
         ];
       });
     },
-    []
+    [setFeedbackHistory]
   );
 
   const mutation = useMutation({
@@ -104,6 +104,19 @@ export default function HomePage() {
           if (event.type === "log") {
             // Handle log events
             setLogs((prev) => [...prev, event]);
+            return;
+          }
+
+          if (event.type === "status" || event.type === "warning") {
+            // Backend emits these as plain {type, message}; show them as log lines.
+            setLogs((prev) => [
+              ...prev,
+              {
+                ...event,
+                timestamp: event.timestamp ?? new Date().toISOString(),
+                level: event.type === "warning" ? "warning" : "info",
+              },
+            ]);
             return;
           }
 
@@ -193,10 +206,15 @@ export default function HomePage() {
       toast({ title: "Done", description: "Items generated successfully.", variant: "success" });
     },
     onError: (err: GenerateError) => {
+      // Prefer the backend's string `detail` (e.g. 429 capacity, 400 missing key)
+      // over the generic "Generate failed: <status>".
+      const message =
+        typeof err.detail === "string" && err.detail ? err.detail : err.message;
       setProgress((prev) => ({
         ...prev,
         status: "error",
-        errorMessage: err.message,
+        // Keep a message already set by an SSE error event.
+        errorMessage: prev.errorMessage || message,
       }));
       setActiveRun((prev) =>
         prev
@@ -219,7 +237,7 @@ export default function HomePage() {
       } else {
         toast({
           title: "Error",
-          description: err.status >= 500 ? "Server error. Try again later." : err.message,
+          description: err.status >= 500 ? "Server error. Try again later." : message,
           variant: "default",
         });
       }
@@ -261,7 +279,16 @@ export default function HomePage() {
       resetProgress();
       mutation.mutate({ request, threadId: effectiveThreadId });
     },
-    [mutation, resetProgress]
+    [
+      mutation,
+      resetProgress,
+      setActiveRun,
+      setLastRequestJson,
+      setLastResponseJson,
+      setResult,
+      setStep,
+      setThreadIdInput,
+    ]
   );
 
   const handleSetupSubmit = React.useCallback(
@@ -272,7 +299,7 @@ export default function HomePage() {
       setUseChatGPT(values.use_chatgpt_critics);
       runGeneration(formToRequest(values), threadId);
     },
-    [runGeneration]
+    [runGeneration, setFeedbackHistory, setHumanFeedback, setSubmittedSetup]
   );
 
   const handleRefineRun = React.useCallback(() => {
@@ -294,7 +321,15 @@ export default function HomePage() {
     setActiveRun(null);
     setLastResponseJson(null);
     resetProgress();
-  }, [resetProgress]);
+  }, [
+    resetProgress,
+    setActiveRun,
+    setFeedbackHistory,
+    setHumanFeedback,
+    setLastResponseJson,
+    setResult,
+    setStep,
+  ]);
 
   const handleClearResults = React.useCallback(() => {
     setResult(null);
@@ -305,7 +340,16 @@ export default function HomePage() {
     setLastRequestJson(null);
     resetProgress();
     setStep("setup");
-  }, [resetProgress]);
+  }, [
+    resetProgress,
+    setActiveRun,
+    setFeedbackHistory,
+    setHumanFeedback,
+    setLastRequestJson,
+    setLastResponseJson,
+    setResult,
+    setStep,
+  ]);
 
   useRunRecovery({
     hasRestored,
@@ -331,7 +375,7 @@ export default function HomePage() {
       return;
     }
     setStep("setup");
-  }, [activeRun, result]);
+  }, [activeRun, result, setStep]);
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-app-gradient">

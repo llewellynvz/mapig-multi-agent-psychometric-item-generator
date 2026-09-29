@@ -13,6 +13,9 @@ function isFinalOutput(value: unknown): value is FinalOutput {
   return Array.isArray(obj.final_items) && typeof obj.audit === "object" && obj.audit !== null;
 }
 
+// Stop polling after this many consecutive unresolved polls (~12.5s at 2.5s).
+const MAX_POLL_FAILURES = 5;
+
 interface UseRunRecoveryOptions {
   hasRestored: boolean;
   activeRun: ActiveRunState | null;
@@ -46,12 +49,24 @@ export function useRunRecovery({
     if (isMutationPending) return;
 
     let cancelled = false;
+    // Consecutive polls that neither progressed nor resolved the run (network
+    // errors, non-404 HTTP errors, "complete" with an invalid payload).
+    let failures = 0;
+    const giveUp = (message: string) => {
+      cancelled = true;
+      window.clearInterval(timer);
+      setProgress((prev) => ({ ...prev, status: "error", errorMessage: message }));
+      setActiveRun((prev) =>
+        prev ? { ...prev, status: "error", updatedAt: new Date().toISOString() } : prev
+      );
+    };
     const poll = async () => {
       try {
         const status = await fetchRunStatus(activeRun.threadId);
         if (cancelled) return;
 
         if (status.status === "running") {
+          failures = 0;
           setStep("run");
           setProgress({
             currentNode: status.current_node ?? null,
@@ -113,8 +128,15 @@ export function useRunRecovery({
             description: status.error || "The previous run ended with an error.",
             variant: "default",
           });
+          return;
+        }
+
+        // "complete" without a valid final_output (or an unknown status).
+        if (++failures >= MAX_POLL_FAILURES) {
+          giveUp("Run finished but its results could not be recovered.");
         }
       } catch (error) {
+        if (cancelled) return;
         const err = error as GenerateError;
         if (err.status === 404) {
           // Server restarted — in-memory registry lost this thread.
@@ -127,12 +149,8 @@ export function useRunRecovery({
             ...prev,
             status: "idle",
           }));
-        } else {
-          setProgress((prev) => ({
-            ...prev,
-            status: "error",
-            errorMessage: "Could not fetch run status.",
-          }));
+        } else if (++failures >= MAX_POLL_FAILURES) {
+          giveUp("Could not fetch run status.");
         }
       }
     };

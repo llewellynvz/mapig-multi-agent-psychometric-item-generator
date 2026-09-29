@@ -7,7 +7,7 @@ export const instrumentSetupSchema = z.object({
   model_provider: z.enum(["claude", "openai"]).default("claude"),
   use_chatgpt_critics: z.boolean().default(true),
   use_gpt52_analytics: z.boolean().default(false),
-  is_unidimensional: z.boolean().default(true),
+  is_unidimensional: z.boolean().default(false),
   include_qualitative: z.boolean().default(false),
   construct_name: z
     .string()
@@ -89,7 +89,7 @@ export const defaultInstrumentSetup: InstrumentSetupFormValues = {
   model_provider: "claude",
   use_chatgpt_critics: true,
   use_gpt52_analytics: false,
-  is_unidimensional: true,
+  is_unidimensional: false,
   include_qualitative: false,
   construct_name: "",
   construct_definition: "",

@@ -6,18 +6,7 @@
 
 import type { FinalOutput } from './types';
 import { sanitizeFilename } from './utils';
-
-/**
- * Escape a field value for CSV according to RFC 4180
- * Fields with quotes, commas, or newlines are wrapped in quotes
- * Internal quotes are doubled
- */
-function escapeCsvField(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
+import { escapeCsvField } from './csv';
 
 /**
  * Export FinalOutput to CSV format with UTF-8 BOM for Excel compatibility

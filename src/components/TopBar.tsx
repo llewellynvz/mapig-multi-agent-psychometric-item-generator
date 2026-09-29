@@ -15,6 +15,7 @@ export function TopBar() {
 
   // Avoid hydration mismatch by only rendering theme-dependent content after mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-shot mount flag for next-themes hydration
     setMounted(true);
   }, []);
 
@@ -27,7 +28,7 @@ export function TopBar() {
           </div>
           <div>
             <p className="text-sm font-semibold tracking-tight text-white md:text-base">
-              Multi-agent psychometric item generator ("MAPIG")
+              Multi-agent psychometric item generator (&quot;MAPIG&quot;)
             </p>
             <p className="hidden text-[0.72rem] text-slate-200/85 md:block">
               Evidence-bounded, multi-agent item drafting for scale development
